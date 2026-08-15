@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>布利歐管樂團｜簽到管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<style>
+  :root{
+    --ink:#20242F;
+    --ink-soft:#4A4F5C;
+    --paper:#F2EFE5;
+    --paper-raised:#FBFAF4;
+    --line:#DAD3BE;
+    --brass:#B8863A;
+    --brass-deep:#8F6A2C;
+    --burgundy:#7A2331;
+    --burgundy-deep:#5C1A26;
+    --sage:#5F6E58;
+    --sage-bg:#E7EBDF;
+    --radius-lg:20px;
+    --radius-md:14px;
+    --radius-sm:9px;
+    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% -10%, #EFE9D6 0%, transparent 45%),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Noto Sans TC','Noto Sans',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding: 0 0 48px;
+  }
+
+  button, a, input{ -webkit-tap-highlight-color: transparent; font-family:inherit; }
+  :focus-visible{ outline:2.5px solid var(--brass-deep); outline-offset:2px; border-radius:6px; }
+
+  .app{
+    width:100%;
+    max-width:460px;
+    min-height:100vh;
+    background:var(--paper);
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .hidden{ display:none !important; }
+  .auth-loading{
+    min-height:100vh; width:100%; max-width:460px; margin:0 auto;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:12px; color:var(--ink-soft); font-size:13px;
+  }
+  .auth-loading .spinner{
+    width:22px; height:22px; border-radius:50%;
+    border:2.5px solid var(--line); border-top-color:var(--brass);
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  /* ---------- App Bar ---------- */
+  .appbar{ display:flex; align-items:center; gap:12px; padding:18px 20px 14px; }
+  .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
+  .brandtext{ display:flex; flex-direction:column; line-height:1.1; }
+  .brandtext .name{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:19px; letter-spacing:.02em; }
+  .brandtext .sub{ font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.14em; color:var(--ink-soft); margin-top:3px; text-transform:uppercase; }
+  .appbar .spacer{ flex:1; }
+  .hamburger-btn{
+    width:36px; height:36px; flex:none;
+    background:none; border:1px solid var(--line); border-radius:var(--radius-sm);
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .hamburger-btn:active{ background:var(--paper-raised); }
+  .avatar{
+    width:38px; height:38px; border-radius:50%;
+    background:var(--burgundy); color:#F2EFE5;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Noto Serif TC',serif; font-weight:700; font-size:14px;
+    border:2px solid var(--paper-raised); box-shadow:0 0 0 1.5px var(--line);
+    padding:0; cursor:pointer;
+  }
+
+  .staff{
+    height:16px; margin:0 20px 6px;
+    background-image: repeating-linear-gradient(var(--line), var(--line) 1px, transparent 1px, transparent 4px);
+    opacity:.9;
+  }
+
+  /* ---------- Admin drawer ---------- */
+  .drawer-overlay{
+    position:fixed; inset:0; z-index:70;
+    background:rgba(32,36,47,.5);
+    display:none;
+  }
+  .drawer-overlay.active{ display:block; }
+  .drawer-panel{
+    position:absolute; top:0; left:0; bottom:0;
+    width:78%; max-width:300px;
+    background:var(--paper-raised);
+    box-shadow:8px 0 30px rgba(0,0,0,.25);
+    padding:env(safe-area-inset-top) 0 20px;
+    display:flex; flex-direction:column;
+    transform:translateX(-100%);
+    transition:transform .22s ease;
+  }
+  .drawer-overlay.active .drawer-panel{ transform:translateX(0); }
+  .drawer-header{
+    padding:20px 20px 14px; border-bottom:1px solid var(--line);
+  }
+  .drawer-header .name{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:16px; }
+  .drawer-home{
+    display:flex; align-items:center; gap:9px;
+    padding:14px 20px; font-size:13.5px; font-weight:700; color:var(--ink-soft);
+    text-decoration:none; border-bottom:1px solid var(--line);
+  }
+  .drawer-section-label{
+    padding:16px 20px 6px; font-family:'Roboto Mono',monospace; font-size:10px;
+    letter-spacing:.1em; color:var(--ink-soft); text-transform:uppercase;
+  }
+  .drawer-link{
+    display:flex; align-items:center;
+    padding:12px 20px; font-size:13.5px; font-weight:600; color:var(--ink);
+    text-decoration:none;
+  }
+  .drawer-link.active{ background:var(--sage-bg); color:var(--sage); font-weight:700; }
+
+  .section-label{ display:flex; align-items:baseline; gap:8px; margin:20px 20px 4px; }
+  .section-label .tw{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:15.5px; }
+  .section-label .en{ font-family:'Roboto Mono',monospace; font-size:10px; letter-spacing:.12em; color:var(--ink-soft); text-transform:uppercase; }
+  .lede{ margin:6px 20px 10px; font-size:12.5px; line-height:1.6; color:var(--ink-soft); }
+
+  /* ---------- Event picker ---------- */
+  .list{
+    margin:0 20px 24px;
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-card);
+    overflow:hidden;
+  }
+  .picker-item{
+    padding:13px 16px;
+    display:flex; align-items:center; gap:12px;
+  }
+  .picker-item + .picker-item{ border-top:1px solid var(--line); }
+  .picker-body{ flex:1; min-width:0; }
+  .picker-title{ font-weight:700; font-size:13.5px; color:var(--ink); display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+  .kind{
+    font-family:'Roboto Mono',monospace; font-size:9.5px; letter-spacing:.05em;
+    padding:1.5px 6px; border-radius:5px; font-weight:600;
+  }
+  .kind.rehearsal{ background:var(--sage-bg); color:var(--sage); }
+  .kind.sectional{ background:#EFE7D2; color:var(--brass-deep); }
+  .kind.performance{ background:var(--burgundy); color:#F2EFE5; }
+  .picker-meta{ margin-top:4px; font-size:12px; color:var(--ink-soft); line-height:1.5; }
+  .btn-start{
+    flex:none;
+    background:var(--brass); color:var(--ink); border:none;
+    border-radius:var(--radius-sm); padding:9px 14px;
+    font-weight:700; font-size:12px; cursor:pointer;
+  }
+  .btn-start:active{ background:var(--brass-deep); }
+  .btn-start:disabled{ opacity:.5; }
+
+  .list-error{
+    margin:0 20px 14px;
+    font-size:12.5px; color:var(--burgundy);
+    background:#FBF3F3; border:1px solid #EFD4D8; border-radius:var(--radius-sm);
+    padding:10px 12px; display:none;
+  }
+  .list-error.show{ display:block; }
+
+  /* ---------- Session list ---------- */
+  .list-header{
+    display:flex; align-items:center; justify-content:space-between;
+    margin:0 20px 10px;
+  }
+  .refresh-btn{
+    background:none; border:1px solid var(--line); border-radius:999px;
+    padding:6px 12px; font-size:11.5px; font-weight:700; color:var(--ink-soft);
+    cursor:pointer; display:flex; align-items:center; gap:5px;
+  }
+  .refresh-btn:active{ background:var(--paper-raised); }
+
+  .session-card{
+    margin:0 20px 16px;
+    background:var(--ink); color:var(--paper);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-card);
+    overflow:hidden;
+    position:relative;
+  }
+  .session-card.expired{
+    background:var(--paper-raised);
+    color:var(--ink-soft);
+    border:1px solid var(--line);
+  }
+  .session-card .staff-bg{
+    position:absolute; inset:0;
+    background-image: repeating-linear-gradient(rgba(242,239,229,.09), rgba(242,239,229,.09) 1px, transparent 1px, transparent 9px);
+    pointer-events:none;
+  }
+  .session-card.expired .staff-bg{ display:none; }
+  .session-inner{ position:relative; padding:18px 18px 16px; }
+
+  .session-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+  .session-title{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:16.5px; }
+  .session-meta{ font-family:'Roboto Mono',monospace; font-size:10.5px; color:#C9C2A8; margin-top:3px; }
+  .session-card.expired .session-meta{ color:var(--ink-soft); }
+  .status-chip{
+    font-family:'Roboto Mono',monospace; font-weight:600; font-size:10.5px;
+    padding:3px 9px; border-radius:999px; flex:none;
+  }
+  .status-chip.active{ background:var(--sage); color:#F2EFE5; }
+  .status-chip.expired{ background:#EFE1E3; color:var(--burgundy-deep); }
+
+  .qr-wrap{
+    margin-top:14px; background:#fff; border-radius:var(--radius-md);
+    padding:14px; display:flex; align-items:center; justify-content:center;
+  }
+  .qr-wrap img{ width:180px; height:180px; display:block; cursor:zoom-in; }
+  .session-card.expired .qr-wrap{ opacity:.35; }
+
+  .qr-zoom-overlay{
+    position:fixed; inset:0; z-index:60;
+    background:rgba(32,36,47,.82);
+    display:none; align-items:center; justify-content:center;
+    padding:32px; cursor:zoom-out;
+  }
+  .qr-zoom-overlay.active{ display:flex; }
+  .qr-zoom-overlay img{
+    width:min(84vw, 360px); height:min(84vw, 360px);
+    background:#fff; border-radius:var(--radius-lg); padding:20px;
+    box-shadow:0 20px 60px rgba(0,0,0,.4);
+  }
+
+  .session-actions{ display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+  .session-actions button{
+    flex:1; min-width:100px;
+    border-radius:var(--radius-sm); padding:10px 8px;
+    font-weight:700; font-size:12px; cursor:pointer;
+    transition:transform .12s ease;
+  }
+  .session-actions button:active{ transform:scale(.97); }
+  .btn-reopen{ background:var(--brass); color:var(--ink); border:none; }
+  .btn-regen{ background:none; border:1px solid rgba(242,239,229,.4); color:var(--paper); }
+  .session-card.expired .btn-regen{ border-color:var(--line); color:var(--ink-soft); }
+  .btn-end{ background:none; border:1px solid rgba(242,239,229,.4); color:#E8B4BC; }
+  .session-card.expired .btn-end{ border-color:var(--line); color:var(--burgundy-deep); }
+
+  .empty{ padding:36px 20px; text-align:center; font-size:13px; color:var(--ink-soft); }
+</style>
+</head>
+<body>
+<div id="authLoading" class="auth-loading">
+  <div class="spinner"></div>
+  <p>驗證登入狀態中…</p>
+</div>
+<div class="app hidden" id="appRoot">
+
+  <div class="appbar">
+    <button class="hamburger-btn" id="adminMenuBtn" type="button" aria-label="選單">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="#20242F" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+    <img class="mark" src="assets/BrioLogo.jpg" alt="布利歐管樂團 Logo">
+    <div class="brandtext">
+      <div class="name">布利歐管樂團</div>
+      <div class="sub">Brio Wind Band</div>
+    </div>
+    <div class="spacer"></div>
+    <button class="avatar" id="avatarBtn" type="button" aria-label="登出" title="點擊登出"></button>
+  </div>
+
+  <div class="staff"></div>
+
+  <div class="section-label">
+    <span class="tw">選擇活動開始簽到</span>
+    <span class="en">Start Check-in</span>
+  </div>
+  <p class="lede">只列出近期的活動，如果找不到要的活動，請先到「活動管理」建立。</p>
+  <p class="list-error" id="pickerError"></p>
+
+  <div class="list" id="eventPicker"></div>
+
+  <div class="list-header">
+    <div class="section-label" style="margin:0;">
+      <span class="tw">簽到狀態</span>
+      <span class="en">Sessions</span>
+    </div>
+    <button type="button" class="refresh-btn" id="refreshBtn">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M4 4v6h6M20 20v-6h-6" stroke="#4A4F5C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 15a8 8 0 0 0 13.9 3M18.5 9A8 8 0 0 0 4.6 6" stroke="#4A4F5C" stroke-width="2" stroke-linecap="round"/></svg>
+      重新整理
+    </button>
+  </div>
+
+  <div id="sessionList"></div>
+
+</div>
+
+<div class="qr-zoom-overlay" id="qrZoomOverlay">
+  <img id="qrZoomImg" alt="簽到 QR Code 放大">
+</div>
+
+<div class="drawer-overlay" id="drawerOverlay">
+  <nav class="drawer-panel" id="drawerPanel"></nav>
+</div>
+
+<script type="module">
+  import { requireAdmin, logout } from './auth-guard.js';
+  import { db } from './firebase-init.js';
+  import { initAdminNav } from './admin-nav.js';
+  import {
+    collection, doc, setDoc, getDoc, deleteDoc, onSnapshot,
+    serverTimestamp, Timestamp
+  } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+
+  initAdminNav('checkin-admin.html');
+
+  var WINDOW_MINUTES = 30;
+  var PICKER_PAST_HOURS = 6;
+  var PICKER_MAX = 10;
+  var KIND_LABEL = { rehearsal: '團練', sectional: '分部練', performance: '演出' };
+
+  var currentAdminUid = null;
+
+  // eventId -> { title, type, date, location }
+  var eventsById = {};
+  // eventId -> { code, windowEnd(Date), generatedAt }
+  var sessionsById = {};
+
+  var eventPicker = document.getElementById('eventPicker');
+  var pickerError = document.getElementById('pickerError');
+  var sessionList = document.getElementById('sessionList');
+
+  function showPickerError(message){
+    pickerError.textContent = message;
+    pickerError.classList.toggle('show', !!message);
+  }
+
+  function qrDataUrl(text){
+    var qr = qrcode(0, 'M');
+    qr.addData(text);
+    qr.make();
+    return qr.createDataURL(6, 8);
+  }
+
+  function checkinUrl(eventId, code){
+    return location.origin + location.pathname.replace(/checkin-admin\.html$/, '') +
+      'checkin.html?event=' + encodeURIComponent(eventId) + '&code=' + encodeURIComponent(code);
+  }
+
+  function renderPicker(){
+    var cutoff = Date.now() - PICKER_PAST_HOURS * 3600000;
+    var ids = Object.keys(eventsById).filter(function(id){
+      var evt = eventsById[id];
+      return evt.date && evt.date.getTime() >= cutoff;
+    });
+
+    if (ids.length === 0){
+      eventPicker.innerHTML = '<div class="empty">近期沒有活動，請先到「活動管理」建立</div>';
+      return;
+    }
+
+    ids.sort(function(a, b){ return eventsById[a].date.getTime() - eventsById[b].date.getTime(); });
+    ids = ids.slice(0, PICKER_MAX);
+
+    eventPicker.innerHTML = ids.map(function(eventId){
+      var evt = eventsById[eventId];
+      var d = evt.date;
+      var dateLabel = d.toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
+      var hasActiveSession = sessionsById[eventId] && sessionsById[eventId].windowEnd > new Date();
+
+      return (
+        '<div class="picker-item">' +
+          '<div class="picker-body">' +
+            '<div class="picker-title">' + evt.title + '<span class="kind ' + evt.type + '">' + (KIND_LABEL[evt.type] || evt.type) + '</span></div>' +
+            '<div class="picker-meta">' + dateLabel + (evt.location ? ' · ' + evt.location : '') + '</div>' +
+          '</div>' +
+          '<button type="button" class="btn-start" data-start="' + eventId + '">' + (hasActiveSession ? '重新產生' : '產生 QR Code') + '</button>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function renderSessions(){
+    var ids = Object.keys(sessionsById);
+    if (ids.length === 0){
+      sessionList.innerHTML = '<div class="empty">目前沒有任何簽到中的活動</div>';
+      return;
+    }
+
+    ids.sort(function(a, b){
+      return (sessionsById[b].generatedAt ? sessionsById[b].generatedAt.getTime() : 0) -
+             (sessionsById[a].generatedAt ? sessionsById[a].generatedAt.getTime() : 0);
+    });
+
+    var now = new Date();
+
+    sessionList.innerHTML = ids.map(function(eventId){
+      var session = sessionsById[eventId];
+      var evt = eventsById[eventId];
+      var isExpired = session.windowEnd <= now;
+      var title = evt ? evt.title : '（活動已被刪除）';
+      var dateLabel = evt && evt.date ? evt.date.toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+      var expiryLabel = isExpired
+        ? '已於 ' + session.windowEnd.toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' }) + ' 過期'
+        : '開放至 ' + session.windowEnd.toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' });
+
+      return (
+        '<div class="session-card' + (isExpired ? ' expired' : '') + '" data-event="' + eventId + '">' +
+          '<div class="staff-bg"></div>' +
+          '<div class="session-inner">' +
+            '<div class="session-top">' +
+              '<div>' +
+                '<div class="session-title">' + title + '</div>' +
+                '<div class="session-meta">' + dateLabel + (evt && evt.location ? ' · ' + evt.location : '') + '</div>' +
+              '</div>' +
+              '<span class="status-chip ' + (isExpired ? 'expired' : 'active') + '">' + (isExpired ? '已過期' : expiryLabel) + '</span>' +
+            '</div>' +
+            (isExpired ? '' :
+              '<div class="qr-wrap"><img src="' + qrDataUrl(checkinUrl(eventId, session.code)) + '" alt="簽到 QR Code"></div>'
+            ) +
+            '<div class="session-actions">' +
+              '<button type="button" class="btn-reopen" data-reopen="' + eventId + '">' + (isExpired ? '重新開放' : '延長 30 分') + '</button>' +
+              '<button type="button" class="btn-regen" data-regen="' + eventId + '">產生新的 QR</button>' +
+              '<button type="button" class="btn-end" data-end="' + eventId + '">✕ 結束</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function randomCode(){
+    return Array.from(crypto.getRandomValues(new Uint8Array(16))).map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+  }
+
+  async function startSession(eventId){
+    await setDoc(doc(db, 'checkinSessions', eventId), {
+      code: randomCode(),
+      windowEnd: Timestamp.fromMillis(Date.now() + WINDOW_MINUTES * 60000),
+      generatedAt: serverTimestamp(),
+      generatedBy: currentAdminUid
+    });
+  }
+
+  async function reopenSession(eventId){
+    var ref = doc(db, 'checkinSessions', eventId);
+    var snap = await getDoc(ref);
+    if (!snap.exists()){
+      await startSession(eventId);
+      return;
+    }
+    await setDoc(ref, {
+      windowEnd: Timestamp.fromMillis(Date.now() + WINDOW_MINUTES * 60000),
+      generatedAt: serverTimestamp(),
+      generatedBy: currentAdminUid
+    }, { merge: true });
+  }
+
+  async function endSession(eventId){
+    await deleteDoc(doc(db, 'checkinSessions', eventId));
+  }
+
+  eventPicker.addEventListener('click', function(e){
+    var startBtn = e.target.closest('[data-start]');
+    if (!startBtn) return;
+    showPickerError('');
+    startBtn.disabled = true;
+    startSession(startBtn.getAttribute('data-start')).catch(function(err){
+      showPickerError('產生失敗（' + err.code + '）');
+    }).finally(function(){
+      startBtn.disabled = false;
+    });
+  });
+
+  sessionList.addEventListener('click', function(e){
+    var reopenBtn = e.target.closest('[data-reopen]');
+    var regenBtn = e.target.closest('[data-regen]');
+    var endBtn = e.target.closest('[data-end]');
+    var img = e.target.closest('.qr-wrap img');
+
+    if (img){
+      qrZoomImg.src = img.src;
+      qrZoomOverlay.classList.add('active');
+      return;
+    }
+    if (reopenBtn){
+      reopenBtn.disabled = true;
+      reopenSession(reopenBtn.getAttribute('data-reopen')).catch(function(err){ alert('操作失敗：' + err.code); }).finally(function(){ reopenBtn.disabled = false; });
+    }
+    if (regenBtn){
+      regenBtn.disabled = true;
+      startSession(regenBtn.getAttribute('data-regen')).catch(function(err){ alert('操作失敗：' + err.code); }).finally(function(){ regenBtn.disabled = false; });
+    }
+    if (endBtn){
+      endBtn.disabled = true;
+      endSession(endBtn.getAttribute('data-end')).catch(function(err){ alert('操作失敗：' + err.code); }).finally(function(){ endBtn.disabled = false; });
+    }
+  });
+
+  document.getElementById('refreshBtn').addEventListener('click', renderSessions);
+
+  var qrZoomOverlay = document.getElementById('qrZoomOverlay');
+  var qrZoomImg = document.getElementById('qrZoomImg');
+
+  qrZoomOverlay.addEventListener('click', function(){
+    qrZoomOverlay.classList.remove('active');
+  });
+
+  requireAdmin().then(function(result){
+    if (!result) return;
+    currentAdminUid = result.uid;
+
+    document.getElementById('avatarBtn').textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
+    document.getElementById('authLoading').classList.add('hidden');
+    document.getElementById('appRoot').classList.remove('hidden');
+    document.getElementById('avatarBtn').addEventListener('click', function(){
+      if (confirm('確定要登出嗎？')) logout();
+    });
+
+    onSnapshot(collection(db, 'events'), function(snap){
+      eventsById = {};
+      snap.forEach(function(docSnap){
+        var data = docSnap.data();
+        eventsById[docSnap.id] = {
+          title: data.title,
+          type: data.type,
+          date: data.date && data.date.toDate ? data.date.toDate() : null,
+          location: data.location
+        };
+      });
+      renderPicker();
+      renderSessions();
+    });
+
+    onSnapshot(collection(db, 'checkinSessions'), function(snap){
+      sessionsById = {};
+      snap.forEach(function(docSnap){
+        var data = docSnap.data();
+        sessionsById[docSnap.id] = {
+          code: data.code,
+          windowEnd: data.windowEnd && data.windowEnd.toDate ? data.windowEnd.toDate() : new Date(0),
+          generatedAt: data.generatedAt && data.generatedAt.toDate ? data.generatedAt.toDate() : null
+        };
+      });
+      renderPicker();
+      renderSessions();
+    });
+  });
+</script>
+</body>
+</html>

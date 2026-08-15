@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>布利歐管樂團｜活動管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#20242F;
+    --ink-soft:#4A4F5C;
+    --paper:#F2EFE5;
+    --paper-raised:#FBFAF4;
+    --line:#DAD3BE;
+    --brass:#B8863A;
+    --brass-deep:#8F6A2C;
+    --burgundy:#7A2331;
+    --burgundy-deep:#5C1A26;
+    --sage:#5F6E58;
+    --sage-bg:#E7EBDF;
+    --radius-lg:20px;
+    --radius-md:14px;
+    --radius-sm:9px;
+    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% -10%, #EFE9D6 0%, transparent 45%),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Noto Sans TC','Noto Sans',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding: 0 0 48px;
+  }
+
+  button, a, input{ -webkit-tap-highlight-color: transparent; font-family:inherit; }
+  :focus-visible{ outline:2.5px solid var(--brass-deep); outline-offset:2px; border-radius:6px; }
+
+  .app{
+    width:100%;
+    max-width:460px;
+    min-height:100vh;
+    background:var(--paper);
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .hidden{ display:none !important; }
+  .auth-loading{
+    min-height:100vh; width:100%; max-width:460px; margin:0 auto;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:12px; color:var(--ink-soft); font-size:13px;
+  }
+  .auth-loading .spinner{
+    width:22px; height:22px; border-radius:50%;
+    border:2.5px solid var(--line); border-top-color:var(--brass);
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .appbar{ display:flex; align-items:center; gap:12px; padding:18px 20px 14px; }
+  .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
+  .brandtext{ display:flex; flex-direction:column; line-height:1.1; }
+  .brandtext .name{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:19px; letter-spacing:.02em; }
+  .brandtext .sub{ font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.14em; color:var(--ink-soft); margin-top:3px; text-transform:uppercase; }
+  .appbar .spacer{ flex:1; }
+  .avatar{
+    width:38px; height:38px; border-radius:50%;
+    background:var(--burgundy); color:#F2EFE5;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Noto Serif TC',serif; font-weight:700; font-size:14px;
+    border:2px solid var(--paper-raised); box-shadow:0 0 0 1.5px var(--line);
+    padding:0; cursor:pointer;
+  }
+
+  .hamburger-btn{
+    width:36px; height:36px; flex:none;
+    background:none; border:1px solid var(--line); border-radius:var(--radius-sm);
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .hamburger-btn:active{ background:var(--paper-raised); }
+
+  .staff{
+    height:16px; margin:0 20px 6px;
+    background-image: repeating-linear-gradient(var(--line), var(--line) 1px, transparent 1px, transparent 4px);
+    opacity:.9;
+  }
+
+  /* ---------- Admin drawer ---------- */
+  .drawer-overlay{
+    position:fixed; inset:0; z-index:70;
+    background:rgba(32,36,47,.5);
+    display:none;
+  }
+  .drawer-overlay.active{ display:block; }
+  .drawer-panel{
+    position:absolute; top:0; left:0; bottom:0;
+    width:78%; max-width:300px;
+    background:var(--paper-raised);
+    box-shadow:8px 0 30px rgba(0,0,0,.25);
+    padding:env(safe-area-inset-top) 0 20px;
+    display:flex; flex-direction:column;
+    transform:translateX(-100%);
+    transition:transform .22s ease;
+  }
+  .drawer-overlay.active .drawer-panel{ transform:translateX(0); }
+  .drawer-header{
+    padding:20px 20px 14px; border-bottom:1px solid var(--line);
+  }
+  .drawer-header .name{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:16px; }
+  .drawer-home{
+    display:flex; align-items:center; gap:9px;
+    padding:14px 20px; font-size:13.5px; font-weight:700; color:var(--ink-soft);
+    text-decoration:none; border-bottom:1px solid var(--line);
+  }
+  .drawer-section-label{
+    padding:16px 20px 6px; font-family:'Roboto Mono',monospace; font-size:10px;
+    letter-spacing:.1em; color:var(--ink-soft); text-transform:uppercase;
+  }
+  .drawer-link{
+    display:flex; align-items:center;
+    padding:12px 20px; font-size:13.5px; font-weight:600; color:var(--ink);
+    text-decoration:none;
+  }
+  .drawer-link.active{ background:var(--sage-bg); color:var(--sage); font-weight:700; }
+
+  .section-label{ display:flex; align-items:baseline; gap:8px; margin:20px 20px 4px; }
+  .section-label .tw{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:15.5px; }
+  .section-label .en{ font-family:'Roboto Mono',monospace; font-size:10px; letter-spacing:.12em; color:var(--ink-soft); text-transform:uppercase; }
+
+  /* ---------- Event form ---------- */
+  .card{
+    margin:14px 20px 20px;
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-card);
+    padding:16px;
+  }
+  .field{ margin-top:12px; display:flex; flex-direction:column; gap:6px; }
+  .field:first-child{ margin-top:0; }
+  .field label{
+    font-family:'Roboto Mono',monospace; font-size:10.5px; font-weight:600;
+    letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft);
+  }
+  .field input, .field select{
+    border:1px solid var(--line); background:var(--paper);
+    border-radius:var(--radius-sm); padding:11px 13px;
+    font-size:14px; color:var(--ink); width:100%;
+  }
+
+  .form-buttons{ display:flex; gap:10px; margin-top:16px; }
+  .cta-btn{
+    flex:1;
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    background:var(--brass); color:var(--ink); border:none;
+    border-radius:var(--radius-md); padding:14px 16px;
+    font-weight:700; font-size:14.5px; cursor:pointer;
+    transition:transform .12s ease, background .12s ease;
+  }
+  .cta-btn:hover{ background:#C7963F; }
+  .cta-btn:active{ transform:scale(.98); background:var(--brass-deep); }
+  .cta-btn:disabled{ opacity:.55; cursor:default; transform:none; }
+  .cancel-btn{
+    flex:none;
+    background:none; border:1px solid var(--line); color:var(--ink-soft);
+    border-radius:var(--radius-md); padding:14px 18px;
+    font-weight:700; font-size:14px; cursor:pointer;
+  }
+
+  .form-error{
+    margin-top:12px; font-size:12.5px; color:var(--burgundy);
+    background:#FBF3F3; border:1px solid #EFD4D8; border-radius:var(--radius-sm);
+    padding:10px 12px; display:none;
+  }
+  .form-error.show{ display:block; }
+
+  /* ---------- Event list ---------- */
+  .list{
+    margin:0 20px 24px;
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-card);
+    overflow:hidden;
+  }
+  .event-item{ padding:14px 16px; }
+  .event-item + .event-item{ border-top:1px solid var(--line); }
+
+  .event-top{ display:flex; align-items:flex-start; gap:10px; }
+  .event-date{
+    flex:none; width:44px; text-align:center;
+  }
+  .event-date .d{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:19px; line-height:1.05; color:var(--ink); }
+  .event-date .m{ font-family:'Roboto Mono',monospace; font-size:9.5px; color:var(--ink-soft); letter-spacing:.05em; }
+
+  .event-body{ flex:1; min-width:0; }
+  .event-title{ font-weight:700; font-size:13.5px; color:var(--ink); display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+  .kind{
+    font-family:'Roboto Mono',monospace; font-size:9.5px; letter-spacing:.05em;
+    padding:1.5px 6px; border-radius:5px; font-weight:600;
+  }
+  .kind.rehearsal{ background:var(--sage-bg); color:var(--sage); }
+  .kind.sectional{ background:#EFE7D2; color:var(--brass-deep); }
+  .kind.performance{ background:var(--burgundy); color:#F2EFE5; }
+  .event-meta{ margin-top:4px; font-size:12px; color:var(--ink-soft); line-height:1.5; }
+
+  .event-actions{ display:flex; gap:8px; margin-top:10px; margin-left:54px; }
+  .event-actions button{
+    flex:none;
+    border-radius:var(--radius-sm); padding:7px 14px;
+    font-weight:700; font-size:11.5px; cursor:pointer;
+  }
+  .btn-edit{ background:none; border:1px solid var(--line); color:var(--ink-soft); }
+  .btn-edit:active{ background:var(--paper); }
+  .btn-delete{ background:none; border:1px solid var(--line); color:var(--burgundy-deep); }
+  .btn-delete:active{ background:#F6EDEE; }
+
+  .empty{ padding:36px 20px; text-align:center; font-size:13px; color:var(--ink-soft); }
+</style>
+</head>
+<body>
+<div id="authLoading" class="auth-loading">
+  <div class="spinner"></div>
+  <p>驗證登入狀態中…</p>
+</div>
+<div class="app hidden" id="appRoot">
+
+  <div class="appbar">
+    <button class="hamburger-btn" id="adminMenuBtn" type="button" aria-label="選單">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="#20242F" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+    <img class="mark" src="assets/BrioLogo.jpg" alt="布利歐管樂團 Logo">
+    <div class="brandtext">
+      <div class="name">布利歐管樂團</div>
+      <div class="sub">Brio Wind Band</div>
+    </div>
+    <div class="spacer"></div>
+    <button class="avatar" id="avatarBtn" type="button" aria-label="登出" title="點擊登出"></button>
+  </div>
+
+  <div class="staff"></div>
+
+  <div class="section-label">
+    <span class="tw" id="formTitle">建立活動</span>
+    <span class="en">Events</span>
+  </div>
+
+  <form class="card" id="eventForm">
+    <div class="field">
+      <label>活動標題</label>
+      <input type="text" id="eventTitle" placeholder="例如：大團練" required>
+    </div>
+    <div class="field">
+      <label>類型</label>
+      <select id="eventType">
+        <option value="rehearsal">團練</option>
+        <option value="sectional">分部練</option>
+        <option value="performance">演出</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>日期時間</label>
+      <input type="datetime-local" id="eventDate" required>
+    </div>
+    <div class="field">
+      <label>地點</label>
+      <input type="text" id="eventLocation" placeholder="例如：音樂系館 B1 排練室">
+    </div>
+    <p class="form-error" id="eventFormError"></p>
+    <div class="form-buttons">
+      <button type="submit" class="cta-btn" id="eventSubmitBtn">建立活動</button>
+      <button type="button" class="cancel-btn hidden" id="eventCancelBtn">取消</button>
+    </div>
+  </form>
+
+  <div class="section-label">
+    <span class="tw">所有活動</span>
+    <span class="en">All Events</span>
+  </div>
+
+  <div class="list" id="eventList"></div>
+
+</div>
+
+<div class="drawer-overlay" id="drawerOverlay">
+  <nav class="drawer-panel" id="drawerPanel"></nav>
+</div>
+
+<script type="module">
+  import { requireAdmin, logout } from './auth-guard.js';
+  import { db } from './firebase-init.js';
+  import { initAdminNav } from './admin-nav.js';
+  import {
+    collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot,
+    serverTimestamp, Timestamp
+  } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+
+  initAdminNav('event-admin.html');
+
+  var KIND_LABEL = { rehearsal: '團練', sectional: '分部練', performance: '演出' };
+
+  var eventsById = {};
+  var editingId = null;
+
+  var eventForm = document.getElementById('eventForm');
+  var eventFormError = document.getElementById('eventFormError');
+  var eventSubmitBtn = document.getElementById('eventSubmitBtn');
+  var eventCancelBtn = document.getElementById('eventCancelBtn');
+  var formTitle = document.getElementById('formTitle');
+  var eventList = document.getElementById('eventList');
+
+  function showEventFormError(message){
+    eventFormError.textContent = message;
+    eventFormError.classList.toggle('show', !!message);
+  }
+
+  function toDatetimeLocalValue(date){
+    return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  }
+
+  function setDefaultEventDate(){
+    var defaultDate = new Date(Date.now() + 60 * 60000);
+    defaultDate.setMinutes(Math.round(defaultDate.getMinutes() / 15) * 15, 0, 0);
+    document.getElementById('eventDate').value = toDatetimeLocalValue(defaultDate);
+  }
+
+  function enterCreateMode(){
+    editingId = null;
+    eventForm.reset();
+    setDefaultEventDate();
+    formTitle.textContent = '建立活動';
+    eventSubmitBtn.textContent = '建立活動';
+    eventCancelBtn.classList.add('hidden');
+    showEventFormError('');
+  }
+
+  function enterEditMode(eventId){
+    var evt = eventsById[eventId];
+    if (!evt) return;
+    editingId = eventId;
+    document.getElementById('eventTitle').value = evt.title || '';
+    document.getElementById('eventType').value = evt.type || 'rehearsal';
+    document.getElementById('eventDate').value = evt.date ? toDatetimeLocalValue(evt.date) : '';
+    document.getElementById('eventLocation').value = evt.location || '';
+    formTitle.textContent = '編輯活動';
+    eventSubmitBtn.textContent = '儲存變更';
+    eventCancelBtn.classList.remove('hidden');
+    showEventFormError('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  eventCancelBtn.addEventListener('click', enterCreateMode);
+
+  eventForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    showEventFormError('');
+
+    var title = document.getElementById('eventTitle').value.trim();
+    var type = document.getElementById('eventType').value;
+    var dateVal = document.getElementById('eventDate').value;
+    var location = document.getElementById('eventLocation').value.trim();
+
+    if (!title || !dateVal){
+      showEventFormError('請填寫活動標題與日期時間');
+      return;
+    }
+
+    eventSubmitBtn.disabled = true;
+    eventSubmitBtn.textContent = editingId ? '儲存中…' : '建立中…';
+
+    var payload = {
+      title: title,
+      type: type,
+      date: Timestamp.fromDate(new Date(dateVal)),
+      location: location
+    };
+
+    var task = editingId
+      ? updateDoc(doc(db, 'events', editingId), payload)
+      : addDoc(collection(db, 'events'), Object.assign({}, payload, {
+          createdBy: currentAdminUid,
+          createdAt: serverTimestamp()
+        }));
+
+    task.then(function(){
+      enterCreateMode();
+    }).catch(function(error){
+      eventSubmitBtn.disabled = false;
+      eventSubmitBtn.textContent = editingId ? '儲存變更' : '建立活動';
+      showEventFormError('操作失敗（' + error.code + '）');
+    });
+  });
+
+  function render(){
+    var ids = Object.keys(eventsById);
+    if (ids.length === 0){
+      eventList.innerHTML = '<div class="empty">目前沒有任何活動</div>';
+      return;
+    }
+
+    ids.sort(function(a, b){
+      var da = eventsById[a].date ? eventsById[a].date.getTime() : 0;
+      var db_ = eventsById[b].date ? eventsById[b].date.getTime() : 0;
+      return db_ - da;
+    });
+
+    eventList.innerHTML = ids.map(function(eventId){
+      var evt = eventsById[eventId];
+      var d = evt.date;
+      return (
+        '<div class="event-item" data-event="' + eventId + '">' +
+          '<div class="event-top">' +
+            '<div class="event-date">' +
+              '<div class="d">' + (d ? d.getDate() : '—') + '</div>' +
+              '<div class="m">' + (d ? (d.getMonth() + 1) + '月' : '') + '</div>' +
+            '</div>' +
+            '<div class="event-body">' +
+              '<div class="event-title">' + evt.title + '<span class="kind ' + evt.type + '">' + (KIND_LABEL[evt.type] || evt.type) + '</span></div>' +
+              '<div class="event-meta">' + (d ? d.toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit' }) : '') + (evt.location ? ' · ' + evt.location : '') + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="event-actions">' +
+            '<button type="button" class="btn-edit" data-edit="' + eventId + '">編輯</button>' +
+            '<button type="button" class="btn-delete" data-delete="' + eventId + '">刪除</button>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  eventList.addEventListener('click', function(e){
+    var editBtn = e.target.closest('[data-edit]');
+    var deleteBtn = e.target.closest('[data-delete]');
+
+    if (editBtn){
+      enterEditMode(editBtn.getAttribute('data-edit'));
+    }
+    if (deleteBtn){
+      var eventId = deleteBtn.getAttribute('data-delete');
+      var evt = eventsById[eventId];
+      var ok = confirm(
+        '確定要刪除「' + (evt ? evt.title : '這場活動') + '」嗎？\n' +
+        '如果這場活動已經有簽到紀錄，刪除後那些紀錄會找不到對應的活動資料。\n' +
+        '此動作無法復原。'
+      );
+      if (!ok) return;
+      deleteBtn.disabled = true;
+      Promise.all([
+        deleteDoc(doc(db, 'events', eventId)),
+        deleteDoc(doc(db, 'checkinSessions', eventId)).catch(function(){})
+      ]).then(function(){
+        if (editingId === eventId) enterCreateMode();
+      }).catch(function(err){
+        alert('刪除失敗：' + err.code);
+        deleteBtn.disabled = false;
+      });
+    }
+  });
+
+  var currentAdminUid = null;
+
+  requireAdmin().then(function(result){
+    if (!result) return;
+    currentAdminUid = result.uid;
+
+    document.getElementById('avatarBtn').textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
+    document.getElementById('authLoading').classList.add('hidden');
+    document.getElementById('appRoot').classList.remove('hidden');
+    document.getElementById('avatarBtn').addEventListener('click', function(){
+      if (confirm('確定要登出嗎？')) logout();
+    });
+
+    onSnapshot(collection(db, 'events'), function(snap){
+      eventsById = {};
+      snap.forEach(function(docSnap){
+        var data = docSnap.data();
+        eventsById[docSnap.id] = {
+          title: data.title,
+          type: data.type,
+          date: data.date && data.date.toDate ? data.date.toDate() : null,
+          location: data.location
+        };
+      });
+      render();
+    });
+
+    setDefaultEventDate();
+  });
+</script>
+</body>
+</html>

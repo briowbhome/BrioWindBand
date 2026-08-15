@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>布利歐管樂團｜簽到</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#20242F;
+    --ink-soft:#4A4F5C;
+    --paper:#F2EFE5;
+    --paper-raised:#FBFAF4;
+    --line:#DAD3BE;
+    --brass:#B8863A;
+    --brass-deep:#8F6A2C;
+    --burgundy:#7A2331;
+    --burgundy-deep:#5C1A26;
+    --sage:#5F6E58;
+    --sage-bg:#E7EBDF;
+    --radius-lg:20px;
+    --radius-md:14px;
+    --radius-sm:9px;
+    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% -10%, #EFE9D6 0%, transparent 45%),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Noto Sans TC','Noto Sans',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding: 0 0 48px;
+  }
+
+  button, a{ -webkit-tap-highlight-color: transparent; font-family:inherit; }
+  :focus-visible{ outline:2.5px solid var(--brass-deep); outline-offset:2px; border-radius:6px; }
+
+  .app{
+    width:100%;
+    max-width:460px;
+    min-height:100vh;
+    background:var(--paper);
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .hidden{ display:none !important; }
+  .auth-loading{
+    min-height:100vh; width:100%; max-width:460px; margin:0 auto;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:12px; color:var(--ink-soft); font-size:13px;
+  }
+  .auth-loading .spinner{
+    width:22px; height:22px; border-radius:50%;
+    border:2.5px solid var(--line); border-top-color:var(--brass);
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .appbar{ display:flex; align-items:center; gap:12px; padding:18px 20px 14px; }
+  .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
+  .brandtext{ display:flex; flex-direction:column; line-height:1.1; }
+  .brandtext .name{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:19px; letter-spacing:.02em; }
+  .brandtext .sub{ font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.14em; color:var(--ink-soft); margin-top:3px; text-transform:uppercase; }
+
+  .staff{
+    height:16px; margin:0 20px 6px;
+    background-image: repeating-linear-gradient(var(--line), var(--line) 1px, transparent 1px, transparent 4px);
+    opacity:.9;
+  }
+
+  .stage{ flex:1; display:flex; flex-direction:column; justify-content:center; padding:12px 0 32px; }
+
+  /* ---------- Ticket card (success / already-checked-in) ---------- */
+  .ticket{
+    margin:0 20px 20px;
+    border-radius:var(--radius-lg);
+    background:var(--ink); color:var(--paper);
+    position:relative; overflow:hidden;
+    box-shadow:var(--shadow-card);
+  }
+  .ticket .staff-bg{
+    position:absolute; inset:0;
+    background-image: repeating-linear-gradient(rgba(242,239,229,.09), rgba(242,239,229,.09) 1px, transparent 1px, transparent 9px);
+    pointer-events:none;
+  }
+  .ticket-inner{ position:relative; padding:26px 22px 20px; }
+
+  .ticket-top{ display:flex; justify-content:space-between; align-items:flex-start; }
+  .ticket-eyebrow{ font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--brass); }
+  .status-chip{
+    font-family:'Roboto Mono',monospace; font-weight:600; font-size:11px;
+    padding:4px 10px; border-radius:999px; background:var(--sage); color:#F2EFE5;
+  }
+
+  .ticket-headline{ display:flex; align-items:center; gap:14px; margin-top:18px; }
+  .ticket-headline .ico{ flex:none; width:40px; height:40px; }
+  .ticket-headline .txt{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:24px; line-height:1.15; }
+  .ticket-sub{ margin-top:8px; font-size:13px; color:#C9C2A8; line-height:1.6; }
+
+  .ticket-rows{ margin-top:20px; display:flex; flex-direction:column; gap:10px; }
+  .ticket-row{ display:flex; align-items:center; gap:10px; font-size:13.5px; }
+  .ticket-row .label{ color:#C9C2A8; font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.06em; min-width:56px; }
+  .ticket-row .val{ color:var(--paper); font-weight:500; }
+
+  .tear{ margin-top:20px; border-top:1.5px dashed rgba(242,239,229,.35); padding-top:14px; position:relative; }
+  .tear::before,.tear::after{ content:""; position:absolute; top:-8px; width:16px; height:16px; border-radius:50%; background:var(--paper); }
+  .tear::before{ left:-28px; } .tear::after{ right:-28px; }
+  .tear-note{ font-size:11.5px; color:#B7AF93; line-height:1.6; text-align:center; }
+
+  /* ---------- Error / notice card ---------- */
+  .notice{
+    margin:0 20px 20px;
+    border-radius:var(--radius-lg);
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    box-shadow:var(--shadow-card);
+    padding:26px 22px;
+    text-align:center;
+  }
+  .notice .ico{ width:38px; height:38px; margin-bottom:14px; }
+  .notice .headline{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:17px; color:var(--ink); }
+  .notice .sub{ margin-top:8px; font-size:13px; color:var(--ink-soft); line-height:1.6; }
+
+  .back-link{
+    display:block; margin:0 20px; text-align:center;
+    background:none; border:none; color:var(--ink-soft);
+    font-size:12.5px; text-decoration:underline; text-underline-offset:2px; cursor:pointer;
+  }
+</style>
+</head>
+<body>
+<div id="authLoading" class="auth-loading">
+  <div class="spinner"></div>
+  <p>驗證簽到中…</p>
+</div>
+<div class="app hidden" id="appRoot">
+
+  <div class="appbar">
+    <img class="mark" src="assets/BrioLogo.jpg" alt="布利歐管樂團 Logo">
+    <div class="brandtext">
+      <div class="name">布利歐管樂團</div>
+      <div class="sub">Brio Wind Band</div>
+    </div>
+  </div>
+
+  <div class="staff"></div>
+
+  <div class="stage" id="stage"></div>
+
+  <a href="index.html" class="back-link">← 返回首頁</a>
+
+</div>
+
+<script type="module">
+  import { requireApprovedMember } from './auth-guard.js';
+  import { db } from './firebase-init.js';
+  import { doc, getDoc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+
+  var stage = document.getElementById('stage');
+
+  function fmtDateTime(date){
+    if (!date) return '—';
+    return date.toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
+  }
+  function fmtTime(date){
+    if (!date) return '—';
+    return date.toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' });
+  }
+
+  function renderNotice(iconPath, headline, sub){
+    stage.innerHTML =
+      '<div class="notice">' +
+        '<svg class="ico" viewBox="0 0 24 24" fill="none">' + iconPath + '</svg>' +
+        '<div class="headline">' + headline + '</div>' +
+        '<div class="sub">' + sub + '</div>' +
+      '</div>';
+  }
+
+  function renderTicket(opts){
+    stage.innerHTML =
+      '<div class="ticket">' +
+        '<div class="staff-bg"></div>' +
+        '<div class="ticket-inner">' +
+          '<div class="ticket-top">' +
+            '<span class="ticket-eyebrow">簽到狀態 · Check-in</span>' +
+            '<span class="status-chip">已簽到</span>' +
+          '</div>' +
+          '<div class="ticket-headline">' +
+            '<svg class="ico" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#F2EFE5" stroke-width="1.5"/><path d="M8 12.5l2.5 2.5L16 9" stroke="#F2EFE5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+            '<span class="txt">' + opts.headline + '</span>' +
+          '</div>' +
+          '<p class="ticket-sub">' + opts.sub + '</p>' +
+          '<div class="ticket-rows">' +
+            '<div class="ticket-row"><span class="label">活動</span><span class="val">' + opts.title + '</span></div>' +
+            '<div class="ticket-row"><span class="label">時間</span><span class="val">' + fmtDateTime(opts.date) + (opts.location ? ' · ' + opts.location : '') + '</span></div>' +
+            '<div class="ticket-row"><span class="label">簽到</span><span class="val">' + fmtTime(opts.checkedInAt) + '</span></div>' +
+          '</div>' +
+          '<div class="tear"><p class="tear-note">' + opts.note + '</p></div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  var ICO_WARN = '<circle cx="12" cy="12" r="9" stroke="#20242F" stroke-width="1.4"/><path d="M12 8v5" stroke="#20242F" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16" r="1" fill="#20242F"/>';
+
+  async function run(){
+    var result = await requireApprovedMember();
+    if (!result) return; // 未通過驗證，requireApprovedMember 已處理導轉
+
+    document.getElementById('authLoading').classList.add('hidden');
+    document.getElementById('appRoot').classList.remove('hidden');
+
+    var params = new URLSearchParams(location.search);
+    var eventId = params.get('event');
+    var code = params.get('code');
+
+    if (!eventId || !code){
+      renderNotice(ICO_WARN, '請掃描現場的簽到 QR Code', '這個頁面需要透過簽到 QR Code 開啟，直接開啟無法完成簽到。');
+      return;
+    }
+
+    var checkinId = eventId + '_' + result.uid;
+
+    var existingSnap = await getDoc(doc(db, 'checkins', checkinId));
+    if (existingSnap.exists()){
+      var existing = existingSnap.data();
+      var eventSnap = await getDoc(doc(db, 'events', eventId));
+      var evt = eventSnap.exists() ? eventSnap.data() : {};
+      renderTicket({
+        headline: '你已經簽到過了',
+        sub: '這場活動你已經完成簽到，不需要再簽一次。',
+        title: evt.title || '—',
+        date: evt.date && evt.date.toDate ? evt.date.toDate() : null,
+        location: evt.location,
+        checkedInAt: existing.checkedInAt && existing.checkedInAt.toDate ? existing.checkedInAt.toDate() : null,
+        note: '如時間有誤，請洽現場幹部協助確認。'
+      });
+      return;
+    }
+
+    var sessionSnap = await getDoc(doc(db, 'checkinSessions', eventId));
+    if (!sessionSnap.exists()){
+      renderNotice(ICO_WARN, '此簽到碼已失效', '請洽現場幹部確認，或請幹部重新開放簽到。');
+      return;
+    }
+    var session = sessionSnap.data();
+    var windowEnd = session.windowEnd && session.windowEnd.toDate ? session.windowEnd.toDate() : new Date(0);
+
+    if (session.code !== code || windowEnd <= new Date()){
+      renderNotice(ICO_WARN, '此簽到碼已失效', '請洽現場幹部確認，或請幹部重新開放簽到。');
+      return;
+    }
+
+    var eventSnap2 = await getDoc(doc(db, 'events', eventId));
+    var evt2 = eventSnap2.exists() ? eventSnap2.data() : {};
+
+    try {
+      await setDoc(doc(db, 'checkins', checkinId), {
+        eventId: eventId,
+        uid: result.uid,
+        account: result.profile.account,
+        name: result.profile.name,
+        checkedInAt: serverTimestamp(),
+        method: 'qr',
+        code: code
+      });
+    } catch (error) {
+      renderNotice(ICO_WARN, '簽到失敗', '請洽現場幹部協助（' + error.code + '）。');
+      return;
+    }
+
+    renderTicket({
+      headline: '簽到成功',
+      sub: '已經記錄你的出席，祝團練順利！',
+      title: evt2.title || '—',
+      date: evt2.date && evt2.date.toDate ? evt2.date.toDate() : null,
+      location: evt2.location,
+      checkedInAt: new Date(),
+      note: '如有任何問題，請洽現場幹部。'
+    });
+  }
+
+  run();
+</script>
+</body>
+</html>

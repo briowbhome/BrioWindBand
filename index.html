@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>布利歐管樂團｜首頁</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<style>
+  :root{
+    --ink:#20242F;
+    --ink-soft:#4A4F5C;
+    --paper:#F2EFE5;
+    --paper-raised:#FBFAF4;
+    --line:#DAD3BE;
+    --brass:#B8863A;
+    --brass-deep:#8F6A2C;
+    --burgundy:#7A2331;
+    --burgundy-deep:#5C1A26;
+    --sage:#5F6E58;
+    --sage-bg:#E7EBDF;
+    --radius-lg:20px;
+    --radius-md:14px;
+    --radius-sm:9px;
+    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% -10%, #EFE9D6 0%, transparent 45%),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Noto Sans TC','Noto Sans',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding: 0 0 48px;
+  }
+
+  button, a{ -webkit-tap-highlight-color: transparent; font-family:inherit; }
+  :focus-visible{ outline:2.5px solid var(--brass-deep); outline-offset:2px; border-radius:6px; }
+
+  .app{
+    width:100%;
+    max-width:460px;
+    min-height:100vh;
+    background:var(--paper);
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* ---------- App Bar ---------- */
+  .appbar{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:18px 20px 14px;
+  }
+  .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
+  .brandtext{ display:flex; flex-direction:column; line-height:1.1; }
+  .brandtext .name{
+    font-family:'Noto Serif TC',serif;
+    font-weight:900;
+    font-size:19px;
+    letter-spacing:.02em;
+  }
+  .brandtext .sub{
+    font-family:'Roboto Mono',monospace;
+    font-size:10.5px;
+    letter-spacing:.14em;
+    color:var(--ink-soft);
+    margin-top:3px;
+    text-transform:uppercase;
+  }
+  .appbar .spacer{ flex:1; }
+  .admin-entry{
+    width:36px; height:36px; border-radius:50%;
+    background:var(--paper-raised);
+    border:1.5px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    margin-right:8px;
+    text-decoration:none;
+  }
+  .admin-entry:active{ background:var(--sage-bg); }
+  .avatar{
+    width:38px; height:38px; border-radius:50%;
+    background:var(--burgundy); color:#F2EFE5;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Noto Serif TC',serif; font-weight:700; font-size:14px;
+    border:2px solid var(--paper-raised);
+    box-shadow:0 0 0 1.5px var(--line);
+    padding:0; cursor:pointer;
+  }
+
+  /* ---------- Staff-line divider (signature motif) ---------- */
+  .staff{
+    height:16px;
+    margin:0 20px 6px;
+    background-image: repeating-linear-gradient(
+      var(--line), var(--line) 1px, transparent 1px, transparent 4px
+    );
+    opacity:.9;
+  }
+
+  /* ---------- Announcement ticker ---------- */
+  .ticker{
+    margin:2px 20px 18px;
+    background:var(--ink);
+    color:#F2EFE5;
+    border-radius:var(--radius-md);
+    padding:12px 14px;
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    box-shadow:var(--shadow-card);
+  }
+  .ticker .ico{
+    flex:none; width:20px; height:20px; margin-top:1px;
+  }
+  .ticker .body{ flex:1; min-width:0; }
+  .ticker .headline{
+    font-size:13.5px; font-weight:500; line-height:1.5;
+  }
+  .ticker .meta{
+    display:flex; align-items:center; gap:8px;
+    margin-top:6px;
+    font-family:'Roboto Mono',monospace;
+    font-size:10.5px;
+    color:#C9C2A8;
+  }
+  .ticker .meta .more{
+    color:var(--brass);
+    font-weight:600;
+    text-decoration:underline;
+    text-underline-offset:2px;
+    background:none;border:none;padding:0;cursor:pointer;
+    font-family:inherit;font-size:inherit;
+  }
+
+  /* ---------- Section label ---------- */
+  .section-label{
+    display:flex; align-items:baseline; gap:8px;
+    margin:0 20px 10px;
+  }
+  .section-label .tw{
+    font-family:'Noto Serif TC',serif;
+    font-weight:700;
+    font-size:15.5px;
+  }
+  .section-label .en{
+    font-family:'Roboto Mono',monospace;
+    font-size:10px;
+    letter-spacing:.12em;
+    color:var(--ink-soft);
+    text-transform:uppercase;
+  }
+
+  /* ---------- Hero: next rehearsal card ---------- */
+  .hero{
+    margin:0 20px 22px;
+    border-radius:var(--radius-lg);
+    background:var(--ink);
+    color:var(--paper);
+    position:relative;
+    overflow:hidden;
+    box-shadow:var(--shadow-card);
+  }
+  .hero .staff-bg{
+    position:absolute; inset:0;
+    background-image: repeating-linear-gradient(
+      rgba(242,239,229,.09), rgba(242,239,229,.09) 1px, transparent 1px, transparent 9px
+    );
+    pointer-events:none;
+  }
+  .hero-inner{ position:relative; padding:20px 20px 18px; }
+
+  .hero-top{
+    display:flex; justify-content:space-between; align-items:flex-start;
+  }
+  .hero-eyebrow{
+    font-family:'Roboto Mono',monospace;
+    font-size:10.5px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--brass);
+  }
+  .countdown-chip{
+    background:var(--brass);
+    color:var(--ink);
+    font-family:'Roboto Mono',monospace;
+    font-weight:600;
+    font-size:11px;
+    padding:4px 10px;
+    border-radius:999px;
+  }
+
+  .hero-date{
+    display:flex; align-items:baseline; gap:10px;
+    margin-top:10px;
+  }
+  .hero-date .num{
+    font-family:'Noto Serif TC',serif;
+    font-weight:900;
+    font-size:44px;
+    line-height:1;
+  }
+  .hero-date .dow{
+    font-family:'Noto Serif TC',serif;
+    font-weight:700;
+    font-size:17px;
+    color:#D9D2BC;
+  }
+
+  .hero-rows{
+    margin-top:16px;
+    display:flex; flex-direction:column; gap:9px;
+  }
+  .hero-row{ display:flex; align-items:center; gap:10px; font-size:13px; }
+  .hero-row .ico{ flex:none; width:16px; height:16px; opacity:.85; }
+  .hero-row .label{ color:#C9C2A8; font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.06em; min-width:52px;}
+  .hero-row .val{ color:var(--paper); font-weight:500; }
+  .hero-row .val .tag{
+    display:inline-block; margin-left:6px;
+    background:rgba(242,239,229,.14);
+    border:1px solid rgba(242,239,229,.28);
+    border-radius:6px;
+    padding:1px 7px;
+    font-size:11.5px;
+  }
+
+  /* ---------- Ticket-stub check-in CTA ---------- */
+  .checkin{
+    margin-top:18px;
+    border-top:1.5px dashed rgba(242,239,229,.35);
+    padding-top:14px;
+    position:relative;
+  }
+  .checkin::before,.checkin::after{
+    content:"";
+    position:absolute; top:-8px;
+    width:16px; height:16px; border-radius:50%;
+    background:var(--paper);
+  }
+  .checkin::before{ left:-28px; }
+  .checkin::after{ right:-28px; }
+
+  .checkin-btn{
+    width:100%;
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    background:var(--brass);
+    color:var(--ink);
+    border:none;
+    border-radius:var(--radius-md);
+    padding:15px 16px;
+    font-family:'Noto Sans TC',sans-serif;
+    font-weight:700;
+    font-size:15px;
+    cursor:pointer;
+    transition:transform .12s ease, background .12s ease;
+  }
+  .checkin-btn:hover{ background:#C7963F; }
+  .checkin-btn:active{ transform:scale(.98); background:var(--brass-deep); }
+  .checkin-btn .ico{ width:20px; height:20px; flex:none; }
+  .checkin-sub{
+    text-align:center;
+    margin-top:8px;
+    font-size:11.5px;
+    color:#B7AF93;
+  }
+
+  /* ---------- Upcoming events (program listing) ---------- */
+  .program{
+    margin:0 20px 24px;
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-card);
+    overflow:hidden;
+  }
+  .program-item{
+    display:flex; gap:14px;
+    padding:15px 16px;
+    align-items:flex-start;
+  }
+  .program-item + .program-item{ border-top:1px solid var(--line); }
+
+  .measure{
+    flex:none;
+    font-family:'Roboto Mono',monospace;
+    font-size:10px;
+    color:var(--brass-deep);
+    border:1px solid var(--brass);
+    border-radius:5px;
+    padding:2px 5px;
+    margin-top:2px;
+    min-width:26px;
+    text-align:center;
+  }
+
+  .program-date{
+    flex:none;
+    width:46px;
+    text-align:center;
+  }
+  .program-date .d{
+    font-family:'Noto Serif TC',serif;
+    font-weight:900;
+    font-size:20px;
+    line-height:1.05;
+    color:var(--ink);
+  }
+  .program-date .m{
+    font-family:'Roboto Mono',monospace;
+    font-size:9.5px;
+    color:var(--ink-soft);
+    letter-spacing:.05em;
+  }
+
+  .program-body{ flex:1; min-width:0; }
+  .program-title{
+    font-weight:700; font-size:13.5px; color:var(--ink);
+    display:flex; align-items:center; gap:7px; flex-wrap:wrap;
+  }
+  .kind{
+    font-family:'Roboto Mono',monospace;
+    font-size:9.5px; letter-spacing:.05em;
+    padding:1.5px 6px; border-radius:5px;
+    font-weight:600;
+  }
+  .kind.perf{ background:var(--burgundy); color:#F2EFE5; }
+  .kind.rehearsal{ background:var(--sage-bg); color:var(--sage); }
+  .kind.deadline{ background:#EFE1E3; color:var(--burgundy-deep); }
+
+  .program-meta{
+    margin-top:4px;
+    font-size:12px;
+    color:var(--ink-soft);
+    line-height:1.5;
+  }
+
+  /* ---------- Bottom tab bar ---------- */
+  .tabbar{
+    position:sticky;
+    bottom:0;
+    margin-top:auto;
+    background:var(--paper-raised);
+    border-top:1px solid var(--line);
+    padding: 8px 10px calc(10px + env(safe-area-inset-bottom));
+    display:flex;
+    justify-content:space-around;
+  }
+  .tab{
+    display:flex; flex-direction:column; align-items:center; gap:3px;
+    background:none; border:none; cursor:pointer;
+    color:var(--ink-soft);
+    font-family:'Noto Sans TC',sans-serif;
+    font-size:10.5px;
+    padding:4px 10px;
+  }
+  .tab.active{ color:var(--burgundy); }
+  .tab .ico{ width:20px; height:20px; }
+
+  @media (prefers-reduced-motion: reduce){
+    .checkin-btn{ transition:none; }
+  }
+
+  .hidden{ display:none !important; }
+  .auth-loading{
+    min-height:100vh;
+    width:100%;
+    max-width:460px;
+    margin:0 auto;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:12px;
+    color:var(--ink-soft);
+    font-size:13px;
+  }
+  .auth-loading .spinner{
+    width:22px; height:22px;
+    border-radius:50%;
+    border:2.5px solid var(--line);
+    border-top-color:var(--brass);
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+<div id="authLoading" class="auth-loading">
+  <div class="spinner"></div>
+  <p>驗證登入狀態中…</p>
+</div>
+<div class="app hidden" id="appRoot">
+
+  <!-- App Bar -->
+  <div class="appbar">
+    <img class="mark" src="assets/BrioLogo.jpg" alt="布利歐管樂團 Logo">
+    <div class="brandtext">
+      <div class="name">布利歐管樂團</div>
+      <div class="sub">Brio Wind Band</div>
+    </div>
+    <div class="spacer"></div>
+    <a class="admin-entry hidden" id="adminEntryBtn" href="admin.html" aria-label="後台管理" title="後台管理">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 2l7 3v6c0 4.8-3 8.6-7 11-4-2.4-7-6.2-7-11V5l7-3Z" stroke="#8F6A2C" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="#8F6A2C" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <button class="avatar" id="avatarBtn" type="button" aria-label="登出" title="點擊登出"></button>
+  </div>
+
+  <div class="staff"></div>
+
+  <!-- 公告 Announcement -->
+  <div class="ticker">
+    <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M3 10v4a1 1 0 0 0 1 1h2l6 4V5L6 9H4a1 1 0 0 0-1 1Z" stroke="#B8863A" stroke-width="1.5" stroke-linejoin="round"/><path d="M16 8.5a5 5 0 0 1 0 7" stroke="#B8863A" stroke-width="1.5" stroke-linecap="round"/></svg>
+    <div class="body">
+      <div class="headline">大團練提前至 13:30 開始，地點更換至音樂系館 B1 排練室，請提早熱身。</div>
+      <div class="meta">
+        <span>2 小時前 · 行政部</span>
+        <button class="more">還有 2 則公告</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 練習資訊 Hero -->
+  <div class="section-label">
+    <span class="tw">下一次團練</span>
+    <span class="en">Next Rehearsal</span>
+  </div>
+
+  <div class="hero">
+    <div class="staff-bg"></div>
+    <div class="hero-inner">
+      <div class="hero-top">
+        <span class="hero-eyebrow">大團練 · Tutti</span>
+        <span class="countdown-chip">3 天後</span>
+      </div>
+
+      <div class="hero-date">
+        <span class="num">12.14</span>
+        <span class="dow">星期六</span>
+      </div>
+
+      <div class="hero-rows">
+        <div class="hero-row">
+          <svg class="ico" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#F2EFE5" stroke-width="1.5"/><path d="M12 7v5l3 2" stroke="#F2EFE5" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span class="label">時間</span>
+          <span class="val">13:30 – 17:00</span>
+        </div>
+        <div class="hero-row">
+          <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21Z" stroke="#F2EFE5" stroke-width="1.5" stroke-linejoin="round"/><circle cx="12" cy="9.5" r="2.2" stroke="#F2EFE5" stroke-width="1.5"/></svg>
+          <span class="label">地點</span>
+          <span class="val">音樂系館 B1 排練室</span>
+        </div>
+        <div class="hero-row">
+          <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M4 18V8l8-3 8 3v10" stroke="#F2EFE5" stroke-width="1.5" stroke-linejoin="round"/><path d="M4 18h16M9 18v-5h6v5" stroke="#F2EFE5" stroke-width="1.5" stroke-linejoin="round"/></svg>
+          <span class="label">你的編制</span>
+          <span class="val">長笛 Flute I<span class="tag">已報名</span></span>
+        </div>
+      </div>
+
+      <div class="checkin">
+        <button class="checkin-btn" id="checkinBtn">
+          <svg class="ico" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1" stroke="#20242F" stroke-width="1.6"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="#20242F" stroke-width="1.6"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="#20242F" stroke-width="1.6"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z" fill="#20242F"/></svg>
+          拍照掃描 QR Code 簽到
+        </button>
+        <input type="file" accept="image/*" capture="environment" id="qrPhotoInput" class="hidden">
+        <div class="checkin-sub" id="checkinSub">請對準現場的簽到 QR Code 拍照</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 即將到來的活動 -->
+  <div class="section-label">
+    <span class="tw">即將到來的活動</span>
+    <span class="en">Upcoming</span>
+  </div>
+
+  <div class="program">
+    <div class="program-item">
+      <span class="measure">01</span>
+      <div class="program-date"><div class="d">14</div><div class="m">12月</div></div>
+      <div class="program-body">
+        <div class="program-title">大團練<span class="kind rehearsal">排練</span></div>
+        <div class="program-meta">13:30–17:00 · 音樂系館 B1 排練室</div>
+      </div>
+    </div>
+    <div class="program-item">
+      <span class="measure">02</span>
+      <div class="program-date"><div class="d">18</div><div class="m">12月</div></div>
+      <div class="program-body">
+        <div class="program-title">木管分部練<span class="kind rehearsal">排練</span></div>
+        <div class="program-meta">19:00–21:30 · 校友會館 302 教室</div>
+      </div>
+    </div>
+    <div class="program-item">
+      <span class="measure">03</span>
+      <div class="program-date"><div class="d">22</div><div class="m">12月</div></div>
+      <div class="program-body">
+        <div class="program-title">請假申請截止<span class="kind deadline">截止</span></div>
+        <div class="program-meta">冬季音樂會前最後一次請假登記</div>
+      </div>
+    </div>
+    <div class="program-item">
+      <span class="measure">04</span>
+      <div class="program-date"><div class="d">28</div><div class="m">12月</div></div>
+      <div class="program-body">
+        <div class="program-title">冬季音樂會<span class="kind perf">演出</span></div>
+        <div class="program-meta">19:30 開演 · 文化大學大新館 · 10:00 裝箱集合</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom tab bar -->
+  <div class="tabbar">
+    <button class="tab active">
+      <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M4 11 12 4l8 7" stroke="#7A2331" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10v9h12v-9" stroke="#7A2331" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      首頁
+    </button>
+    <button class="tab">
+      <svg class="ico" viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="16" rx="2" stroke="#4A4F5C" stroke-width="1.6"/><path d="M4 10h16M9 3v4M15 3v4" stroke="#4A4F5C" stroke-width="1.6" stroke-linecap="round"/></svg>
+      行事曆
+    </button>
+    <button class="tab">
+      <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M6 4h9l3 3v13H6z" stroke="#4A4F5C" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 11h6M9 14h6M9 17h4" stroke="#4A4F5C" stroke-width="1.6" stroke-linecap="round"/></svg>
+      譜夾
+    </button>
+    <button class="tab">
+      <svg class="ico" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="#4A4F5C" stroke-width="1.6"/><path d="M5 20c1.2-3.8 4-5.5 7-5.5s5.8 1.7 7 5.5" stroke="#4A4F5C" stroke-width="1.6" stroke-linecap="round"/></svg>
+      我的
+    </button>
+  </div>
+
+</div>
+
+<script type="module">
+  import { requireApprovedMember, logout } from './auth-guard.js';
+
+  requireApprovedMember().then(function(result){
+    if (!result) return; // 未通過驗證，requireApprovedMember 已經處理導轉
+    var profile = result.profile;
+
+    document.getElementById('avatarBtn').textContent = profile.name ? profile.name.charAt(0) : '?';
+    if (profile.role === 'admin' || profile.role === 'owner'){
+      document.getElementById('adminEntryBtn').classList.remove('hidden');
+    }
+    document.getElementById('authLoading').classList.add('hidden');
+    document.getElementById('appRoot').classList.remove('hidden');
+
+    document.getElementById('avatarBtn').addEventListener('click', function(){
+      if (confirm('確定要登出嗎？')) logout();
+    });
+
+    // 公告展開（示意用）
+    document.querySelector('.more')?.addEventListener('click', () => {
+      document.querySelector('.headline').textContent =
+        '① 大團練提前至 13:30，地點更換至音樂系館 B1。② 樂譜已上傳，請至譜夾下載。③ 冬季音樂會服裝規定：全黑正式服裝。';
+      document.querySelector('.more').remove();
+    });
+
+    // 簽到：拍照 → 解碼 QR Code → 導向簽到頁
+    var checkinBtn = document.getElementById('checkinBtn');
+    var qrPhotoInput = document.getElementById('qrPhotoInput');
+    var checkinSub = document.getElementById('checkinSub');
+
+    checkinBtn?.addEventListener('click', function(){
+      qrPhotoInput.click();
+    });
+
+    qrPhotoInput?.addEventListener('change', function(){
+      var file = qrPhotoInput.files[0];
+      if (!file) return;
+
+      checkinSub.textContent = '辨識中…';
+
+      var img = new Image();
+      img.onload = function(){
+        var canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        var result = jsQR(imageData.data, imageData.width, imageData.height);
+
+        URL.revokeObjectURL(img.src);
+        qrPhotoInput.value = '';
+
+        if (result && /checkin\.html\?.*code=/.test(result.data)){
+          location.href = result.data;
+        } else {
+          checkinSub.textContent = '找不到 QR Code，請對準後重新拍攝';
+        }
+      };
+      img.onerror = function(){
+        checkinSub.textContent = '照片讀取失敗，請重新拍攝';
+      };
+      img.src = URL.createObjectURL(file);
+    });
+  });
+</script>
+</body>
+</html>

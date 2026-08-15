@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>布利歐管樂團｜登入</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#20242F;
+    --ink-soft:#4A4F5C;
+    --paper:#F2EFE5;
+    --paper-raised:#FBFAF4;
+    --line:#DAD3BE;
+    --brass:#B8863A;
+    --brass-deep:#8F6A2C;
+    --burgundy:#7A2331;
+    --burgundy-deep:#5C1A26;
+    --sage:#5F6E58;
+    --sage-bg:#E7EBDF;
+    --radius-lg:20px;
+    --radius-md:14px;
+    --radius-sm:9px;
+    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% -10%, #EFE9D6 0%, transparent 45%),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Noto Sans TC','Noto Sans',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding: 0 0 48px;
+  }
+
+  button, a, input{ -webkit-tap-highlight-color: transparent; font-family:inherit; }
+  :focus-visible{ outline:2.5px solid var(--brass-deep); outline-offset:2px; border-radius:6px; }
+
+  .app{
+    width:100%;
+    max-width:460px;
+    min-height:100vh;
+    background:var(--paper);
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* ---------- App Bar ---------- */
+  .appbar{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:18px 20px 14px;
+  }
+  .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
+  .brandtext{ display:flex; flex-direction:column; line-height:1.1; }
+  .brandtext .name{
+    font-family:'Noto Serif TC',serif;
+    font-weight:900;
+    font-size:19px;
+    letter-spacing:.02em;
+  }
+  .brandtext .sub{
+    font-family:'Roboto Mono',monospace;
+    font-size:10.5px;
+    letter-spacing:.14em;
+    color:var(--ink-soft);
+    margin-top:3px;
+    text-transform:uppercase;
+  }
+
+  /* ---------- Staff-line divider (signature motif) ---------- */
+  .staff{
+    height:16px;
+    margin:0 20px 6px;
+    background-image: repeating-linear-gradient(
+      var(--line), var(--line) 1px, transparent 1px, transparent 4px
+    );
+    opacity:.9;
+  }
+
+  /* ---------- Section label ---------- */
+  .section-label{
+    display:flex; align-items:baseline; gap:8px;
+    margin:20px 20px 10px;
+  }
+  .section-label .tw{
+    font-family:'Noto Serif TC',serif;
+    font-weight:700;
+    font-size:15.5px;
+  }
+  .section-label .en{
+    font-family:'Roboto Mono',monospace;
+    font-size:10px;
+    letter-spacing:.12em;
+    color:var(--ink-soft);
+    text-transform:uppercase;
+  }
+
+  .lede{
+    margin:0 20px 4px;
+    font-size:12.5px;
+    line-height:1.6;
+    color:var(--ink-soft);
+  }
+
+  /* ---------- Auth card ---------- */
+  .authcard{
+    margin:14px 20px 20px;
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-card);
+    overflow:hidden;
+    padding-top:6px;
+  }
+
+  .back-row{
+    display:none;
+    align-items:center;
+    gap:6px;
+    margin:14px 20px 0;
+  }
+  .back-row.show{ display:flex; }
+  .back-row button{
+    background:none; border:none; cursor:pointer;
+    color:var(--ink-soft); font-size:12.5px;
+    padding:0; display:flex; align-items:center; gap:5px;
+  }
+
+  form{ display:block; }
+  .panel{ display:none; padding-bottom:6px; }
+  .panel.active{ display:block; }
+
+  .field{
+    margin:14px 20px 0;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .field label{
+    font-family:'Roboto Mono',monospace;
+    font-size:10.5px;
+    font-weight:600;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+  }
+  .field input{
+    border:1px solid var(--line);
+    background:var(--paper);
+    border-radius:var(--radius-sm);
+    padding:12px 14px;
+    font-size:14.5px;
+    color:var(--ink);
+    width:100%;
+  }
+  .field input::placeholder{ color:#B4AD97; }
+  .field .hint{
+    font-size:11px;
+    color:var(--ink-soft);
+  }
+  .field .error{
+    font-size:11px;
+    color:var(--burgundy);
+    display:none;
+  }
+  .field.invalid input{ border-color:var(--burgundy); background:#FBF3F3; }
+  .field.invalid .picker-trigger{ border-color:var(--burgundy); background:#FBF3F3; }
+  .field.invalid .hint{ display:none; }
+  .field.invalid .error{ display:block; }
+
+  .form-error{
+    margin:14px 20px 0;
+    font-size:12.5px;
+    color:var(--burgundy);
+    background:#FBF3F3;
+    border:1px solid #EFD4D8;
+    border-radius:var(--radius-sm);
+    padding:10px 12px;
+    display:none;
+  }
+  .form-error.show{ display:block; }
+
+  .forgot{
+    margin:10px 20px 0;
+    font-size:11.5px;
+    color:var(--ink-soft);
+    line-height:1.6;
+  }
+
+  /* ---------- Instrument picker (field-style trigger) ---------- */
+  .picker-trigger{
+    width:100%;
+    border:1px solid var(--line);
+    background:var(--paper);
+    border-radius:var(--radius-sm);
+    padding:11px 14px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    cursor:pointer;
+    text-align:left;
+  }
+  .picker-trigger .placeholder{ color:#B4AD97; font-size:14px; }
+  .picker-trigger .tagsWrap{
+    display:flex; flex-wrap:wrap; gap:6px; flex:1;
+  }
+  .picker-tag{
+    background:var(--brass);
+    color:var(--ink);
+    font-size:11.5px;
+    font-weight:700;
+    padding:4px 6px 4px 10px;
+    border-radius:999px;
+    display:flex; align-items:center; gap:5px;
+  }
+  .picker-tag .x{
+    width:15px; height:15px;
+    border-radius:50%;
+    background:rgba(32,36,47,.14);
+    display:flex; align-items:center; justify-content:center;
+    font-size:10px; line-height:1;
+    cursor:pointer;
+  }
+  .picker-trigger .chev{ flex:none; width:16px; height:16px; opacity:.55; }
+
+  /* ---------- Chips (reused inside bottom sheet) ---------- */
+  .chip{
+    border:1px solid var(--line);
+    background:var(--paper-raised);
+    border-radius:999px;
+    padding:7px 14px;
+    font-size:12.5px;
+    color:var(--ink-soft);
+    cursor:pointer;
+    transition:background .12s ease, border-color .12s ease, color .12s ease;
+  }
+  .chip.active{
+    background:var(--brass);
+    border-color:var(--brass);
+    color:var(--ink);
+    font-weight:700;
+  }
+
+  /* ---------- CTA ---------- */
+  .cta-wrap{
+    margin:20px 20px 18px;
+  }
+  .cta-btn{
+    width:100%;
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    background:var(--brass);
+    color:var(--ink);
+    border:none;
+    border-radius:var(--radius-md);
+    padding:15px 16px;
+    font-weight:700;
+    font-size:15px;
+    cursor:pointer;
+    transition:transform .12s ease, background .12s ease;
+  }
+  .cta-btn:hover{ background:#C7963F; }
+  .cta-btn:active{ transform:scale(.98); background:var(--brass-deep); }
+  .cta-btn:disabled{ opacity:.6; cursor:default; transform:none; }
+
+  .switchline{
+    text-align:center;
+    margin:0 20px 22px;
+    font-size:12.5px;
+    color:var(--ink-soft);
+  }
+  .switchline button{
+    background:none; border:none; cursor:pointer;
+    color:var(--brass-deep); font-weight:700; font-size:12.5px;
+    padding:0; text-decoration:underline; text-underline-offset:2px;
+  }
+
+  /* ---------- Bottom sheet: instrument picker ---------- */
+  .sheet-overlay{
+    position:fixed; inset:0;
+    background:rgba(32,36,47,.45);
+    display:none;
+    align-items:flex-end;
+    justify-content:center;
+    z-index:50;
+  }
+  .sheet-overlay.active{ display:flex; }
+  .sheet{
+    width:100%; max-width:460px;
+    max-height:80vh;
+    background:var(--paper-raised);
+    border-radius:20px 20px 0 0;
+    display:flex; flex-direction:column;
+    box-shadow:0 -10px 30px rgba(32,36,47,.3);
+  }
+  .sheet-handle{
+    width:36px; height:4px;
+    background:var(--line);
+    border-radius:999px;
+    margin:10px auto 2px;
+  }
+  .sheet-header{
+    padding:6px 20px 10px;
+  }
+  .sheet-header .tw{
+    font-family:'Noto Serif TC',serif;
+    font-weight:700;
+    font-size:15.5px;
+  }
+  .sheet-header .hint{
+    margin-top:3px;
+    font-size:11.5px;
+    color:var(--ink-soft);
+  }
+  .sheet-body{
+    overflow-y:auto;
+    padding:0 20px 8px;
+    border-top:1px solid var(--line);
+  }
+  .sheet-group{ margin-top:16px; }
+  .sheet-group-label{
+    font-family:'Roboto Mono',monospace;
+    font-size:10px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin-bottom:9px;
+  }
+  .sheet-chipgroup{
+    display:flex; flex-wrap:wrap; gap:8px;
+  }
+  .sheet-footer{
+    padding:14px 20px calc(14px + env(safe-area-inset-bottom));
+    border-top:1px solid var(--line);
+  }
+
+  /* ---------- Pending review (ticket) ---------- */
+  .pending{
+    display:none;
+    margin:14px 20px 24px;
+    border-radius:var(--radius-lg);
+    background:var(--ink);
+    color:var(--paper);
+    position:relative;
+    overflow:hidden;
+    box-shadow:var(--shadow-card);
+  }
+  .pending.active{ display:block; }
+  .pending .staff-bg{
+    position:absolute; inset:0;
+    background-image: repeating-linear-gradient(
+      rgba(242,239,229,.09), rgba(242,239,229,.09) 1px, transparent 1px, transparent 9px
+    );
+    pointer-events:none;
+  }
+  .pending-inner{ position:relative; padding:22px 20px 18px; }
+
+  .pending-top{
+    display:flex; justify-content:space-between; align-items:flex-start;
+  }
+  .pending-eyebrow{
+    font-family:'Roboto Mono',monospace;
+    font-size:10.5px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--brass);
+  }
+  .status-chip{
+    background:var(--brass);
+    color:var(--ink);
+    font-family:'Roboto Mono',monospace;
+    font-weight:600;
+    font-size:11px;
+    padding:4px 10px;
+    border-radius:999px;
+  }
+
+  .pending-headline{
+    display:flex; align-items:center; gap:12px;
+    margin-top:14px;
+  }
+  .pending-headline .ico{ flex:none; width:34px; height:34px; }
+  .pending-headline .txt{
+    font-family:'Noto Serif TC',serif;
+    font-weight:900;
+    font-size:22px;
+    line-height:1.15;
+  }
+  .pending-sub{
+    margin-top:6px;
+    font-size:12.5px;
+    color:#C9C2A8;
+    line-height:1.6;
+  }
+
+  .pending-rows{
+    margin-top:18px;
+    display:flex; flex-direction:column; gap:9px;
+  }
+  .pending-row{ display:flex; align-items:flex-start; gap:10px; font-size:13px; }
+  .pending-row .label{ color:#C9C2A8; font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.06em; min-width:64px; margin-top:2px;}
+  .pending-row .val{ color:var(--paper); font-weight:500; }
+
+  .tear{
+    margin-top:18px;
+    border-top:1.5px dashed rgba(242,239,229,.35);
+    padding-top:14px;
+    position:relative;
+  }
+  .tear::before,.tear::after{
+    content:"";
+    position:absolute; top:-8px;
+    width:16px; height:16px; border-radius:50%;
+    background:var(--paper);
+  }
+  .tear::before{ left:-28px; }
+  .tear::after{ right:-28px; }
+  .tear-note{
+    font-size:11.5px;
+    color:#B7AF93;
+    line-height:1.6;
+    text-align:center;
+  }
+
+  .back-link{
+    display:block;
+    margin:0 20px 24px;
+    text-align:center;
+    background:none;
+    border:none;
+    color:var(--ink-soft);
+    font-size:12.5px;
+    text-decoration:underline;
+    text-underline-offset:2px;
+    cursor:pointer;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- App Bar -->
+  <div class="appbar">
+    <img class="mark" src="assets/BrioLogo.jpg" alt="布利歐管樂團 Logo">
+    <div class="brandtext">
+      <div class="name">布利歐管樂團</div>
+      <div class="sub">Brio Wind Band</div>
+    </div>
+  </div>
+
+  <div class="staff"></div>
+
+  <div id="authView">
+    <div class="section-label">
+      <span class="tw" id="headlineTw">帳號登入</span>
+      <span class="en" id="headlineEn">Member Access</span>
+    </div>
+
+    <div class="authcard">
+      <div class="back-row" id="backRow">
+        <button type="button" id="toLogin">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M15 5 8 12l7 7" stroke="#4A4F5C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          返回登入
+        </button>
+      </div>
+
+      <!-- 登入 -->
+      <form class="panel active" id="panelLogin" novalidate>
+        <div class="field" id="f-login-account">
+          <label>帳號</label>
+          <input type="text" id="loginAccount" placeholder="請輸入帳號" autocomplete="username">
+          <span class="error">請輸入帳號</span>
+        </div>
+        <div class="field" id="f-login-password">
+          <label>密碼</label>
+          <input type="password" id="loginPassword" placeholder="請輸入密碼" autocomplete="current-password">
+          <span class="error">請輸入密碼</span>
+        </div>
+        <p class="forgot">如忘記密碼請洽幹部協助重設。</p>
+        <p class="form-error" id="loginFormError"></p>
+        <div class="cta-wrap">
+          <button type="submit" class="cta-btn" id="loginBtn">登入</button>
+        </div>
+        <p class="switchline">還沒有帳號？<button type="button" id="toRegister">申請帳號</button></p>
+      </form>
+
+      <!-- 申請帳號 -->
+      <form class="panel" id="panelRegister" novalidate>
+        <div class="field" id="f-reg-account">
+          <label>帳號</label>
+          <input type="text" id="regAccount" placeholder="輸入帳號" autocomplete="username">
+          <span class="hint">英文字母開頭，4–20 碼，可包含數字、底線或連字號</span>
+          <span class="error">帳號需以英文字母開頭，4–20 碼，僅能包含英文、數字、底線或連字號</span>
+        </div>
+        <div class="field" id="f-reg-password">
+          <label>密碼</label>
+          <input type="password" id="regPassword" placeholder="包含英文及數字，至少 8 碼" autocomplete="new-password">
+          <span class="error">密碼需包含英文及數字，至少 8 碼</span>
+        </div>
+        <div class="field" id="f-reg-password2">
+          <label>確認密碼</label>
+          <input type="password" id="regPassword2" placeholder="再次輸入密碼" autocomplete="new-password">
+          <span class="error">兩次輸入的密碼不一致</span>
+        </div>
+        <div class="field" id="f-reg-name">
+          <label>姓名</label>
+          <input type="text" id="regName" placeholder="請輸入真實姓名">
+          <span class="error">請輸入姓名</span>
+        </div>
+
+        <div class="field" id="f-reg-instruments">
+          <label>樂器/聲部</label>
+          <button type="button" class="picker-trigger" id="instrumentTrigger">
+            <span class="tagsWrap" id="instrumentTagsWrap">
+              <span class="placeholder" id="instrumentPlaceholder">點擊選擇樂器／聲部（可複選）</span>
+            </span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="#4A4F5C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <span class="error">請至少選擇一項樂器／聲部</span>
+        </div>
+
+        <p class="lede" style="margin:16px 20px 0;">送出後將由幹部審核，核准前無法使用部分功能。</p>
+        <p class="form-error" id="registerFormError"></p>
+
+        <div class="cta-wrap">
+          <button type="submit" class="cta-btn" id="registerBtn">送出帳號申請</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 審核中 -->
+  <div class="pending" id="pendingView">
+    <div class="staff-bg"></div>
+    <div class="pending-inner">
+      <div class="pending-top">
+        <span class="pending-eyebrow">帳號狀態 · Account Status</span>
+        <span class="status-chip">審核中</span>
+      </div>
+
+      <div class="pending-headline">
+        <svg class="ico" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#F2EFE5" stroke-width="1.5"/><path d="M12 7v5l3.5 2" stroke="#F2EFE5" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span class="txt">申請已送出</span>
+      </div>
+      <p class="pending-sub">你的帳號申請已送出，審核通過後即可使用完整功能。</p>
+
+      <div class="pending-rows">
+        <div class="pending-row"><span class="label">帳號</span><span class="val" id="sumAccount">—</span></div>
+        <div class="pending-row"><span class="label">姓名</span><span class="val" id="sumName">—</span></div>
+        <div class="pending-row"><span class="label">樂器/聲部</span><span class="val" id="sumInstruments">—</span></div>
+      </div>
+
+      <div class="tear">
+        <p class="tear-note">如需確認審核進度，可直接洽詢幹部。</p>
+      </div>
+    </div>
+  </div>
+  <button type="button" class="back-link" id="backToLogin" style="display:none;">← 返回登入</button>
+
+  <!-- 樂器/聲部 選擇 Bottom Sheet -->
+  <div class="sheet-overlay" id="sheetOverlay">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div class="tw">選擇樂器／聲部</div>
+        <div class="hint">可複選你會演奏的樂器／聲部</div>
+      </div>
+      <div class="sheet-body">
+        <div class="sheet-group">
+          <div class="sheet-group-label">木管 Woodwind</div>
+          <div class="sheet-chipgroup" data-family="woodwind">
+            <button type="button" class="chip" data-name="長笛">長笛</button>
+            <button type="button" class="chip" data-name="雙簧管">雙簧管</button>
+            <button type="button" class="chip" data-name="單簧管">單簧管</button>
+            <button type="button" class="chip" data-name="低音管">低音管</button>
+            <button type="button" class="chip" data-name="薩克斯風">薩克斯風</button>
+          </div>
+        </div>
+        <div class="sheet-group">
+          <div class="sheet-group-label">銅管 Brass</div>
+          <div class="sheet-chipgroup" data-family="brass">
+            <button type="button" class="chip" data-name="小號">小號</button>
+            <button type="button" class="chip" data-name="法國號">法國號</button>
+            <button type="button" class="chip" data-name="長號">長號</button>
+            <button type="button" class="chip" data-name="上低音號">上低音號</button>
+            <button type="button" class="chip" data-name="低音號">低音號</button>
+          </div>
+        </div>
+        <div class="sheet-group">
+          <div class="sheet-group-label">打擊 Percussion</div>
+          <div class="sheet-chipgroup" data-family="percussion">
+            <button type="button" class="chip" data-name="打擊樂">打擊樂</button>
+          </div>
+        </div>
+      </div>
+      <div class="sheet-footer">
+        <button type="button" class="cta-btn" id="sheetDoneBtn">完成</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script type="module">
+  import { registerAccount, loginAccount } from './auth-service.js';
+
+  var selectedInstruments = [];
+
+  var sheetOverlay = document.getElementById('sheetOverlay');
+  var instrumentTrigger = document.getElementById('instrumentTrigger');
+  var instrumentTagsWrap = document.getElementById('instrumentTagsWrap');
+
+  function renderTrigger(){
+    if (selectedInstruments.length === 0){
+      instrumentTagsWrap.innerHTML = '<span class="placeholder" id="instrumentPlaceholder">點擊選擇你會的樂器／聲部（可複選）</span>';
+      return;
+    }
+    instrumentTagsWrap.innerHTML = selectedInstruments.map(function(name){
+      return '<span class="picker-tag" data-name="' + name + '">' + name + '<span class="x" data-remove="' + name + '">✕</span></span>';
+    }).join('');
+  }
+
+  function syncSheetChips(){
+    document.querySelectorAll('.sheet-chipgroup .chip').forEach(function(chip){
+      chip.classList.toggle('active', selectedInstruments.indexOf(chip.getAttribute('data-name')) !== -1);
+    });
+  }
+
+  document.querySelectorAll('.sheet-chipgroup .chip').forEach(function(chip){
+    chip.addEventListener('click', function(){
+      var name = chip.getAttribute('data-name');
+      var idx = selectedInstruments.indexOf(name);
+      if (idx === -1){ selectedInstruments.push(name); }
+      else { selectedInstruments.splice(idx, 1); }
+      chip.classList.toggle('active');
+      renderTrigger();
+    });
+  });
+
+  instrumentTrigger.addEventListener('click', function(){
+    syncSheetChips();
+    sheetOverlay.classList.add('active');
+  });
+
+  sheetOverlay.addEventListener('click', function(e){
+    if (e.target === sheetOverlay) sheetOverlay.classList.remove('active');
+  });
+  document.getElementById('sheetDoneBtn').addEventListener('click', function(){
+    sheetOverlay.classList.remove('active');
+    document.getElementById('f-reg-instruments').classList.remove('invalid');
+  });
+
+  instrumentTagsWrap.addEventListener('click', function(e){
+    var removeName = e.target.getAttribute('data-remove');
+    if (!removeName) return;
+    e.stopPropagation();
+    var idx = selectedInstruments.indexOf(removeName);
+    if (idx !== -1) selectedInstruments.splice(idx, 1);
+    renderTrigger();
+  });
+
+  // 登入 ↔ 申請帳號 畫面切換
+  var panelLogin = document.getElementById('panelLogin');
+  var panelRegister = document.getElementById('panelRegister');
+  var headlineTw = document.getElementById('headlineTw');
+  var headlineEn = document.getElementById('headlineEn');
+  var backRow = document.getElementById('backRow');
+
+  function showView(name){
+    var isLogin = name === 'login';
+    panelLogin.classList.toggle('active', isLogin);
+    panelRegister.classList.toggle('active', !isLogin);
+    headlineTw.textContent = isLogin ? '帳號登入' : '申請帳號';
+    headlineEn.textContent = isLogin ? 'Member Access' : 'Request Account';
+    backRow.classList.toggle('show', !isLogin);
+  }
+
+  document.getElementById('toRegister').addEventListener('click', function(){ showView('register'); });
+  document.getElementById('toLogin').addEventListener('click', function(){ showView('login'); });
+
+  function setInvalid(fieldId, invalid){
+    document.getElementById(fieldId).classList.toggle('invalid', invalid);
+  }
+
+  function showFormError(elId, message){
+    var el = document.getElementById(elId);
+    el.textContent = message;
+    el.classList.toggle('show', !!message);
+  }
+
+  // 登入表單
+  panelLogin.addEventListener('submit', function(e){
+    e.preventDefault();
+    showFormError('loginFormError', '');
+    var account = document.getElementById('loginAccount').value.trim();
+    var password = document.getElementById('loginPassword').value;
+    var ok = true;
+    setInvalid('f-login-account', !account); if (!account) ok = false;
+    setInvalid('f-login-password', !password); if (!password) ok = false;
+    if (!ok) return;
+
+    var btn = document.getElementById('loginBtn');
+    btn.disabled = true;
+    btn.textContent = '登入中…';
+
+    loginAccount({ account: account, password: password }).then(function(result){
+      btn.textContent = '✓ 登入成功，前往首頁';
+      btn.style.background = '#5F6E58';
+      var redirect = new URLSearchParams(location.search).get('redirect');
+      var target = (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) ? redirect : 'index.html';
+      setTimeout(function(){ location.href = target; }, 500);
+    }).catch(function(error){
+      btn.disabled = false;
+      btn.textContent = '登入';
+      showFormError('loginFormError', error.message);
+    });
+  });
+
+  // 申請帳號表單
+  panelRegister.addEventListener('submit', function(e){
+    e.preventDefault();
+    showFormError('registerFormError', '');
+    var account = document.getElementById('regAccount').value.trim();
+    var password = document.getElementById('regPassword').value;
+    var password2 = document.getElementById('regPassword2').value;
+    var name = document.getElementById('regName').value.trim();
+
+    var ok = true;
+    var accountValid = /^[A-Za-z][A-Za-z0-9_-]{3,19}$/.test(account);
+    setInvalid('f-reg-account', !accountValid); if (!accountValid) ok = false;
+    var passwordValid = password.length >= 8 && /[A-Za-z]/.test(password) && /[0-9]/.test(password);
+    setInvalid('f-reg-password', !passwordValid); if (!passwordValid) ok = false;
+    setInvalid('f-reg-password2', password2 !== password || !password2); if (password2 !== password || !password2) ok = false;
+    setInvalid('f-reg-name', !name); if (!name) ok = false;
+    document.getElementById('f-reg-instruments').classList.toggle('invalid', selectedInstruments.length === 0);
+    if (selectedInstruments.length === 0) ok = false;
+
+    if (!ok) return;
+
+    var btn = document.getElementById('registerBtn');
+    btn.disabled = true;
+    btn.textContent = '送出中…';
+
+    registerAccount({
+      account: account,
+      password: password,
+      name: name,
+      instruments: selectedInstruments
+    }).then(function(result){
+      btn.disabled = false;
+      btn.textContent = '送出帳號申請';
+
+      document.getElementById('sumAccount').textContent = account;
+      document.getElementById('sumName').textContent = name;
+      document.getElementById('sumInstruments').textContent = selectedInstruments.join('、');
+
+      document.getElementById('authView').style.display = 'none';
+      document.getElementById('pendingView').classList.add('active');
+      document.getElementById('backToLogin').style.display = 'block';
+    }).catch(function(error){
+      btn.disabled = false;
+      btn.textContent = '送出帳號申請';
+      showFormError('registerFormError', error.message);
+    });
+  });
+
+  document.getElementById('backToLogin').addEventListener('click', function(){
+    document.getElementById('pendingView').classList.remove('active');
+    document.getElementById('authView').style.display = 'block';
+    document.getElementById('backToLogin').style.display = 'none';
+    showView('login');
+  });
+</script>
+</body>
+</html>
