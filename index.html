@@ -105,8 +105,8 @@
   }
 
   /* ---------- Announcement ticker ---------- */
+  .ticker-wrap{ margin:2px 20px 18px; }
   .ticker{
-    margin:2px 20px 18px;
     background:var(--ink);
     color:#F2EFE5;
     border-radius:var(--radius-md);
@@ -116,6 +116,16 @@
     gap:10px;
     box-shadow:var(--shadow-card);
   }
+  .announce-list{
+    margin-top:8px;
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-radius:var(--radius-md);
+    overflow:hidden;
+  }
+  .announce-item{ padding:10px 14px; font-size:12.5px; color:var(--ink); line-height:1.6; white-space:pre-wrap; }
+  .announce-item + .announce-item{ border-top:1px solid var(--line); }
+  .announce-item .t{ margin-top:4px; font-size:10.5px; color:var(--ink-soft); font-family:'Roboto Mono',monospace; }
   .ticker .ico{
     flex:none; width:20px; height:20px; margin-top:1px;
   }
@@ -400,15 +410,18 @@
   <div class="staff"></div>
 
   <!-- 公告 Announcement -->
-  <div class="ticker">
-    <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M3 10v4a1 1 0 0 0 1 1h2l6 4V5L6 9H4a1 1 0 0 0-1 1Z" stroke="#B8863A" stroke-width="1.5" stroke-linejoin="round"/><path d="M16 8.5a5 5 0 0 1 0 7" stroke="#B8863A" stroke-width="1.5" stroke-linecap="round"/></svg>
-    <div class="body">
-      <div class="headline">大團練提前至 13:30 開始，地點更換至音樂系館 B1 排練室，請提早熱身。</div>
-      <div class="meta">
-        <span>2 小時前 · 行政部</span>
-        <button class="more">還有 2 則公告</button>
+  <div class="ticker-wrap hidden" id="announceWrap">
+    <div class="ticker">
+      <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M3 10v4a1 1 0 0 0 1 1h2l6 4V5L6 9H4a1 1 0 0 0-1 1Z" stroke="#B8863A" stroke-width="1.5" stroke-linejoin="round"/><path d="M16 8.5a5 5 0 0 1 0 7" stroke="#B8863A" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <div class="body">
+        <div class="headline" id="announceHeadline"></div>
+        <div class="meta">
+          <span id="announceMeta"></span>
+          <button class="more hidden" id="announceMoreBtn" type="button"></button>
+        </div>
       </div>
     </div>
+    <div class="announce-list hidden" id="announceList"></div>
   </div>
 
   <!-- 練習資訊 Hero -->
@@ -451,7 +464,7 @@
           <svg class="ico" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1" stroke="#20242F" stroke-width="1.6"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="#20242F" stroke-width="1.6"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="#20242F" stroke-width="1.6"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z" fill="#20242F"/></svg>
           拍照掃描 QR Code 簽到
         </button>
-        <input type="file" accept="image/*" capture="environment" id="qrPhotoInput" class="hidden">
+        <input type="file" accept="image/*" id="qrPhotoInput" class="hidden">
         <div class="checkin-sub" id="checkinSub">請對準現場的簽到 QR Code 拍照</div>
       </div>
     </div>
@@ -593,7 +606,10 @@
 
     function renderEventsSection(){
       if (!typesLoaded) return;
-      renderHero(latestEvents.find(function(evt){ return evt.type === 'rehearsal'; }) || null);
+      renderHero(latestEvents.find(function(evt){
+        var t = eventTypesById[evt.type];
+        return t && t.homeHighlight;
+      }) || null);
       renderProgram(latestEvents.slice(0, 5));
     }
 
@@ -620,11 +636,63 @@
       renderEventsSection();
     });
 
-    // 公告展開（示意用）
-    document.querySelector('.more')?.addEventListener('click', () => {
-      document.querySelector('.headline').textContent =
-        '① 大團練提前至 13:30，地點更換至音樂系館 B1。② 樂譜已上傳，請至譜夾下載。③ 冬季音樂會服裝規定：全黑正式服裝。';
-      document.querySelector('.more').remove();
+    // 公告：接 announcements collection，最新一則當標題，其餘展開成清單
+    function formatRelativeTime(date){
+      var diffMs = Date.now() - date.getTime();
+      var minutes = Math.floor(diffMs / 60000);
+      if (minutes < 1) return '剛剛';
+      if (minutes < 60) return minutes + ' 分鐘前';
+      var hours = Math.floor(minutes / 60);
+      if (hours < 24) return hours + ' 小時前';
+      var days = Math.floor(hours / 24);
+      if (days === 1) return '昨天';
+      if (days < 7) return days + ' 天前';
+      return date.toLocaleDateString('zh-TW', { month:'numeric', day:'numeric' });
+    }
+
+    var announceMoreBtn = document.getElementById('announceMoreBtn');
+    var announceList = document.getElementById('announceList');
+
+    announceMoreBtn.addEventListener('click', function(){
+      announceList.classList.toggle('hidden');
+    });
+
+    onSnapshot(query(collection(db, 'announcements'), orderBy('createdAt', 'desc'), limit(5)), function(snap){
+      var items = snap.docs.map(function(docSnap){
+        var data = docSnap.data();
+        return {
+          content: data.content,
+          createdAt: data.createdAt && data.createdAt.toDate ? data.createdAt.toDate() : new Date()
+        };
+      });
+
+      var wrap = document.getElementById('announceWrap');
+      if (items.length === 0){
+        wrap.classList.add('hidden');
+        return;
+      }
+      wrap.classList.remove('hidden');
+
+      document.getElementById('announceHeadline').textContent = items[0].content;
+      document.getElementById('announceMeta').textContent = formatRelativeTime(items[0].createdAt);
+
+      var rest = items.slice(1);
+      if (rest.length === 0){
+        announceMoreBtn.classList.add('hidden');
+        announceList.classList.add('hidden');
+        announceList.innerHTML = '';
+        return;
+      }
+      announceMoreBtn.classList.remove('hidden');
+      announceMoreBtn.textContent = '還有 ' + rest.length + ' 則公告';
+      announceList.innerHTML = rest.map(function(item){
+        return (
+          '<div class="announce-item">' +
+            item.content +
+            '<div class="t">' + formatRelativeTime(item.createdAt) + '</div>' +
+          '</div>'
+        );
+      }).join('');
     });
 
     // 簽到：拍照 → 解碼 QR Code → 導向簽到頁

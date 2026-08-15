@@ -260,6 +260,34 @@
   .btn-end{ background:none; border:1px solid rgba(242,239,229,.4); color:#E8B4BC; }
   .session-card.expired .btn-end{ border-color:var(--line); color:var(--burgundy-deep); }
 
+  /* ---------- Attendance (簽到名單) ---------- */
+  .att-toggle{
+    display:flex; align-items:center; gap:6px;
+    margin-top:12px; background:none; border:none; padding:0;
+    font-size:12px; font-weight:700; color:var(--brass); cursor:pointer;
+  }
+  .session-card.expired .att-toggle{ color:var(--brass-deep); }
+  .att-toggle .chev{ transition:transform .15s ease; }
+  .att-toggle.open .chev{ transform:rotate(180deg); }
+  .att-panel{
+    margin-top:10px; background:var(--paper-raised); color:var(--ink);
+    border-radius:var(--radius-md); overflow:hidden;
+  }
+  .att-summary{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:9px 12px; background:var(--sage-bg); color:var(--sage);
+    font-size:11.5px; font-weight:700;
+  }
+  .att-row{ display:flex; align-items:center; gap:10px; padding:8px 12px; font-size:12px; }
+  .att-row + .att-row{ border-top:1px solid var(--line); }
+  .att-name{ font-weight:500; color:var(--ink); }
+  .att-sub{ font-size:10px; color:var(--ink-soft); font-family:'Roboto Mono',monospace; margin-top:1px; }
+  .att-time{ flex:none; font-family:'Roboto Mono',monospace; font-size:11px; font-weight:700; }
+  .att-time.ontime{ color:var(--sage); }
+  .att-time.late{ color:var(--brass-deep); }
+  .att-time.verylate{ color:var(--burgundy-deep); }
+  .att-empty{ padding:16px 12px; text-align:center; font-size:12px; color:var(--ink-soft); }
+
   .empty{ padding:36px 20px; text-align:center; font-size:13px; color:var(--ink-soft); }
 </style>
 </head>
@@ -324,8 +352,8 @@
   import { initAccountMenu } from './account-menu.js';
   import { subscribeEventTypes, badgeStyle } from './event-types.js';
   import {
-    collection, doc, setDoc, getDoc, deleteDoc, onSnapshot,
-    serverTimestamp, Timestamp
+    collection, doc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot,
+    query, where, serverTimestamp, Timestamp
   } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
   initAdminNav('checkin-admin.html');
@@ -333,6 +361,9 @@
   var WINDOW_MINUTES = 30;
   var PICKER_PAST_HOURS = 6;
   var PICKER_MAX = 10;
+  // 簽到名單的遲到門檻，之後想調整標準改這兩個數字就好
+  var LATE_MINUTES = 15;
+  var VERY_LATE_MINUTES = 30;
   var eventTypesById = {};
 
   function typeBadge(typeId){
@@ -445,6 +476,11 @@
               '<button type="button" class="btn-regen" data-regen="' + eventId + '">產生新的 QR</button>' +
               '<button type="button" class="btn-end" data-end="' + eventId + '">✕ 結束</button>' +
             '</div>' +
+            '<button type="button" class="att-toggle" data-att-toggle="' + eventId + '">' +
+              '<svg class="chev" width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+              '簽到名單' +
+            '</button>' +
+            '<div class="att-panel hidden" id="attPanel-' + eventId + '"></div>' +
           '</div>' +
         '</div>'
       );
@@ -482,6 +518,60 @@
     await deleteDoc(doc(db, 'checkinSessions', eventId));
   }
 
+  function formatAttTime(checkedInAt, eventDate){
+    var label = checkedInAt.toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit', hour12:false });
+    if (!eventDate) return { label: label, cls: 'ontime' };
+    var lateMinutes = (checkedInAt.getTime() - eventDate.getTime()) / 60000;
+    var cls = lateMinutes <= LATE_MINUTES ? 'ontime' : (lateMinutes <= VERY_LATE_MINUTES ? 'late' : 'verylate');
+    return { label: label, cls: cls };
+  }
+
+  async function loadAttendance(eventId){
+    var panel = document.getElementById('attPanel-' + eventId);
+    if (!panel) return;
+    panel.innerHTML = '<div class="att-empty">載入中…</div>';
+
+    try {
+      var snap = await getDocs(query(collection(db, 'checkins'), where('eventId', '==', eventId)));
+      var rows = snap.docs.map(function(docSnap){ return docSnap.data(); });
+
+      if (rows.length === 0){
+        panel.innerHTML = '<div class="att-empty">目前還沒有人簽到</div>';
+        return;
+      }
+
+      rows.sort(function(a, b){
+        var ta = a.checkedInAt && a.checkedInAt.toDate ? a.checkedInAt.toDate().getTime() : 0;
+        var tb = b.checkedInAt && b.checkedInAt.toDate ? b.checkedInAt.toDate().getTime() : 0;
+        return ta - tb;
+      });
+
+      var evt = eventsById[eventId];
+      var eventDate = evt ? evt.date : null;
+
+      var rowsHtml = rows.map(function(r){
+        var checkedInAt = r.checkedInAt && r.checkedInAt.toDate ? r.checkedInAt.toDate() : null;
+        var timeInfo = checkedInAt ? formatAttTime(checkedInAt, eventDate) : { label: '—', cls: 'ontime' };
+        var methodLabel = r.method === 'manual' ? '手動補登' : '掃碼';
+        return (
+          '<div class="att-row">' +
+            '<div style="flex:1;min-width:0;">' +
+              '<div class="att-name">' + (r.name || r.account || '未知') + '</div>' +
+              '<div class="att-sub">' + (r.account || '') + ' · ' + methodLabel + '</div>' +
+            '</div>' +
+            '<div class="att-time ' + timeInfo.cls + '">' + timeInfo.label + '</div>' +
+          '</div>'
+        );
+      }).join('');
+
+      panel.innerHTML =
+        '<div class="att-summary"><span>已簽到</span><span>' + rows.length + ' 人</span></div>' +
+        rowsHtml;
+    } catch (err) {
+      panel.innerHTML = '<div class="att-empty">載入失敗（' + err.code + '）</div>';
+    }
+  }
+
   eventPicker.addEventListener('click', function(e){
     var startBtn = e.target.closest('[data-start]');
     if (!startBtn) return;
@@ -498,11 +588,21 @@
     var reopenBtn = e.target.closest('[data-reopen]');
     var regenBtn = e.target.closest('[data-regen]');
     var endBtn = e.target.closest('[data-end]');
+    var attToggle = e.target.closest('[data-att-toggle]');
     var img = e.target.closest('.qr-wrap img');
 
     if (img){
       qrZoomImg.src = img.src;
       qrZoomOverlay.classList.add('active');
+      return;
+    }
+    if (attToggle){
+      var eventId = attToggle.getAttribute('data-att-toggle');
+      var panel = document.getElementById('attPanel-' + eventId);
+      var opening = panel.classList.contains('hidden');
+      panel.classList.toggle('hidden', !opening);
+      attToggle.classList.toggle('open', opening);
+      if (opening) loadAttendance(eventId);
       return;
     }
     if (reopenBtn){

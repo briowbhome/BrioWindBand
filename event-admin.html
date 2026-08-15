@@ -279,6 +279,32 @@
 
   <div class="staff"></div>
 
+  <div class="section-label hidden" id="typesSectionLabel">
+    <span class="tw">活動類型管理</span>
+    <span class="en">Event Types</span>
+  </div>
+
+  <form class="card hidden" id="typeForm">
+    <div class="field">
+      <label>新增/編輯類型名稱</label>
+      <input type="text" id="newTypeLabel" placeholder="例如：社遊">
+    </div>
+    <div class="field">
+      <label>顏色</label>
+      <div class="swatch-picker" id="colorPicker"></div>
+    </div>
+    <div class="field-checkbox">
+      <input type="checkbox" id="typeHomeHighlight">
+      <label for="typeHomeHighlight">首頁「下一次◯◯」卡片顯示這個類型的活動（通常只勾一個）</label>
+    </div>
+    <p class="form-error" id="typeFormError"></p>
+    <div class="form-buttons">
+      <button type="submit" class="cta-btn" id="typeSubmitBtn">新增類型</button>
+    </div>
+  </form>
+
+  <div class="list hidden" id="typesList"></div>
+
   <div class="section-label">
     <span class="tw" id="formTitle">建立活動</span>
     <span class="en">Events</span>
@@ -328,28 +354,6 @@
   </div>
 
   <div class="list" id="eventList"></div>
-
-  <div class="section-label hidden" id="typesSectionLabel">
-    <span class="tw">活動類型管理</span>
-    <span class="en">Event Types</span>
-  </div>
-
-  <form class="card hidden" id="typeForm">
-    <div class="field">
-      <label>新增/編輯類型名稱</label>
-      <input type="text" id="newTypeLabel" placeholder="例如：社遊">
-    </div>
-    <div class="field">
-      <label>顏色</label>
-      <div class="swatch-picker" id="colorPicker"></div>
-    </div>
-    <p class="form-error" id="typeFormError"></p>
-    <div class="form-buttons">
-      <button type="submit" class="cta-btn" id="typeSubmitBtn">新增類型</button>
-    </div>
-  </form>
-
-  <div class="list hidden" id="typesList"></div>
 
 </div>
 
@@ -422,6 +426,7 @@
     setDefaultEventDate();
     updateTimeFieldsVisibility();
     formTitle.textContent = '建立活動';
+    eventSubmitBtn.disabled = false;
     eventSubmitBtn.textContent = '建立活動';
     eventCancelBtn.classList.add('hidden');
     showEventFormError('');
@@ -440,6 +445,7 @@
     document.getElementById('eventLocation').value = evt.location || '';
     updateTimeFieldsVisibility();
     formTitle.textContent = '編輯活動';
+    eventSubmitBtn.disabled = false;
     eventSubmitBtn.textContent = '儲存變更';
     eventCancelBtn.classList.remove('hidden');
     showEventFormError('');
@@ -608,6 +614,7 @@
     typeForm.reset();
     selectedColorKey = 'sage';
     renderColorPicker();
+    typeSubmitBtn.disabled = false;
     typeSubmitBtn.textContent = '新增類型';
     typeFormError.textContent = '';
     typeFormError.classList.remove('show');
@@ -621,9 +628,21 @@
       typeFormError.classList.add('show');
       return;
     }
+    var duplicate = eventTypesList.some(function(t){
+      return t.label === label && t.id !== editingTypeId;
+    });
+    if (duplicate){
+      typeFormError.textContent = '已經有一個叫「' + label + '」的類型了，請改用別的名稱，或直接編輯既有的那個';
+      typeFormError.classList.add('show');
+      return;
+    }
     typeSubmitBtn.disabled = true;
 
-    var payload = { label: label, colorKey: selectedColorKey };
+    var payload = {
+      label: label,
+      colorKey: selectedColorKey,
+      homeHighlight: document.getElementById('typeHomeHighlight').checked
+    };
     var task = editingTypeId
       ? updateDoc(doc(db, 'eventTypes', editingTypeId), payload)
       : addDoc(collection(db, 'eventTypes'), Object.assign({}, payload, {
@@ -653,7 +672,7 @@
       return (
         '<div class="type-item">' +
           '<span class="type-swatch" style="background:' + theme.bg + ';"></span>' +
-          '<span class="type-label">' + t.label + '</span>' +
+          '<span class="type-label">' + t.label + (t.homeHighlight ? ' <span title="首頁焦點類型">★</span>' : '') + '</span>' +
           '<div class="type-actions">' +
             '<button type="button" data-edit-type="' + t.id + '">編輯</button>' +
             '<button type="button" class="btn-type-delete" data-delete-type="' + t.id + '">刪除</button>' +
@@ -675,6 +694,7 @@
       document.getElementById('newTypeLabel').value = editType.label;
       selectedColorKey = editType.colorKey;
       renderColorPicker();
+      document.getElementById('typeHomeHighlight').checked = !!editType.homeHighlight;
       typeSubmitBtn.textContent = '儲存變更';
       typeForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }

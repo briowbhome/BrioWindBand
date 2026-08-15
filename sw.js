@@ -8,6 +8,7 @@ const CORE_ASSETS = [
   './admin-index.html',
   './event-admin.html',
   './checkin-admin.html',
+  './announce-admin.html',
   './auth-guard.js',
   './auth-service.js',
   './firebase-init.js',

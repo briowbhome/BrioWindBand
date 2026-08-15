@@ -17,9 +17,9 @@ export var COLOR_THEMES = {
 };
 
 var DEFAULT_TYPES = [
-  { id: "rehearsal", label: "排練", colorKey: "sage", order: 1 },
-  { id: "sectional", label: "分部練", colorKey: "brass", order: 2 },
-  { id: "performance", label: "演出", colorKey: "burgundy", order: 3 }
+  { id: "rehearsal", label: "排練", colorKey: "sage", order: 1, homeHighlight: true },
+  { id: "sectional", label: "分部練", colorKey: "brass", order: 2, homeHighlight: false },
+  { id: "performance", label: "演出", colorKey: "burgundy", order: 3, homeHighlight: false }
 ];
 
 var seeded = false;
@@ -32,6 +32,7 @@ function seedDefaults(db, uid) {
       label: t.label,
       colorKey: t.colorKey,
       order: t.order,
+      homeHighlight: t.homeHighlight,
       createdBy: uid,
       createdAt: serverTimestamp()
     }).catch(function () {});
@@ -50,7 +51,13 @@ export function subscribeEventTypes(db, callback, seedIfEmptyUid) {
     }
     callback(snap.docs.map(function (docSnap) {
       var data = docSnap.data();
-      return { id: docSnap.id, label: data.label, colorKey: data.colorKey, order: data.order };
+      return {
+        id: docSnap.id,
+        label: data.label,
+        colorKey: data.colorKey,
+        order: data.order,
+        homeHighlight: !!data.homeHighlight
+      };
     }));
   });
 }
