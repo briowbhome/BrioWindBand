@@ -5,16 +5,21 @@ const CORE_ASSETS = [
   './login.html',
   './checkin.html',
   './admin.html',
+  './admin-index.html',
   './event-admin.html',
   './checkin-admin.html',
   './auth-guard.js',
   './auth-service.js',
   './firebase-init.js',
   './admin-nav.js',
+  './account-menu.js',
+  './event-types.js',
   './manifest.json',
   './assets/BrioLogo.jpg',
   './assets/icons/icon-192.png',
-  './assets/icons/icon-512.png'
+  './assets/icons/icon-512.png',
+  './assets/icons/icon-192-maskable.png',
+  './assets/icons/icon-512-maskable.png'
 ];
 
 self.addEventListener('install', (event) => {

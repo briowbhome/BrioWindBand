@@ -84,15 +84,6 @@
     text-transform:uppercase;
   }
   .appbar .spacer{ flex:1; }
-  .admin-entry{
-    width:36px; height:36px; border-radius:50%;
-    background:var(--paper-raised);
-    border:1.5px solid var(--line);
-    display:flex; align-items:center; justify-content:center;
-    margin-right:8px;
-    text-decoration:none;
-  }
-  .admin-entry:active{ background:var(--sage-bg); }
   .avatar{
     width:38px; height:38px; border-radius:50%;
     background:var(--burgundy); color:#F2EFE5;
@@ -328,9 +319,6 @@
     padding:1.5px 6px; border-radius:5px;
     font-weight:600;
   }
-  .kind.rehearsal{ background:var(--sage-bg); color:var(--sage); }
-  .kind.sectional{ background:#EFE7D2; color:var(--brass-deep); }
-  .kind.performance{ background:var(--burgundy); color:#F2EFE5; }
   .empty{ padding:36px 20px; text-align:center; font-size:13px; color:var(--ink-soft); }
   .hero-empty{ padding:14px 0 18px; text-align:center; font-size:13px; color:#D9D2BC; }
 
@@ -406,9 +394,6 @@
       <div class="sub">Brio Wind Band</div>
     </div>
     <div class="spacer"></div>
-    <a class="admin-entry hidden" id="adminEntryBtn" href="admin.html" aria-label="後台管理" title="後台管理">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 2l7 3v6c0 4.8-3 8.6-7 11-4-2.4-7-6.2-7-11V5l7-3Z" stroke="#8F6A2C" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="#8F6A2C" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </a>
     <button class="avatar" id="avatarBtn" type="button" aria-label="帳號選單"></button>
   </div>
 
@@ -506,6 +491,7 @@
 <script type="module">
   import { requireApprovedMember } from './auth-guard.js';
   import { initAccountMenu } from './account-menu.js';
+  import { subscribeEventTypes, badgeStyle } from './event-types.js';
   import { db } from './firebase-init.js';
   import {
     collection, query, where, orderBy, limit, onSnapshot, Timestamp
@@ -516,23 +502,22 @@
     var profile = result.profile;
 
     document.getElementById('avatarBtn').textContent = profile.name ? profile.name.charAt(0) : '?';
-    if (profile.role === 'admin' || profile.role === 'owner'){
-      document.getElementById('adminEntryBtn').classList.remove('hidden');
-    }
+    var isAdmin = profile.role === 'admin' || profile.role === 'owner';
     document.getElementById('authLoading').classList.add('hidden');
     document.getElementById('appRoot').classList.remove('hidden');
 
-    initAccountMenu(profile.name);
+    initAccountMenu(profile.name, isAdmin ? 'admin-index.html' : null);
 
     // 首頁資料：下一次團練 + 即將到來的活動，接 events collection 即時更新
-    var KIND_LABEL = { rehearsal: '排練', sectional: '分部練', performance: '演出' };
     var WEEKDAY = ['日', '一', '二', '三', '四', '五', '六'];
+    var eventTypesById = {};
+    var latestEvents = [];
 
     function formatEventTime(evt){
       if (evt.allDay) return '全天';
-      var start = evt.date.toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit' });
+      var start = evt.date.toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit', hour12:false });
       if (!evt.endTime) return start + ' 開始';
-      var end = evt.endTime.toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit' });
+      var end = evt.endTime.toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit', hour12:false });
       return start + '–' + end;
     }
 
@@ -566,6 +551,12 @@
       document.getElementById('heroLocationVal').textContent = nextRehearsal.location || '地點未定';
     }
 
+    function typeBadge(typeId){
+      var t = eventTypesById[typeId];
+      var label = t ? t.label : typeId;
+      return '<span class="kind" style="' + badgeStyle(t ? t.colorKey : null) + '">' + label + '</span>';
+    }
+
     function renderProgram(events){
       var list = document.getElementById('programList');
       var empty = document.getElementById('programEmpty');
@@ -581,7 +572,7 @@
             '<span class="measure">' + String(i + 1).padStart(2, '0') + '</span>' +
             '<div class="program-date"><div class="d">' + evt.date.getDate() + '</div><div class="m">' + (evt.date.getMonth() + 1) + '月</div></div>' +
             '<div class="program-body">' +
-              '<div class="program-title">' + evt.title + '<span class="kind ' + evt.type + '">' + (KIND_LABEL[evt.type] || evt.type) + '</span></div>' +
+              '<div class="program-title">' + evt.title + typeBadge(evt.type) + '</div>' +
               '<div class="program-meta">' + formatEventTime(evt) + (evt.location ? ' · ' + evt.location : '') + '</div>' +
             '</div>' +
           '</div>'
@@ -596,8 +587,25 @@
       limit(20)
     );
 
+    // 活動類型跟活動本身是兩份分開即時更新的資料，先等類型資料到齊過一次才開始畫，
+    // 避免類型還沒載入時先顯示原始 ID 的畫面
+    var typesLoaded = false;
+
+    function renderEventsSection(){
+      if (!typesLoaded) return;
+      renderHero(latestEvents.find(function(evt){ return evt.type === 'rehearsal'; }) || null);
+      renderProgram(latestEvents.slice(0, 5));
+    }
+
+    subscribeEventTypes(db, function(types){
+      eventTypesById = {};
+      types.forEach(function(t){ eventTypesById[t.id] = t; });
+      typesLoaded = true;
+      renderEventsSection();
+    });
+
     onSnapshot(upcomingQuery, function(snap){
-      var events = snap.docs.map(function(docSnap){
+      latestEvents = snap.docs.map(function(docSnap){
         var data = docSnap.data();
         return {
           title: data.title,
@@ -609,8 +617,7 @@
         };
       });
 
-      renderHero(events.find(function(evt){ return evt.type === 'rehearsal'; }) || null);
-      renderProgram(events.slice(0, 5));
+      renderEventsSection();
     });
 
     // 公告展開（示意用）

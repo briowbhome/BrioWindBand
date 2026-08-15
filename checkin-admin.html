@@ -164,9 +164,6 @@
     font-family:'Roboto Mono',monospace; font-size:9.5px; letter-spacing:.05em;
     padding:1.5px 6px; border-radius:5px; font-weight:600;
   }
-  .kind.rehearsal{ background:var(--sage-bg); color:var(--sage); }
-  .kind.sectional{ background:#EFE7D2; color:var(--brass-deep); }
-  .kind.performance{ background:var(--burgundy); color:#F2EFE5; }
   .picker-meta{ margin-top:4px; font-size:12px; color:var(--ink-soft); line-height:1.5; }
   .btn-start{
     flex:none;
@@ -325,6 +322,7 @@
   import { db } from './firebase-init.js';
   import { initAdminNav } from './admin-nav.js';
   import { initAccountMenu } from './account-menu.js';
+  import { subscribeEventTypes, badgeStyle } from './event-types.js';
   import {
     collection, doc, setDoc, getDoc, deleteDoc, onSnapshot,
     serverTimestamp, Timestamp
@@ -335,7 +333,13 @@
   var WINDOW_MINUTES = 30;
   var PICKER_PAST_HOURS = 6;
   var PICKER_MAX = 10;
-  var KIND_LABEL = { rehearsal: '團練', sectional: '分部練', performance: '演出' };
+  var eventTypesById = {};
+
+  function typeBadge(typeId){
+    var t = eventTypesById[typeId];
+    var label = t ? t.label : typeId;
+    return '<span class="kind" style="' + badgeStyle(t ? t.colorKey : null) + '">' + label + '</span>';
+  }
 
   var currentAdminUid = null;
 
@@ -383,13 +387,13 @@
     eventPicker.innerHTML = ids.map(function(eventId){
       var evt = eventsById[eventId];
       var d = evt.date;
-      var dateLabel = d.toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
+      var dateLabel = d.toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit', hour12:false });
       var hasActiveSession = sessionsById[eventId] && sessionsById[eventId].windowEnd > new Date();
 
       return (
         '<div class="picker-item">' +
           '<div class="picker-body">' +
-            '<div class="picker-title">' + evt.title + '<span class="kind ' + evt.type + '">' + (KIND_LABEL[evt.type] || evt.type) + '</span></div>' +
+            '<div class="picker-title">' + evt.title + typeBadge(evt.type) + '</div>' +
             '<div class="picker-meta">' + dateLabel + (evt.location ? ' · ' + evt.location : '') + '</div>' +
           '</div>' +
           '<button type="button" class="btn-start" data-start="' + eventId + '">' + (hasActiveSession ? '重新產生' : '產生 QR Code') + '</button>' +
@@ -417,10 +421,10 @@
       var evt = eventsById[eventId];
       var isExpired = session.windowEnd <= now;
       var title = evt ? evt.title : '（活動已被刪除）';
-      var dateLabel = evt && evt.date ? evt.date.toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+      var dateLabel = evt && evt.date ? evt.date.toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit', hour12:false }) : '';
       var expiryLabel = isExpired
-        ? '已於 ' + session.windowEnd.toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' }) + ' 過期'
-        : '開放至 ' + session.windowEnd.toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' });
+        ? '已於 ' + session.windowEnd.toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit', hour12:false }) + ' 過期'
+        : '開放至 ' + session.windowEnd.toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit', hour12:false });
 
       return (
         '<div class="session-card' + (isExpired ? ' expired' : '') + '" data-event="' + eventId + '">' +
@@ -533,6 +537,17 @@
     document.getElementById('appRoot').classList.remove('hidden');
     initAccountMenu(result.profile.name);
 
+    // 活動類型跟活動本身是兩份分開即時更新的資料，先等類型資料到齊過一次才開始畫，
+    // 避免類型還沒載入時先顯示原始 ID 的畫面
+    var typesLoaded = false;
+
+    subscribeEventTypes(db, function(types){
+      eventTypesById = {};
+      types.forEach(function(t){ eventTypesById[t.id] = t; });
+      typesLoaded = true;
+      renderPicker();
+    });
+
     onSnapshot(collection(db, 'events'), function(snap){
       eventsById = {};
       snap.forEach(function(docSnap){
@@ -544,7 +559,7 @@
           location: data.location
         };
       });
-      renderPicker();
+      if (typesLoaded) renderPicker();
       renderSessions();
     });
 

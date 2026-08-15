@@ -222,9 +222,6 @@
     font-family:'Roboto Mono',monospace; font-size:9.5px; letter-spacing:.05em;
     padding:1.5px 6px; border-radius:5px; font-weight:600;
   }
-  .kind.rehearsal{ background:var(--sage-bg); color:var(--sage); }
-  .kind.sectional{ background:#EFE7D2; color:var(--brass-deep); }
-  .kind.performance{ background:var(--burgundy); color:#F2EFE5; }
   .event-meta{ margin-top:4px; font-size:12px; color:var(--ink-soft); line-height:1.5; }
 
   .event-actions{ display:flex; gap:8px; margin-top:10px; margin-left:54px; }
@@ -239,6 +236,25 @@
   .btn-delete:active{ background:#F6EDEE; }
 
   .empty{ padding:36px 20px; text-align:center; font-size:13px; color:var(--ink-soft); }
+
+  /* ---------- Event type manager ---------- */
+  .swatch-picker{ display:flex; flex-wrap:wrap; gap:10px; }
+  .swatch{
+    width:30px; height:30px; border-radius:50%; flex:none;
+    border:2px solid transparent; cursor:pointer; padding:0;
+  }
+  .swatch.selected{ border-color:var(--ink); }
+  .type-item{ display:flex; align-items:center; gap:10px; padding:12px 16px; }
+  .type-item + .type-item{ border-top:1px solid var(--line); }
+  .type-swatch{ width:18px; height:18px; border-radius:50%; flex:none; }
+  .type-label{ flex:1; font-weight:600; font-size:13.5px; color:var(--ink); }
+  .type-actions{ display:flex; gap:6px; }
+  .type-actions button{
+    flex:none; border-radius:var(--radius-sm); padding:5px 10px;
+    font-weight:700; font-size:11px; cursor:pointer;
+    background:none; border:1px solid var(--line); color:var(--ink-soft);
+  }
+  .btn-type-delete{ color:var(--burgundy-deep); }
 </style>
 </head>
 <body>
@@ -275,11 +291,7 @@
     </div>
     <div class="field">
       <label>類型</label>
-      <select id="eventType">
-        <option value="rehearsal">團練</option>
-        <option value="sectional">分部練</option>
-        <option value="performance">演出</option>
-      </select>
+      <select id="eventType"></select>
     </div>
     <div class="field">
       <label>日期</label>
@@ -317,6 +329,28 @@
 
   <div class="list" id="eventList"></div>
 
+  <div class="section-label hidden" id="typesSectionLabel">
+    <span class="tw">活動類型管理</span>
+    <span class="en">Event Types</span>
+  </div>
+
+  <form class="card hidden" id="typeForm">
+    <div class="field">
+      <label>新增/編輯類型名稱</label>
+      <input type="text" id="newTypeLabel" placeholder="例如：社遊">
+    </div>
+    <div class="field">
+      <label>顏色</label>
+      <div class="swatch-picker" id="colorPicker"></div>
+    </div>
+    <p class="form-error" id="typeFormError"></p>
+    <div class="form-buttons">
+      <button type="submit" class="cta-btn" id="typeSubmitBtn">新增類型</button>
+    </div>
+  </form>
+
+  <div class="list hidden" id="typesList"></div>
+
 </div>
 
 <div class="drawer-overlay" id="drawerOverlay">
@@ -328,6 +362,7 @@
   import { db } from './firebase-init.js';
   import { initAdminNav } from './admin-nav.js';
   import { initAccountMenu } from './account-menu.js';
+  import { subscribeEventTypes, COLOR_THEMES, badgeStyle } from './event-types.js';
   import {
     collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot,
     serverTimestamp, Timestamp
@@ -335,10 +370,13 @@
 
   initAdminNav('event-admin.html');
 
-  var KIND_LABEL = { rehearsal: '團練', sectional: '分部練', performance: '演出' };
-
   var eventsById = {};
   var editingId = null;
+
+  var eventTypesList = [];
+  var eventTypesById = {};
+  var editingTypeId = null;
+  var selectedColorKey = 'sage';
 
   var eventForm = document.getElementById('eventForm');
   var eventFormError = document.getElementById('eventFormError');
@@ -458,10 +496,16 @@
   function formatEventTime(evt){
     if (!evt.date) return '';
     if (evt.allDay) return '全天';
-    var start = evt.date.toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit' });
+    var start = evt.date.toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit', hour12:false });
     if (!evt.endTime) return start;
-    var end = evt.endTime.toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit' });
+    var end = evt.endTime.toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit', hour12:false });
     return start + '–' + end;
+  }
+
+  function typeBadge(typeId){
+    var t = eventTypesById[typeId];
+    var label = t ? t.label : typeId;
+    return '<span class="kind" style="' + badgeStyle(t ? t.colorKey : null) + '">' + label + '</span>';
   }
 
   function render(){
@@ -488,7 +532,7 @@
               '<div class="m">' + (d ? (d.getMonth() + 1) + '月' : '') + '</div>' +
             '</div>' +
             '<div class="event-body">' +
-              '<div class="event-title">' + evt.title + '<span class="kind ' + evt.type + '">' + (KIND_LABEL[evt.type] || evt.type) + '</span></div>' +
+              '<div class="event-title">' + evt.title + typeBadge(evt.type) + '</div>' +
               '<div class="event-meta">' + formatEventTime(evt) + (evt.location ? ' · ' + evt.location : '') + '</div>' +
             '</div>' +
           '</div>' +
@@ -530,6 +574,126 @@
     }
   });
 
+  function renderTypeSelect(){
+    var select = document.getElementById('eventType');
+    var current = select.value;
+    select.innerHTML = eventTypesList.map(function(t){
+      return '<option value="' + t.id + '">' + t.label + '</option>';
+    }).join('');
+    if (eventTypesById[current]) select.value = current;
+  }
+
+  function renderColorPicker(){
+    var picker = document.getElementById('colorPicker');
+    picker.innerHTML = Object.keys(COLOR_THEMES).map(function(key){
+      var theme = COLOR_THEMES[key];
+      return '<button type="button" class="swatch' + (key === selectedColorKey ? ' selected' : '') +
+        '" data-color="' + key + '" style="background:' + theme.bg + ';" aria-label="' + key + '"></button>';
+    }).join('');
+  }
+
+  document.getElementById('colorPicker').addEventListener('click', function(e){
+    var btn = e.target.closest('[data-color]');
+    if (!btn) return;
+    selectedColorKey = btn.getAttribute('data-color');
+    renderColorPicker();
+  });
+
+  var typeForm = document.getElementById('typeForm');
+  var typeFormError = document.getElementById('typeFormError');
+  var typeSubmitBtn = document.getElementById('typeSubmitBtn');
+
+  function enterTypeCreateMode(){
+    editingTypeId = null;
+    typeForm.reset();
+    selectedColorKey = 'sage';
+    renderColorPicker();
+    typeSubmitBtn.textContent = '新增類型';
+    typeFormError.textContent = '';
+    typeFormError.classList.remove('show');
+  }
+
+  typeForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    var label = document.getElementById('newTypeLabel').value.trim();
+    if (!label){
+      typeFormError.textContent = '請輸入類型名稱';
+      typeFormError.classList.add('show');
+      return;
+    }
+    typeSubmitBtn.disabled = true;
+
+    var payload = { label: label, colorKey: selectedColorKey };
+    var task = editingTypeId
+      ? updateDoc(doc(db, 'eventTypes', editingTypeId), payload)
+      : addDoc(collection(db, 'eventTypes'), Object.assign({}, payload, {
+          order: eventTypesList.length + 1,
+          createdBy: currentAdminUid,
+          createdAt: serverTimestamp()
+        }));
+
+    task.then(function(){
+      typeSubmitBtn.disabled = false;
+      enterTypeCreateMode();
+    }).catch(function(err){
+      typeSubmitBtn.disabled = false;
+      typeFormError.textContent = '操作失敗（' + err.code + '）';
+      typeFormError.classList.add('show');
+    });
+  });
+
+  function renderTypesList(){
+    var list = document.getElementById('typesList');
+    if (eventTypesList.length === 0){
+      list.innerHTML = '<div class="empty">目前沒有任何活動類型</div>';
+      return;
+    }
+    list.innerHTML = eventTypesList.map(function(t){
+      var theme = COLOR_THEMES[t.colorKey] || COLOR_THEMES.slate;
+      return (
+        '<div class="type-item">' +
+          '<span class="type-swatch" style="background:' + theme.bg + ';"></span>' +
+          '<span class="type-label">' + t.label + '</span>' +
+          '<div class="type-actions">' +
+            '<button type="button" data-edit-type="' + t.id + '">編輯</button>' +
+            '<button type="button" class="btn-type-delete" data-delete-type="' + t.id + '">刪除</button>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  document.getElementById('typesList').addEventListener('click', function(e){
+    var editBtn = e.target.closest('[data-edit-type]');
+    var deleteBtn = e.target.closest('[data-delete-type]');
+
+    if (editBtn){
+      var editId = editBtn.getAttribute('data-edit-type');
+      var editType = eventTypesById[editId];
+      if (!editType) return;
+      editingTypeId = editId;
+      document.getElementById('newTypeLabel').value = editType.label;
+      selectedColorKey = editType.colorKey;
+      renderColorPicker();
+      typeSubmitBtn.textContent = '儲存變更';
+      typeForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    if (deleteBtn){
+      var delId = deleteBtn.getAttribute('data-delete-type');
+      var delType = eventTypesById[delId];
+      var ok = confirm(
+        '確定要刪除「' + (delType ? delType.label : '這個類型') + '」嗎？\n' +
+        '如果還有活動使用這個類型，畫面會顯示找不到對應名稱，不會自動改到別的類型。'
+      );
+      if (!ok) return;
+      deleteDoc(doc(db, 'eventTypes', delId)).then(function(){
+        if (editingTypeId === delId) enterTypeCreateMode();
+      }).catch(function(err){
+        alert('刪除失敗：' + err.code);
+      });
+    }
+  });
+
   var currentAdminUid = null;
 
   requireAdmin().then(function(result){
@@ -540,6 +704,32 @@
     document.getElementById('authLoading').classList.add('hidden');
     document.getElementById('appRoot').classList.remove('hidden');
     initAccountMenu(result.profile.name);
+
+    var canManageTypes = result.profile.role === 'owner' ||
+      (result.profile.permissions && result.profile.permissions.canManageEventTypes === true);
+
+    if (canManageTypes){
+      document.getElementById('typesSectionLabel').classList.remove('hidden');
+      typeForm.classList.remove('hidden');
+      document.getElementById('typesList').classList.remove('hidden');
+    }
+
+    renderColorPicker();
+
+    // 活動類型跟活動本身是兩份分開即時更新的資料，先等類型資料到齊過一次，
+    // 才開始畫活動列表/下拉選單，避免出現「類型還沒載入時顯示原始 ID」的畫面，
+    // 也避免使用者在那個空窗期點編輯，選單選不到正確值卡住的問題
+    var typesLoaded = false;
+
+    subscribeEventTypes(db, function(types){
+      eventTypesList = types;
+      eventTypesById = {};
+      types.forEach(function(t){ eventTypesById[t.id] = t; });
+      typesLoaded = true;
+      renderTypeSelect();
+      renderTypesList();
+      render();
+    }, canManageTypes ? currentAdminUid : null);
 
     onSnapshot(collection(db, 'events'), function(snap){
       eventsById = {};
@@ -554,7 +744,7 @@
           location: data.location
         };
       });
-      render();
+      if (typesLoaded) render();
     });
 
     setDefaultEventDate();

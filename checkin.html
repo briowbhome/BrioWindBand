@@ -176,11 +176,11 @@
 
   function fmtDateTime(date){
     if (!date) return '—';
-    return date.toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
+    return date.toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit', hour12:false });
   }
   function fmtTime(date){
     if (!date) return '—';
-    return date.toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' });
+    return date.toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit', hour12:false });
   }
 
   function renderNotice(iconPath, headline, sub){
