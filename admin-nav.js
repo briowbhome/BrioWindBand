@@ -4,7 +4,8 @@ export const ADMIN_PAGES = [
   { href: "admin.html", label: "團員審核" },
   { href: "event-admin.html", label: "活動管理" },
   { href: "checkin-admin.html", label: "簽到管理" },
-  { href: "announce-admin.html", label: "公告管理" }
+  { href: "announce-admin.html", label: "公告管理" },
+  { href: "roles-admin.html", label: "權限管理" }
 ];
 
 // 每個後台頁面都要有 #adminMenuBtn（appbar 上的漢堡按鈕）、

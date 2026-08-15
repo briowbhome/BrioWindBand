@@ -47,7 +47,7 @@
     padding: 0 0 calc(48px + env(safe-area-inset-bottom));
   }
 
-  button, a, input{ -webkit-tap-highlight-color: transparent; font-family:inherit; }
+  button, a, input, select{ -webkit-tap-highlight-color: transparent; font-family:inherit; }
   :focus-visible{ outline:2.5px solid var(--brass-deep); outline-offset:2px; border-radius:6px; }
 
   .app{
@@ -146,35 +146,17 @@
   .section-label .en{ font-family:'Roboto Mono',monospace; font-size:10px; letter-spacing:.12em; color:var(--ink-soft); text-transform:uppercase; }
   .lede{ margin:6px 20px 10px; font-size:12.5px; line-height:1.6; color:var(--ink-soft); }
 
-  /* ---------- Event picker ---------- */
-  .list{
-    margin:0 20px 24px;
-    background:var(--paper-raised);
-    border:1px solid var(--line);
-    border-radius:var(--radius-lg);
-    box-shadow:var(--shadow-card);
-    overflow:hidden;
+  /* ---------- Time range filter ---------- */
+  .filter-row{
+    display:flex; align-items:center; justify-content:space-between;
+    margin:0 20px 14px;
   }
-  .picker-item{
-    padding:13px 16px;
-    display:flex; align-items:center; gap:12px;
+  .filter-row label{ font-size:12px; color:var(--ink-soft); font-weight:600; }
+  .filter-row select{
+    border:1px solid var(--line); background:var(--paper-raised);
+    border-radius:999px; padding:6px 14px; font-size:12px; color:var(--ink);
+    font-weight:700;
   }
-  .picker-item + .picker-item{ border-top:1px solid var(--line); }
-  .picker-body{ flex:1; min-width:0; }
-  .picker-title{ font-weight:700; font-size:13.5px; color:var(--ink); display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
-  .kind{
-    font-family:'Roboto Mono',monospace; font-size:9.5px; letter-spacing:.05em;
-    padding:1.5px 6px; border-radius:5px; font-weight:600;
-  }
-  .picker-meta{ margin-top:4px; font-size:12px; color:var(--ink-soft); line-height:1.5; }
-  .btn-start{
-    flex:none;
-    background:var(--brass); color:var(--ink); border:none;
-    border-radius:var(--radius-sm); padding:9px 14px;
-    font-weight:700; font-size:12px; cursor:pointer;
-  }
-  .btn-start:active{ background:var(--brass-deep); }
-  .btn-start:disabled{ opacity:.5; }
 
   .list-error{
     margin:0 20px 14px;
@@ -184,43 +166,61 @@
   }
   .list-error.show{ display:block; }
 
-  /* ---------- Session list ---------- */
-  .list-header{
-    display:flex; align-items:center; justify-content:space-between;
-    margin:0 20px 10px;
-  }
-  .refresh-btn{
-    background:none; border:1px solid var(--line); border-radius:999px;
-    padding:6px 12px; font-size:11.5px; font-weight:700; color:var(--ink-soft);
-    cursor:pointer; display:flex; align-items:center; gap:5px;
-  }
-  .refresh-btn:active{ background:var(--paper-raised); }
-
-  .session-card{
-    margin:0 20px 16px;
-    background:var(--ink); color:var(--paper);
+  /* ---------- Unified event list ---------- */
+  .list{
+    margin:0 20px 24px;
+    background:var(--paper-raised);
+    border:1px solid var(--line);
     border-radius:var(--radius-lg);
     box-shadow:var(--shadow-card);
     overflow:hidden;
-    position:relative;
   }
-  .session-card.expired{
-    background:var(--paper-raised);
-    color:var(--ink-soft);
-    border:1px solid var(--line);
+  .event-item{ padding:14px 16px; }
+  .event-item + .event-item{ border-top:1px solid var(--line); }
+  .event-row{ display:flex; align-items:center; gap:12px; }
+  .event-date{ flex:none; width:40px; text-align:center; }
+  .event-date .d{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:18px; color:var(--ink); line-height:1.05; }
+  .event-date .m{ font-family:'Roboto Mono',monospace; font-size:9px; color:var(--ink-soft); letter-spacing:.04em; }
+  .event-body{ flex:1; min-width:0; }
+  .event-title{ font-weight:700; font-size:13.5px; color:var(--ink); display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .kind{
+    font-family:'Roboto Mono',monospace; font-size:9.5px; letter-spacing:.05em;
+    padding:1.5px 6px; border-radius:5px; font-weight:600;
   }
-  .session-card .staff-bg{
+  .event-meta{ margin-top:3px; font-size:11.5px; color:var(--ink-soft); }
+
+  .btn-start{
+    flex:none;
+    background:var(--brass); color:var(--ink); border:none;
+    border-radius:var(--radius-sm); padding:9px 12px;
+    font-weight:700; font-size:11.5px; cursor:pointer;
+  }
+  .btn-start:active{ background:var(--brass-deep); }
+  .btn-start:disabled{ opacity:.5; }
+
+  .qr-toggle{
+    flex:none; width:38px; height:38px; border-radius:var(--radius-sm);
+    border:1px solid var(--line); background:var(--paper);
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    color:var(--ink-soft); padding:0;
+  }
+  .qr-toggle.active{ border-color:var(--sage); color:var(--sage); background:var(--sage-bg); }
+  .qr-toggle.expired{ color:var(--burgundy-deep); border-color:#EFD4D8; background:#FBF3F3; }
+
+  /* ---------- QR panel (expands within a row) ---------- */
+  .qr-panel{
+    margin-top:12px; background:var(--ink); color:var(--paper);
+    border-radius:var(--radius-md); padding:16px; position:relative; overflow:hidden;
+  }
+  .qr-panel.expired-style{ background:var(--paper); color:var(--ink-soft); border:1px solid var(--line); }
+  .qr-panel .staff-bg{
     position:absolute; inset:0;
     background-image: repeating-linear-gradient(rgba(242,239,229,.09), rgba(242,239,229,.09) 1px, transparent 1px, transparent 9px);
     pointer-events:none;
   }
-  .session-card.expired .staff-bg{ display:none; }
-  .session-inner{ position:relative; padding:18px 18px 16px; }
-
-  .session-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
-  .session-title{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:16.5px; }
-  .session-meta{ font-family:'Roboto Mono',monospace; font-size:10.5px; color:#C9C2A8; margin-top:3px; }
-  .session-card.expired .session-meta{ color:var(--ink-soft); }
+  .qr-panel.expired-style .staff-bg{ display:none; }
+  .qr-panel-inner{ position:relative; }
+  .qr-status-row{ display:flex; justify-content:space-between; align-items:center; gap:10px; }
   .status-chip{
     font-family:'Roboto Mono',monospace; font-weight:600; font-size:10.5px;
     padding:3px 9px; border-radius:999px; flex:none;
@@ -233,7 +233,6 @@
     padding:14px; display:flex; align-items:center; justify-content:center;
   }
   .qr-wrap img{ width:180px; height:180px; display:block; cursor:zoom-in; }
-  .session-card.expired .qr-wrap{ opacity:.35; }
 
   .qr-zoom-overlay{
     position:fixed; inset:0; z-index:60;
@@ -248,31 +247,31 @@
     box-shadow:0 20px 60px rgba(0,0,0,.4);
   }
 
-  .session-actions{ display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
-  .session-actions button{
+  .qr-actions{ display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+  .qr-actions button{
     flex:1; min-width:100px;
     border-radius:var(--radius-sm); padding:10px 8px;
     font-weight:700; font-size:12px; cursor:pointer;
     transition:transform .12s ease;
   }
-  .session-actions button:active{ transform:scale(.97); }
+  .qr-actions button:active{ transform:scale(.97); }
   .btn-reopen{ background:var(--brass); color:var(--ink); border:none; }
   .btn-regen{ background:none; border:1px solid rgba(242,239,229,.4); color:var(--paper); }
-  .session-card.expired .btn-regen{ border-color:var(--line); color:var(--ink-soft); }
+  .qr-panel.expired-style .btn-regen{ border-color:var(--line); color:var(--ink-soft); }
   .btn-end{ background:none; border:1px solid rgba(242,239,229,.4); color:#E8B4BC; }
-  .session-card.expired .btn-end{ border-color:var(--line); color:var(--burgundy-deep); }
+  .qr-panel.expired-style .btn-end{ border-color:var(--line); color:var(--burgundy-deep); }
 
   /* ---------- Attendance (簽到名單) ---------- */
   .att-toggle{
     display:flex; align-items:center; gap:6px;
     margin-top:12px; background:none; border:none; padding:0;
-    font-size:12px; font-weight:700; color:var(--brass); cursor:pointer;
+    font-size:12px; font-weight:700; color:var(--brass-deep); cursor:pointer;
   }
-  .session-card.expired .att-toggle{ color:var(--brass-deep); }
   .att-toggle .chev{ transition:transform .15s ease; }
   .att-toggle.open .chev{ transform:rotate(180deg); }
   .att-panel{
-    margin-top:10px; background:var(--paper-raised); color:var(--ink);
+    margin-top:10px; background:var(--paper); color:var(--ink);
+    border:1px solid var(--line);
     border-radius:var(--radius-md); overflow:hidden;
   }
   .att-summary{
@@ -289,6 +288,21 @@
   .att-time.late{ color:var(--brass-deep); }
   .att-time.verylate{ color:var(--burgundy-deep); }
   .att-empty{ padding:16px 12px; text-align:center; font-size:12px; color:var(--ink-soft); }
+  .att-remove{
+    flex:none; width:22px; height:22px; border-radius:50%; border:none; background:none;
+    color:var(--ink-soft); cursor:pointer; font-size:15px; line-height:1;
+  }
+  .att-remove:active{ color:var(--burgundy-deep); }
+  .att-add-row{ display:flex; gap:8px; padding:10px 12px; border-top:1px solid var(--line); }
+  .att-add-row select{
+    flex:1; min-width:0; border:1px solid var(--line); background:var(--paper-raised);
+    border-radius:var(--radius-sm); padding:7px 9px; font-size:12px; color:var(--ink);
+  }
+  .att-add-row button{
+    flex:none; background:var(--brass); color:var(--ink); border:none;
+    border-radius:var(--radius-sm); padding:7px 14px; font-weight:700; font-size:12px; cursor:pointer;
+  }
+  .att-add-row button:disabled{ opacity:.5; }
 
   .empty{ padding:36px 20px; text-align:center; font-size:13px; color:var(--ink-soft); }
 </style>
@@ -316,26 +330,24 @@
   <div class="staff"></div>
 
   <div class="section-label">
-    <span class="tw">選擇活動開始簽到</span>
-    <span class="en">Start Check-in</span>
+    <span class="tw">簽到管理</span>
+    <span class="en">Check-in</span>
   </div>
-  <p class="lede">只列出近期的活動，如果找不到要的活動，請先到「活動管理」建立。</p>
-  <p class="list-error" id="pickerError"></p>
+  <p class="lede">產生簽到 QR Code、查看簽到名單。找不到活動請先到「活動管理」建立。</p>
 
-  <div class="list" id="eventPicker"></div>
-
-  <div class="list-header">
-    <div class="section-label" style="margin:0;">
-      <span class="tw">簽到狀態</span>
-      <span class="en">Sessions</span>
-    </div>
-    <button type="button" class="refresh-btn" id="refreshBtn">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M4 4v6h6M20 20v-6h-6" stroke="#4A4F5C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 15a8 8 0 0 0 13.9 3M18.5 9A8 8 0 0 0 4.6 6" stroke="#4A4F5C" stroke-width="2" stroke-linecap="round"/></svg>
-      重新整理
-    </button>
+  <div class="filter-row">
+    <label for="rangeFilter">顯示範圍（未來活動一律顯示）</label>
+    <select id="rangeFilter">
+      <option value="7">最近 7 天</option>
+      <option value="30" selected>最近 1 個月</option>
+      <option value="90">最近 3 個月</option>
+      <option value="all">全部</option>
+    </select>
   </div>
 
-  <div id="sessionList"></div>
+  <p class="list-error" id="listError"></p>
+
+  <div class="list" id="eventList"></div>
 
 </div>
 
@@ -361,8 +373,6 @@
   initAdminNav('checkin-admin.html');
 
   var WINDOW_MINUTES = 30;
-  var PICKER_PAST_HOURS = 6;
-  var PICKER_MAX = 10;
   // 簽到名單的遲到門檻，之後想調整標準改這兩個數字就好
   var LATE_MINUTES = 15;
   var VERY_LATE_MINUTES = 30;
@@ -380,14 +390,19 @@
   var eventsById = {};
   // eventId -> { code, windowEnd(Date), generatedAt }
   var sessionsById = {};
+  // 展開中的 QR / 簽到名單面板，重繪列表後要恢復展開狀態
+  var openQrPanels = {};
+  var openAttPanels = {};
+  // 已核准團員清單，手動補登簽到用，第一次要用到時才抓、抓過快取
+  var approvedMembers = null;
 
-  var eventPicker = document.getElementById('eventPicker');
-  var pickerError = document.getElementById('pickerError');
-  var sessionList = document.getElementById('sessionList');
+  var eventList = document.getElementById('eventList');
+  var listError = document.getElementById('listError');
+  var rangeFilter = document.getElementById('rangeFilter');
 
-  function showPickerError(message){
-    pickerError.textContent = message;
-    pickerError.classList.toggle('show', !!message);
+  function showListError(message){
+    listError.textContent = message;
+    listError.classList.toggle('show', !!message);
   }
 
   function qrDataUrl(text){
@@ -402,91 +417,95 @@
       'checkin.html?event=' + encodeURIComponent(eventId) + '&code=' + encodeURIComponent(code);
   }
 
-  function renderPicker(){
-    var cutoff = Date.now() - PICKER_PAST_HOURS * 3600000;
-    var ids = Object.keys(eventsById).filter(function(id){
-      var evt = eventsById[id];
-      return evt.date && evt.date.getTime() >= cutoff;
-    });
-
-    if (ids.length === 0){
-      eventPicker.innerHTML = '<div class="empty">近期沒有活動，請先到「活動管理」建立</div>';
-      return;
-    }
-
-    ids.sort(function(a, b){ return eventsById[a].date.getTime() - eventsById[b].date.getTime(); });
-    ids = ids.slice(0, PICKER_MAX);
-
-    eventPicker.innerHTML = ids.map(function(eventId){
-      var evt = eventsById[eventId];
-      var d = evt.date;
-      var dateLabel = d.toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit', hour12:false });
-      var hasActiveSession = sessionsById[eventId] && sessionsById[eventId].windowEnd > new Date();
-
-      return (
-        '<div class="picker-item">' +
-          '<div class="picker-body">' +
-            '<div class="picker-title">' + evt.title + typeBadge(evt.type) + '</div>' +
-            '<div class="picker-meta">' + dateLabel + (evt.location ? ' · ' + evt.location : '') + '</div>' +
-          '</div>' +
-          '<button type="button" class="btn-start" data-start="' + eventId + '">' + (hasActiveSession ? '重新產生' : '產生 QR Code') + '</button>' +
-        '</div>'
-      );
-    }).join('');
-  }
-
-  function renderSessions(){
-    var ids = Object.keys(sessionsById);
-    if (ids.length === 0){
-      sessionList.innerHTML = '<div class="empty">目前沒有任何簽到中的活動</div>';
-      return;
-    }
-
-    ids.sort(function(a, b){
-      return (sessionsById[b].generatedAt ? sessionsById[b].generatedAt.getTime() : 0) -
-             (sessionsById[a].generatedAt ? sessionsById[a].generatedAt.getTime() : 0);
-    });
-
+  function qrPanelHtml(eventId){
+    var evt = eventsById[eventId];
+    var session = sessionsById[eventId];
     var now = new Date();
 
-    sessionList.innerHTML = ids.map(function(eventId){
-      var session = sessionsById[eventId];
+    if (!session){
+      return '';
+    }
+
+    var isExpired = session.windowEnd <= now;
+    var expiryLabel = isExpired
+      ? '已於 ' + session.windowEnd.toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit', hour12:false }) + ' 過期'
+      : '開放至 ' + session.windowEnd.toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit', hour12:false });
+
+    return (
+      '<div class="qr-panel' + (isExpired ? ' expired-style' : '') + '">' +
+        '<div class="staff-bg"></div>' +
+        '<div class="qr-panel-inner">' +
+          '<div class="qr-status-row">' +
+            '<span class="status-chip ' + (isExpired ? 'expired' : 'active') + '">' + (isExpired ? '已過期' : expiryLabel) + '</span>' +
+          '</div>' +
+          (isExpired ? '' :
+            '<div class="qr-wrap"><img src="' + qrDataUrl(checkinUrl(eventId, session.code)) + '" alt="簽到 QR Code"></div>'
+          ) +
+          '<div class="qr-actions">' +
+            '<button type="button" class="btn-reopen" data-reopen="' + eventId + '">' + (isExpired ? '重新開放' : '延長 30 分') + '</button>' +
+            '<button type="button" class="btn-regen" data-regen="' + eventId + '">產生新的 QR</button>' +
+            '<button type="button" class="btn-end" data-end="' + eventId + '">✕ 結束</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function renderEventList(){
+    var rangeVal = rangeFilter.value;
+    var cutoff = rangeVal === 'all' ? -Infinity : Date.now() - Number(rangeVal) * 86400000;
+
+    var ids = Object.keys(eventsById).filter(function(id){
+      var evt = eventsById[id];
+      if (!evt.date) return false;
+      var t = evt.date.getTime();
+      return t >= Date.now() || t >= cutoff; // 未來活動一律顯示，篩選只影響過去的邊界
+    });
+
+    if (ids.length === 0){
+      eventList.innerHTML = '<div class="empty">這個範圍內沒有活動</div>';
+      return;
+    }
+
+    ids.sort(function(a, b){ return eventsById[b].date.getTime() - eventsById[a].date.getTime(); });
+
+    eventList.innerHTML = ids.map(function(eventId){
       var evt = eventsById[eventId];
-      var isExpired = session.windowEnd <= now;
-      var title = evt ? evt.title : '（活動已被刪除）';
-      var dateLabel = evt && evt.date ? evt.date.toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit', hour12:false }) : '';
-      var expiryLabel = isExpired
-        ? '已於 ' + session.windowEnd.toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit', hour12:false }) + ' 過期'
-        : '開放至 ' + session.windowEnd.toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit', hour12:false });
+      var d = evt.date;
+      var dateLabel = d.toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit', hour12:false });
+      var session = sessionsById[eventId];
+      var qrOpen = !!openQrPanels[eventId];
+      var attOpen = !!openAttPanels[eventId];
+
+      var qrControl = session
+        ? '<button type="button" class="qr-toggle ' + (session.windowEnd > new Date() ? 'active' : 'expired') + '" data-qr-toggle="' + eventId + '" aria-label="簽到 QR Code">' +
+            '<svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.6"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.6"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z" fill="currentColor"/></svg>' +
+          '</button>'
+        : '<button type="button" class="btn-start" data-start="' + eventId + '">產生 QR</button>';
 
       return (
-        '<div class="session-card' + (isExpired ? ' expired' : '') + '" data-event="' + eventId + '">' +
-          '<div class="staff-bg"></div>' +
-          '<div class="session-inner">' +
-            '<div class="session-top">' +
-              '<div>' +
-                '<div class="session-title">' + title + '</div>' +
-                '<div class="session-meta">' + dateLabel + (evt && evt.location ? ' · ' + evt.location : '') + '</div>' +
-              '</div>' +
-              '<span class="status-chip ' + (isExpired ? 'expired' : 'active') + '">' + (isExpired ? '已過期' : expiryLabel) + '</span>' +
+        '<div class="event-item" data-event="' + eventId + '">' +
+          '<div class="event-row">' +
+            '<div class="event-date"><div class="d">' + d.getDate() + '</div><div class="m">' + (d.getMonth() + 1) + '月</div></div>' +
+            '<div class="event-body">' +
+              '<div class="event-title">' + evt.title + typeBadge(evt.type) + '</div>' +
+              '<div class="event-meta">' + dateLabel + (evt.location ? ' · ' + evt.location : '') + '</div>' +
             '</div>' +
-            (isExpired ? '' :
-              '<div class="qr-wrap"><img src="' + qrDataUrl(checkinUrl(eventId, session.code)) + '" alt="簽到 QR Code"></div>'
-            ) +
-            '<div class="session-actions">' +
-              '<button type="button" class="btn-reopen" data-reopen="' + eventId + '">' + (isExpired ? '重新開放' : '延長 30 分') + '</button>' +
-              '<button type="button" class="btn-regen" data-regen="' + eventId + '">產生新的 QR</button>' +
-              '<button type="button" class="btn-end" data-end="' + eventId + '">✕ 結束</button>' +
-            '</div>' +
-            '<button type="button" class="att-toggle" data-att-toggle="' + eventId + '">' +
-              '<svg class="chev" width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
-              '簽到名單' +
-            '</button>' +
-            '<div class="att-panel hidden" id="attPanel-' + eventId + '"></div>' +
+            qrControl +
           '</div>' +
+          '<div class="qr-panel-slot' + (qrOpen ? '' : ' hidden') + '" id="qrPanel-' + eventId + '">' + (session ? qrPanelHtml(eventId) : '') + '</div>' +
+          '<button type="button" class="att-toggle' + (attOpen ? ' open' : '') + '" data-att-toggle="' + eventId + '">' +
+            '<svg class="chev" width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+            '簽到名單' +
+          '</button>' +
+          '<div class="att-panel' + (attOpen ? '' : ' hidden') + '" id="attPanel-' + eventId + '"></div>' +
         '</div>'
       );
     }).join('');
+
+    Object.keys(openAttPanels).forEach(function(eventId){
+      if (openAttPanels[eventId] && eventsById[eventId]) loadAttendance(eventId);
+    });
   }
 
   function randomCode(){
@@ -500,6 +519,7 @@
       generatedAt: serverTimestamp(),
       generatedBy: currentAdminUid
     });
+    openQrPanels[eventId] = true;
   }
 
   async function reopenSession(eventId){
@@ -518,6 +538,7 @@
 
   async function endSession(eventId){
     await deleteDoc(doc(db, 'checkinSessions', eventId));
+    delete openQrPanels[eventId];
   }
 
   function formatAttTime(checkedInAt, eventDate){
@@ -528,6 +549,16 @@
     return { label: label, cls: cls };
   }
 
+  async function ensureApprovedMembers(){
+    if (approvedMembers) return approvedMembers;
+    var snap = await getDocs(query(collection(db, 'users'), where('status', '==', 'approved')));
+    approvedMembers = snap.docs.map(function(docSnap){
+      var data = docSnap.data();
+      return { uid: docSnap.id, name: data.name, account: data.account };
+    });
+    return approvedMembers;
+  }
+
   async function loadAttendance(eventId){
     var panel = document.getElementById('attPanel-' + eventId);
     if (!panel) return;
@@ -535,12 +566,7 @@
 
     try {
       var snap = await getDocs(query(collection(db, 'checkins'), where('eventId', '==', eventId)));
-      var rows = snap.docs.map(function(docSnap){ return docSnap.data(); });
-
-      if (rows.length === 0){
-        panel.innerHTML = '<div class="att-empty">目前還沒有人簽到</div>';
-        return;
-      }
+      var rows = snap.docs.map(function(docSnap){ return Object.assign({ checkinId: docSnap.id }, docSnap.data()); });
 
       rows.sort(function(a, b){
         var ta = a.checkedInAt && a.checkedInAt.toDate ? a.checkedInAt.toDate().getTime() : 0;
@@ -550,47 +576,69 @@
 
       var evt = eventsById[eventId];
       var eventDate = evt ? evt.date : null;
+      var checkedInUids = {};
+      rows.forEach(function(r){ checkedInUids[r.uid] = true; });
 
-      var rowsHtml = rows.map(function(r){
-        var checkedInAt = r.checkedInAt && r.checkedInAt.toDate ? r.checkedInAt.toDate() : null;
-        var timeInfo = checkedInAt ? formatAttTime(checkedInAt, eventDate) : { label: '—', cls: 'ontime' };
-        var methodLabel = r.method === 'manual' ? '手動補登' : '掃碼';
-        return (
-          '<div class="att-row">' +
-            '<div style="flex:1;min-width:0;">' +
-              '<div class="att-name">' + (r.name || r.account || '未知') + '</div>' +
-              '<div class="att-sub">' + (r.account || '') + ' · ' + methodLabel + '</div>' +
-            '</div>' +
-            '<div class="att-time ' + timeInfo.cls + '">' + timeInfo.label + '</div>' +
-          '</div>'
-        );
-      }).join('');
+      var rowsHtml = rows.length === 0
+        ? '<div class="att-empty">目前還沒有人簽到</div>'
+        : '<div class="att-summary"><span>已簽到</span><span>' + rows.length + ' 人</span></div>' +
+          rows.map(function(r){
+            var checkedInAt = r.checkedInAt && r.checkedInAt.toDate ? r.checkedInAt.toDate() : null;
+            var timeInfo = checkedInAt ? formatAttTime(checkedInAt, eventDate) : { label: '—', cls: 'ontime' };
+            var methodLabel = r.method === 'manual' ? '手動補登' : '掃碼';
+            return (
+              '<div class="att-row">' +
+                '<div style="flex:1;min-width:0;">' +
+                  '<div class="att-name">' + (r.name || r.account || '未知') + '</div>' +
+                  '<div class="att-sub">' + (r.account || '') + ' · ' + methodLabel + '</div>' +
+                '</div>' +
+                '<div class="att-time ' + timeInfo.cls + '">' + timeInfo.label + '</div>' +
+                '<button type="button" class="att-remove" data-att-remove="' + r.checkinId + '" aria-label="移除">×</button>' +
+              '</div>'
+            );
+          }).join('');
 
-      panel.innerHTML =
-        '<div class="att-summary"><span>已簽到</span><span>' + rows.length + ' 人</span></div>' +
-        rowsHtml;
+      var members = await ensureApprovedMembers();
+      var available = members.filter(function(m){ return !checkedInUids[m.uid]; });
+      var addRowHtml = '<div class="att-add-row">' +
+        '<select id="attAddSelect-' + eventId + '"' + (available.length === 0 ? ' disabled' : '') + '>' +
+        (available.length === 0
+          ? '<option>所有已核准團員都簽到了</option>'
+          : available.map(function(m){ return '<option value="' + m.uid + '">' + m.name + '（' + m.account + '）</option>'; }).join('')) +
+        '</select>' +
+        '<button type="button" data-att-add="' + eventId + '"' + (available.length === 0 ? ' disabled' : '') + '>手動新增</button>' +
+      '</div>';
+
+      panel.innerHTML = rowsHtml + addRowHtml;
     } catch (err) {
       panel.innerHTML = '<div class="att-empty">載入失敗（' + err.code + '）</div>';
     }
   }
 
-  eventPicker.addEventListener('click', function(e){
-    var startBtn = e.target.closest('[data-start]');
-    if (!startBtn) return;
-    showPickerError('');
-    startBtn.disabled = true;
-    startSession(startBtn.getAttribute('data-start')).catch(function(err){
-      showPickerError('產生失敗（' + err.code + '）');
-    }).finally(function(){
-      startBtn.disabled = false;
+  async function addManualCheckin(eventId, targetUid){
+    var member = (approvedMembers || []).find(function(m){ return m.uid === targetUid; });
+    if (!member) return;
+    var checkinId = eventId + '_' + targetUid;
+    await setDoc(doc(db, 'checkins', checkinId), {
+      eventId: eventId,
+      uid: targetUid,
+      account: member.account,
+      name: member.name,
+      checkedInAt: serverTimestamp(),
+      method: 'manual',
+      recordedBy: currentAdminUid
     });
-  });
+  }
 
-  sessionList.addEventListener('click', function(e){
+  eventList.addEventListener('click', function(e){
+    var startBtn = e.target.closest('[data-start]');
+    var qrToggle = e.target.closest('[data-qr-toggle]');
+    var attToggle = e.target.closest('[data-att-toggle]');
     var reopenBtn = e.target.closest('[data-reopen]');
     var regenBtn = e.target.closest('[data-regen]');
     var endBtn = e.target.closest('[data-end]');
-    var attToggle = e.target.closest('[data-att-toggle]');
+    var addBtn = e.target.closest('[data-att-add]');
+    var removeBtn = e.target.closest('[data-att-remove]');
     var img = e.target.closest('.qr-wrap img');
 
     if (img){
@@ -598,30 +646,77 @@
       qrZoomOverlay.classList.add('active');
       return;
     }
-    if (attToggle){
-      var eventId = attToggle.getAttribute('data-att-toggle');
-      var panel = document.getElementById('attPanel-' + eventId);
-      var opening = panel.classList.contains('hidden');
-      panel.classList.toggle('hidden', !opening);
-      attToggle.classList.toggle('open', opening);
-      if (opening) loadAttendance(eventId);
+
+    if (startBtn){
+      var startId = startBtn.getAttribute('data-start');
+      var evt = eventsById[startId];
+      var ok = confirm('確定要幫「' + (evt ? evt.title : '這場活動') + '」開啟簽到嗎？');
+      if (!ok) return;
+      showListError('');
+      startBtn.disabled = true;
+      startSession(startId).then(function(){
+        renderEventList();
+      }).catch(function(err){
+        showListError('產生失敗（' + err.code + '）');
+        startBtn.disabled = false;
+      });
       return;
     }
+
+    if (qrToggle){
+      var qrEventId = qrToggle.getAttribute('data-qr-toggle');
+      openQrPanels[qrEventId] = !openQrPanels[qrEventId];
+      renderEventList();
+      return;
+    }
+
+    if (attToggle){
+      var attEventId = attToggle.getAttribute('data-att-toggle');
+      openAttPanels[attEventId] = !openAttPanels[attEventId];
+      renderEventList();
+      return;
+    }
+
     if (reopenBtn){
       reopenBtn.disabled = true;
-      reopenSession(reopenBtn.getAttribute('data-reopen')).catch(function(err){ alert('操作失敗：' + err.code); }).finally(function(){ reopenBtn.disabled = false; });
+      reopenSession(reopenBtn.getAttribute('data-reopen')).then(function(){ renderEventList(); }).catch(function(err){ alert('操作失敗：' + err.code); reopenBtn.disabled = false; });
     }
     if (regenBtn){
       regenBtn.disabled = true;
-      startSession(regenBtn.getAttribute('data-regen')).catch(function(err){ alert('操作失敗：' + err.code); }).finally(function(){ regenBtn.disabled = false; });
+      startSession(regenBtn.getAttribute('data-regen')).then(function(){ renderEventList(); }).catch(function(err){ alert('操作失敗：' + err.code); regenBtn.disabled = false; });
     }
     if (endBtn){
       endBtn.disabled = true;
-      endSession(endBtn.getAttribute('data-end')).catch(function(err){ alert('操作失敗：' + err.code); }).finally(function(){ endBtn.disabled = false; });
+      endSession(endBtn.getAttribute('data-end')).then(function(){ renderEventList(); }).catch(function(err){ alert('操作失敗：' + err.code); endBtn.disabled = false; });
+    }
+    if (addBtn){
+      var addEventId = addBtn.getAttribute('data-att-add');
+      var select = document.getElementById('attAddSelect-' + addEventId);
+      if (!select || !select.value) return;
+      addBtn.disabled = true;
+      addManualCheckin(addEventId, select.value).then(function(){
+        loadAttendance(addEventId);
+      }).catch(function(err){
+        alert('新增失敗：' + err.code);
+        addBtn.disabled = false;
+      });
+    }
+    if (removeBtn){
+      var checkinId = removeBtn.getAttribute('data-att-remove');
+      var ok2 = confirm('確定要移除這筆簽到紀錄嗎？此動作無法復原。');
+      if (!ok2) return;
+      var eventIdForRow = checkinId.split('_')[0];
+      removeBtn.disabled = true;
+      deleteDoc(doc(db, 'checkins', checkinId)).then(function(){
+        loadAttendance(eventIdForRow);
+      }).catch(function(err){
+        alert('移除失敗：' + err.code);
+        removeBtn.disabled = false;
+      });
     }
   });
 
-  document.getElementById('refreshBtn').addEventListener('click', renderSessions);
+  rangeFilter.addEventListener('change', renderEventList);
 
   var qrZoomOverlay = document.getElementById('qrZoomOverlay');
   var qrZoomImg = document.getElementById('qrZoomImg');
@@ -647,7 +742,7 @@
       eventTypesById = {};
       types.forEach(function(t){ eventTypesById[t.id] = t; });
       typesLoaded = true;
-      renderPicker();
+      renderEventList();
     });
 
     onSnapshot(collection(db, 'events'), function(snap){
@@ -661,8 +756,7 @@
           location: data.location
         };
       });
-      if (typesLoaded) renderPicker();
-      renderSessions();
+      if (typesLoaded) renderEventList();
     });
 
     onSnapshot(collection(db, 'checkinSessions'), function(snap){
@@ -675,8 +769,7 @@
           generatedAt: data.generatedAt && data.generatedAt.toDate ? data.generatedAt.toDate() : null
         };
       });
-      renderPicker();
-      renderSessions();
+      if (typesLoaded) renderEventList();
     });
   });
 </script>

@@ -581,34 +581,7 @@
         <div class="tw">選擇樂器／聲部</div>
         <div class="hint">可複選你會演奏的樂器／聲部</div>
       </div>
-      <div class="sheet-body">
-        <div class="sheet-group">
-          <div class="sheet-group-label">木管 Woodwind</div>
-          <div class="sheet-chipgroup" data-family="woodwind">
-            <button type="button" class="chip" data-name="長笛">長笛</button>
-            <button type="button" class="chip" data-name="雙簧管">雙簧管</button>
-            <button type="button" class="chip" data-name="單簧管">單簧管</button>
-            <button type="button" class="chip" data-name="低音管">低音管</button>
-            <button type="button" class="chip" data-name="薩克斯風">薩克斯風</button>
-          </div>
-        </div>
-        <div class="sheet-group">
-          <div class="sheet-group-label">銅管 Brass</div>
-          <div class="sheet-chipgroup" data-family="brass">
-            <button type="button" class="chip" data-name="小號">小號</button>
-            <button type="button" class="chip" data-name="法國號">法國號</button>
-            <button type="button" class="chip" data-name="長號">長號</button>
-            <button type="button" class="chip" data-name="上低音號">上低音號</button>
-            <button type="button" class="chip" data-name="低音號">低音號</button>
-          </div>
-        </div>
-        <div class="sheet-group">
-          <div class="sheet-group-label">打擊 Percussion</div>
-          <div class="sheet-chipgroup" data-family="percussion">
-            <button type="button" class="chip" data-name="打擊樂">打擊樂</button>
-          </div>
-        </div>
-      </div>
+      <div class="sheet-body" id="sheetBody"></div>
       <div class="sheet-footer">
         <button type="button" class="cta-btn" id="sheetDoneBtn">完成</button>
       </div>
@@ -619,8 +592,11 @@
 
 <script type="module">
   import { registerAccount, loginAccount } from './auth-service.js';
+  import { db } from './firebase-init.js';
+  import { subscribeInstruments, FAMILY_LABELS, FAMILY_ORDER } from './instruments.js';
 
   var selectedInstruments = [];
+  var sheetBody = document.getElementById('sheetBody');
 
   var sheetOverlay = document.getElementById('sheetOverlay');
   var instrumentTrigger = document.getElementById('instrumentTrigger');
@@ -637,20 +613,45 @@
   }
 
   function syncSheetChips(){
-    document.querySelectorAll('.sheet-chipgroup .chip').forEach(function(chip){
+    sheetBody.querySelectorAll('.chip').forEach(function(chip){
       chip.classList.toggle('active', selectedInstruments.indexOf(chip.getAttribute('data-name')) !== -1);
     });
   }
 
-  document.querySelectorAll('.sheet-chipgroup .chip').forEach(function(chip){
-    chip.addEventListener('click', function(){
-      var name = chip.getAttribute('data-name');
-      var idx = selectedInstruments.indexOf(name);
-      if (idx === -1){ selectedInstruments.push(name); }
-      else { selectedInstruments.splice(idx, 1); }
-      chip.classList.toggle('active');
-      renderTrigger();
+  subscribeInstruments(db, function(list){
+    var byFamily = {};
+    list.forEach(function(item){
+      if (!byFamily[item.family]) byFamily[item.family] = [];
+      byFamily[item.family].push(item.name);
     });
+    var families = FAMILY_ORDER.filter(function(f){ return byFamily[f]; })
+      .concat(Object.keys(byFamily).filter(function(f){ return FAMILY_ORDER.indexOf(f) === -1; }));
+
+    sheetBody.innerHTML = families.map(function(family){
+      return (
+        '<div class="sheet-group">' +
+          '<div class="sheet-group-label">' + (FAMILY_LABELS[family] || family) + '</div>' +
+          '<div class="sheet-chipgroup">' +
+            byFamily[family].map(function(name){
+              return '<button type="button" class="chip" data-name="' + name + '">' + name + '</button>';
+            }).join('') +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+
+    syncSheetChips();
+  });
+
+  sheetBody.addEventListener('click', function(e){
+    var chip = e.target.closest('.chip');
+    if (!chip) return;
+    var name = chip.getAttribute('data-name');
+    var idx = selectedInstruments.indexOf(name);
+    if (idx === -1){ selectedInstruments.push(name); }
+    else { selectedInstruments.splice(idx, 1); }
+    chip.classList.toggle('active');
+    renderTrigger();
   });
 
   instrumentTrigger.addEventListener('click', function(){
