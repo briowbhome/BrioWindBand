@@ -40,9 +40,10 @@
     font-family:'Noto Sans TC','Noto Sans',sans-serif;
     -webkit-font-smoothing:antialiased;
     min-height:100vh;
+    min-height:100dvh;
     display:flex;
     justify-content:center;
-    padding: 0 0 48px;
+    padding: 0 0 calc(48px + env(safe-area-inset-bottom));
   }
 
   button, a{ -webkit-tap-highlight-color: transparent; font-family:inherit; }
@@ -52,6 +53,7 @@
     width:100%;
     max-width:460px;
     min-height:100vh;
+    min-height:100dvh;
     background:var(--paper);
     position:relative;
     display:flex;
@@ -84,7 +86,7 @@
     opacity:.9;
   }
 
-  .stage{ flex:1; display:flex; flex-direction:column; justify-content:center; padding:12px 0 32px; }
+  .stage{ flex:1; display:flex; flex-direction:column; justify-content:center; gap:18px; padding:12px 0 32px; }
 
   /* ---------- Ticket card (success / already-checked-in) ---------- */
   .ticket{
@@ -161,9 +163,10 @@
 
   <div class="staff"></div>
 
-  <div class="stage" id="stage"></div>
-
-  <a href="index.html" class="back-link">← 返回首頁</a>
+  <div class="stage">
+    <div id="stage"></div>
+    <a href="index.html" class="back-link">← 返回首頁</a>
+  </div>
 
 </div>
 

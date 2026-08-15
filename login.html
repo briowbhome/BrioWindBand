@@ -40,9 +40,10 @@
     font-family:'Noto Sans TC','Noto Sans',sans-serif;
     -webkit-font-smoothing:antialiased;
     min-height:100vh;
+    min-height:100dvh;
     display:flex;
     justify-content:center;
-    padding: 0 0 48px;
+    padding: 0 0 calc(48px + env(safe-area-inset-bottom));
   }
 
   button, a, input{ -webkit-tap-highlight-color: transparent; font-family:inherit; }
@@ -52,6 +53,7 @@
     width:100%;
     max-width:460px;
     min-height:100vh;
+    min-height:100dvh;
     background:var(--paper);
     position:relative;
     display:flex;
