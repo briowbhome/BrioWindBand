@@ -270,6 +270,38 @@
     color:#B7AF93;
   }
 
+  /* ---------- QR scan overlay ---------- */
+  .scan-overlay{
+    position:fixed; inset:0; z-index:80;
+    background:rgba(15,17,22,.94);
+    display:none;
+    flex-direction:column; align-items:center; justify-content:center;
+    padding:24px; gap:18px;
+  }
+  .scan-overlay.active{ display:flex; }
+  .scan-frame{
+    position:relative;
+    width:min(84vw, 360px); aspect-ratio:1;
+    border-radius:var(--radius-lg);
+    overflow:hidden;
+    background:#000;
+  }
+  .scan-frame video{ width:100%; height:100%; object-fit:cover; }
+  .scan-guide{
+    position:absolute; inset:12%;
+    border:3px solid var(--brass);
+    border-radius:var(--radius-md);
+    box-shadow:0 0 0 999px rgba(0,0,0,.35);
+    pointer-events:none;
+  }
+  .scan-hint{ color:var(--paper); font-size:13px; text-align:center; margin:0; max-width:300px; }
+  .scan-cancel{
+    background:none; border:1px solid rgba(242,239,229,.4); color:var(--paper);
+    border-radius:var(--radius-md); padding:12px 28px;
+    font-weight:700; font-size:13.5px; cursor:pointer;
+  }
+  .scan-cancel:active{ background:rgba(242,239,229,.12); }
+
   /* ---------- Upcoming events (program listing) ---------- */
   .program{
     margin:0 20px 24px;
@@ -462,10 +494,9 @@
       <div class="checkin">
         <button class="checkin-btn" id="checkinBtn">
           <svg class="ico" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1" stroke="#20242F" stroke-width="1.6"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="#20242F" stroke-width="1.6"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="#20242F" stroke-width="1.6"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z" fill="#20242F"/></svg>
-          拍照掃描 QR Code 簽到
+          掃描 QR Code 簽到
         </button>
-        <input type="file" accept="image/*" id="qrPhotoInput" class="hidden">
-        <div class="checkin-sub" id="checkinSub">請對準現場的簽到 QR Code 拍照</div>
+        <div class="checkin-sub" id="checkinSub">請對準現場的簽到 QR Code</div>
       </div>
     </div>
   </div>
@@ -499,6 +530,15 @@
     </button>
   </div>
 
+</div>
+
+<div class="scan-overlay" id="scanOverlay">
+  <div class="scan-frame">
+    <video id="scanVideo" playsinline autoplay muted></video>
+    <div class="scan-guide"></div>
+  </div>
+  <p class="scan-hint" id="scanHint">將 QR Code 對準框內</p>
+  <button type="button" class="scan-cancel" id="scanCancelBtn">取消</button>
 </div>
 
 <script type="module">
@@ -695,44 +735,67 @@
       }).join('');
     });
 
-    // 簽到：拍照 → 解碼 QR Code → 導向簽到頁
+    // 簽到：即時開相機畫面，持續解碼直到找到 QR Code
     var checkinBtn = document.getElementById('checkinBtn');
-    var qrPhotoInput = document.getElementById('qrPhotoInput');
-    var checkinSub = document.getElementById('checkinSub');
+    var scanOverlay = document.getElementById('scanOverlay');
+    var scanVideo = document.getElementById('scanVideo');
+    var scanHint = document.getElementById('scanHint');
+    var scanCancelBtn = document.getElementById('scanCancelBtn');
+    var scanCanvas = document.createElement('canvas');
+    var scanCtx = scanCanvas.getContext('2d', { willReadFrequently: true });
 
-    checkinBtn?.addEventListener('click', function(){
-      qrPhotoInput.click();
-    });
+    var scanStream = null;
+    var scanRafId = null;
 
-    qrPhotoInput?.addEventListener('change', function(){
-      var file = qrPhotoInput.files[0];
-      if (!file) return;
+    function stopScan(){
+      if (scanRafId) cancelAnimationFrame(scanRafId);
+      scanRafId = null;
+      if (scanStream){
+        scanStream.getTracks().forEach(function(track){ track.stop(); });
+        scanStream = null;
+      }
+      scanVideo.srcObject = null;
+      scanOverlay.classList.remove('active');
+    }
 
-      checkinSub.textContent = '辨識中…';
-
-      var img = new Image();
-      img.onload = function(){
-        var canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        var ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    function scanFrame(){
+      if (scanVideo.readyState === scanVideo.HAVE_ENOUGH_DATA){
+        scanCanvas.width = scanVideo.videoWidth;
+        scanCanvas.height = scanVideo.videoHeight;
+        scanCtx.drawImage(scanVideo, 0, 0, scanCanvas.width, scanCanvas.height);
+        var imageData = scanCtx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
         var result = jsQR(imageData.data, imageData.width, imageData.height);
-
-        URL.revokeObjectURL(img.src);
-        qrPhotoInput.value = '';
-
         if (result && /checkin\.html\?.*code=/.test(result.data)){
-          location.href = result.data;
-        } else {
-          checkinSub.textContent = '找不到 QR Code，請對準後重新拍攝';
+          var target = result.data;
+          stopScan();
+          location.href = target;
+          return;
         }
-      };
-      img.onerror = function(){
-        checkinSub.textContent = '照片讀取失敗，請重新拍攝';
-      };
-      img.src = URL.createObjectURL(file);
+      }
+      scanRafId = requestAnimationFrame(scanFrame);
+    }
+
+    async function startScan(){
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+        alert('這個瀏覽器不支援相機掃描，請改用其他瀏覽器');
+        return;
+      }
+      scanHint.textContent = '將 QR Code 對準框內';
+      scanOverlay.classList.add('active');
+      try {
+        scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        scanVideo.srcObject = scanStream;
+        await scanVideo.play();
+        scanRafId = requestAnimationFrame(scanFrame);
+      } catch (err){
+        scanHint.textContent = '無法開啟相機，請確認已允許相機權限';
+      }
+    }
+
+    checkinBtn?.addEventListener('click', startScan);
+    scanCancelBtn.addEventListener('click', stopScan);
+    scanOverlay.addEventListener('click', function(e){
+      if (e.target === scanOverlay) stopScan();
     });
   });
 </script>

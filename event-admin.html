@@ -449,7 +449,7 @@
     eventSubmitBtn.textContent = '儲存變更';
     eventCancelBtn.classList.remove('hidden');
     showEventFormError('');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    eventForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   eventCancelBtn.addEventListener('click', enterCreateMode);
