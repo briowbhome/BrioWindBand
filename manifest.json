@@ -1,0 +1,25 @@
+{
+  "name": "布利歐管樂團校友團系統",
+  "short_name": "布利歐校友團",
+  "description": "布利歐管樂團校友團內部管理系統：團練簽到、活動與團員審核",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F2EFE5",
+  "theme_color": "#F2EFE5",
+  "lang": "zh-Hant",
+  "icons": [
+    {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
