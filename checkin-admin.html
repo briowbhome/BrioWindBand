@@ -283,7 +283,7 @@
       <div class="sub">Brio Wind Band</div>
     </div>
     <div class="spacer"></div>
-    <button class="avatar" id="avatarBtn" type="button" aria-label="登出" title="點擊登出"></button>
+    <button class="avatar" id="avatarBtn" type="button" aria-label="帳號選單"></button>
   </div>
 
   <div class="staff"></div>
@@ -321,9 +321,10 @@
 </div>
 
 <script type="module">
-  import { requireAdmin, logout } from './auth-guard.js';
+  import { requireAdmin } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAdminNav } from './admin-nav.js';
+  import { initAccountMenu } from './account-menu.js';
   import {
     collection, doc, setDoc, getDoc, deleteDoc, onSnapshot,
     serverTimestamp, Timestamp
@@ -530,9 +531,7 @@
     document.getElementById('avatarBtn').textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
     document.getElementById('authLoading').classList.add('hidden');
     document.getElementById('appRoot').classList.remove('hidden');
-    document.getElementById('avatarBtn').addEventListener('click', function(){
-      if (confirm('確定要登出嗎？')) logout();
-    });
+    initAccountMenu(result.profile.name);
 
     onSnapshot(collection(db, 'events'), function(snap){
       eventsById = {};

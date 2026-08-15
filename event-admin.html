@@ -162,6 +162,14 @@
     border-radius:var(--radius-sm); padding:11px 13px;
     font-size:14px; color:var(--ink); width:100%;
   }
+  .field-checkbox{ margin-top:12px; display:flex; align-items:center; gap:8px; }
+  .field-checkbox input{ width:16px; height:16px; accent-color:var(--brass-deep); }
+  .field-checkbox label{
+    font-family:'Noto Sans TC','Noto Sans',sans-serif; font-size:13px; font-weight:500;
+    letter-spacing:normal; text-transform:none; color:var(--ink);
+  }
+  .field-row{ display:flex; gap:10px; }
+  .field-row .field{ flex:1; margin-top:12px; }
 
   .form-buttons{ display:flex; gap:10px; margin-top:16px; }
   .cta-btn{
@@ -250,7 +258,7 @@
       <div class="sub">Brio Wind Band</div>
     </div>
     <div class="spacer"></div>
-    <button class="avatar" id="avatarBtn" type="button" aria-label="登出" title="點擊登出"></button>
+    <button class="avatar" id="avatarBtn" type="button" aria-label="帳號選單"></button>
   </div>
 
   <div class="staff"></div>
@@ -274,8 +282,22 @@
       </select>
     </div>
     <div class="field">
-      <label>日期時間</label>
-      <input type="datetime-local" id="eventDate" required>
+      <label>日期</label>
+      <input type="date" id="eventDate" required>
+    </div>
+    <div class="field-checkbox">
+      <input type="checkbox" id="eventAllDay">
+      <label for="eventAllDay">全天活動（無明確時間點，例如社遊）</label>
+    </div>
+    <div class="field-row" id="eventTimeFields">
+      <div class="field">
+        <label>開始時間</label>
+        <input type="time" id="eventStartTime">
+      </div>
+      <div class="field">
+        <label>結束時間（選填）</label>
+        <input type="time" id="eventEndTime">
+      </div>
     </div>
     <div class="field">
       <label>地點</label>
@@ -302,9 +324,10 @@
 </div>
 
 <script type="module">
-  import { requireAdmin, logout } from './auth-guard.js';
+  import { requireAdmin } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAdminNav } from './admin-nav.js';
+  import { initAccountMenu } from './account-menu.js';
   import {
     collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot,
     serverTimestamp, Timestamp
@@ -329,20 +352,37 @@
     eventFormError.classList.toggle('show', !!message);
   }
 
-  function toDatetimeLocalValue(date){
-    return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  function pad2(n){ return n < 10 ? '0' + n : '' + n; }
+
+  function toDateValue(date){
+    return date.getFullYear() + '-' + pad2(date.getMonth() + 1) + '-' + pad2(date.getDate());
   }
+
+  function toTimeValue(date){
+    return pad2(date.getHours()) + ':' + pad2(date.getMinutes());
+  }
+
+  function updateTimeFieldsVisibility(){
+    var allDay = document.getElementById('eventAllDay').checked;
+    document.getElementById('eventTimeFields').classList.toggle('hidden', allDay);
+    document.getElementById('eventStartTime').required = !allDay;
+  }
+
+  document.getElementById('eventAllDay').addEventListener('change', updateTimeFieldsVisibility);
 
   function setDefaultEventDate(){
     var defaultDate = new Date(Date.now() + 60 * 60000);
     defaultDate.setMinutes(Math.round(defaultDate.getMinutes() / 15) * 15, 0, 0);
-    document.getElementById('eventDate').value = toDatetimeLocalValue(defaultDate);
+    document.getElementById('eventDate').value = toDateValue(defaultDate);
+    document.getElementById('eventStartTime').value = toTimeValue(defaultDate);
+    document.getElementById('eventEndTime').value = '';
   }
 
   function enterCreateMode(){
     editingId = null;
     eventForm.reset();
     setDefaultEventDate();
+    updateTimeFieldsVisibility();
     formTitle.textContent = '建立活動';
     eventSubmitBtn.textContent = '建立活動';
     eventCancelBtn.classList.add('hidden');
@@ -355,8 +395,12 @@
     editingId = eventId;
     document.getElementById('eventTitle').value = evt.title || '';
     document.getElementById('eventType').value = evt.type || 'rehearsal';
-    document.getElementById('eventDate').value = evt.date ? toDatetimeLocalValue(evt.date) : '';
+    document.getElementById('eventDate').value = evt.date ? toDateValue(evt.date) : '';
+    document.getElementById('eventAllDay').checked = !!evt.allDay;
+    document.getElementById('eventStartTime').value = evt.date && !evt.allDay ? toTimeValue(evt.date) : '';
+    document.getElementById('eventEndTime').value = evt.endTime ? toTimeValue(evt.endTime) : '';
     document.getElementById('eventLocation').value = evt.location || '';
+    updateTimeFieldsVisibility();
     formTitle.textContent = '編輯活動';
     eventSubmitBtn.textContent = '儲存變更';
     eventCancelBtn.classList.remove('hidden');
@@ -373,10 +417,13 @@
     var title = document.getElementById('eventTitle').value.trim();
     var type = document.getElementById('eventType').value;
     var dateVal = document.getElementById('eventDate').value;
+    var allDay = document.getElementById('eventAllDay').checked;
+    var startTimeVal = document.getElementById('eventStartTime').value;
+    var endTimeVal = document.getElementById('eventEndTime').value;
     var location = document.getElementById('eventLocation').value.trim();
 
-    if (!title || !dateVal){
-      showEventFormError('請填寫活動標題與日期時間');
+    if (!title || !dateVal || (!allDay && !startTimeVal)){
+      showEventFormError('請填寫活動標題、日期，以及開始時間（若非全天活動）');
       return;
     }
 
@@ -386,7 +433,9 @@
     var payload = {
       title: title,
       type: type,
-      date: Timestamp.fromDate(new Date(dateVal)),
+      date: Timestamp.fromDate(new Date(dateVal + 'T' + (allDay ? '00:00' : startTimeVal))),
+      allDay: allDay,
+      endTime: (!allDay && endTimeVal) ? Timestamp.fromDate(new Date(dateVal + 'T' + endTimeVal)) : null,
       location: location
     };
 
@@ -405,6 +454,15 @@
       showEventFormError('操作失敗（' + error.code + '）');
     });
   });
+
+  function formatEventTime(evt){
+    if (!evt.date) return '';
+    if (evt.allDay) return '全天';
+    var start = evt.date.toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit' });
+    if (!evt.endTime) return start;
+    var end = evt.endTime.toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit' });
+    return start + '–' + end;
+  }
 
   function render(){
     var ids = Object.keys(eventsById);
@@ -431,7 +489,7 @@
             '</div>' +
             '<div class="event-body">' +
               '<div class="event-title">' + evt.title + '<span class="kind ' + evt.type + '">' + (KIND_LABEL[evt.type] || evt.type) + '</span></div>' +
-              '<div class="event-meta">' + (d ? d.toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit' }) : '') + (evt.location ? ' · ' + evt.location : '') + '</div>' +
+              '<div class="event-meta">' + formatEventTime(evt) + (evt.location ? ' · ' + evt.location : '') + '</div>' +
             '</div>' +
           '</div>' +
           '<div class="event-actions">' +
@@ -481,9 +539,7 @@
     document.getElementById('avatarBtn').textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
     document.getElementById('authLoading').classList.add('hidden');
     document.getElementById('appRoot').classList.remove('hidden');
-    document.getElementById('avatarBtn').addEventListener('click', function(){
-      if (confirm('確定要登出嗎？')) logout();
-    });
+    initAccountMenu(result.profile.name);
 
     onSnapshot(collection(db, 'events'), function(snap){
       eventsById = {};
@@ -493,6 +549,8 @@
           title: data.title,
           type: data.type,
           date: data.date && data.date.toDate ? data.date.toDate() : null,
+          allDay: !!data.allDay,
+          endTime: data.endTime && data.endTime.toDate ? data.endTime.toDate() : null,
           location: data.location
         };
       });

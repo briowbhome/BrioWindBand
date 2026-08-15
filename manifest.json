@@ -1,7 +1,7 @@
 {
-  "name": "布利歐管樂團校友團系統",
-  "short_name": "布利歐校友團",
-  "description": "布利歐管樂團校友團內部管理系統：團練簽到、活動與團員審核",
+  "name": "布利歐管樂團",
+  "short_name": "布利歐管樂團",
+  "description": "布利歐管樂團管理系統",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

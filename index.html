@@ -228,14 +228,6 @@
   .hero-row .ico{ flex:none; width:16px; height:16px; opacity:.85; }
   .hero-row .label{ color:#C9C2A8; font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.06em; min-width:52px;}
   .hero-row .val{ color:var(--paper); font-weight:500; }
-  .hero-row .val .tag{
-    display:inline-block; margin-left:6px;
-    background:rgba(242,239,229,.14);
-    border:1px solid rgba(242,239,229,.28);
-    border-radius:6px;
-    padding:1px 7px;
-    font-size:11.5px;
-  }
 
   /* ---------- Ticket-stub check-in CTA ---------- */
   .checkin{
@@ -336,9 +328,11 @@
     padding:1.5px 6px; border-radius:5px;
     font-weight:600;
   }
-  .kind.perf{ background:var(--burgundy); color:#F2EFE5; }
   .kind.rehearsal{ background:var(--sage-bg); color:var(--sage); }
-  .kind.deadline{ background:#EFE1E3; color:var(--burgundy-deep); }
+  .kind.sectional{ background:#EFE7D2; color:var(--brass-deep); }
+  .kind.performance{ background:var(--burgundy); color:#F2EFE5; }
+  .empty{ padding:36px 20px; text-align:center; font-size:13px; color:var(--ink-soft); }
+  .hero-empty{ padding:14px 0 18px; text-align:center; font-size:13px; color:#D9D2BC; }
 
   .program-meta{
     margin-top:4px;
@@ -415,7 +409,7 @@
     <a class="admin-entry hidden" id="adminEntryBtn" href="admin.html" aria-label="後台管理" title="後台管理">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 2l7 3v6c0 4.8-3 8.6-7 11-4-2.4-7-6.2-7-11V5l7-3Z" stroke="#8F6A2C" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="#8F6A2C" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </a>
-    <button class="avatar" id="avatarBtn" type="button" aria-label="登出" title="點擊登出"></button>
+    <button class="avatar" id="avatarBtn" type="button" aria-label="帳號選單"></button>
   </div>
 
   <div class="staff"></div>
@@ -441,33 +435,31 @@
   <div class="hero">
     <div class="staff-bg"></div>
     <div class="hero-inner">
-      <div class="hero-top">
-        <span class="hero-eyebrow">大團練 · Tutti</span>
-        <span class="countdown-chip">3 天後</span>
-      </div>
+      <div id="heroContent" class="hidden">
+        <div class="hero-top">
+          <span class="hero-eyebrow" id="heroEyebrow"></span>
+          <span class="countdown-chip" id="heroCountdown"></span>
+        </div>
 
-      <div class="hero-date">
-        <span class="num">12.14</span>
-        <span class="dow">星期六</span>
-      </div>
+        <div class="hero-date">
+          <span class="num" id="heroDateNum"></span>
+          <span class="dow" id="heroDateDow"></span>
+        </div>
 
-      <div class="hero-rows">
-        <div class="hero-row">
-          <svg class="ico" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#F2EFE5" stroke-width="1.5"/><path d="M12 7v5l3 2" stroke="#F2EFE5" stroke-width="1.5" stroke-linecap="round"/></svg>
-          <span class="label">時間</span>
-          <span class="val">13:30 – 17:00</span>
-        </div>
-        <div class="hero-row">
-          <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21Z" stroke="#F2EFE5" stroke-width="1.5" stroke-linejoin="round"/><circle cx="12" cy="9.5" r="2.2" stroke="#F2EFE5" stroke-width="1.5"/></svg>
-          <span class="label">地點</span>
-          <span class="val">音樂系館 B1 排練室</span>
-        </div>
-        <div class="hero-row">
-          <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M4 18V8l8-3 8 3v10" stroke="#F2EFE5" stroke-width="1.5" stroke-linejoin="round"/><path d="M4 18h16M9 18v-5h6v5" stroke="#F2EFE5" stroke-width="1.5" stroke-linejoin="round"/></svg>
-          <span class="label">你的編制</span>
-          <span class="val">長笛 Flute I<span class="tag">已報名</span></span>
+        <div class="hero-rows">
+          <div class="hero-row">
+            <svg class="ico" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#F2EFE5" stroke-width="1.5"/><path d="M12 7v5l3 2" stroke="#F2EFE5" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <span class="label">時間</span>
+            <span class="val" id="heroTimeVal"></span>
+          </div>
+          <div class="hero-row">
+            <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21Z" stroke="#F2EFE5" stroke-width="1.5" stroke-linejoin="round"/><circle cx="12" cy="9.5" r="2.2" stroke="#F2EFE5" stroke-width="1.5"/></svg>
+            <span class="label">地點</span>
+            <span class="val" id="heroLocationVal"></span>
+          </div>
         </div>
       </div>
+      <div class="hero-empty hidden" id="heroEmpty">目前沒有排定的團練</div>
 
       <div class="checkin">
         <button class="checkin-btn" id="checkinBtn">
@@ -486,40 +478,8 @@
     <span class="en">Upcoming</span>
   </div>
 
-  <div class="program">
-    <div class="program-item">
-      <span class="measure">01</span>
-      <div class="program-date"><div class="d">14</div><div class="m">12月</div></div>
-      <div class="program-body">
-        <div class="program-title">大團練<span class="kind rehearsal">排練</span></div>
-        <div class="program-meta">13:30–17:00 · 音樂系館 B1 排練室</div>
-      </div>
-    </div>
-    <div class="program-item">
-      <span class="measure">02</span>
-      <div class="program-date"><div class="d">18</div><div class="m">12月</div></div>
-      <div class="program-body">
-        <div class="program-title">木管分部練<span class="kind rehearsal">排練</span></div>
-        <div class="program-meta">19:00–21:30 · 校友會館 302 教室</div>
-      </div>
-    </div>
-    <div class="program-item">
-      <span class="measure">03</span>
-      <div class="program-date"><div class="d">22</div><div class="m">12月</div></div>
-      <div class="program-body">
-        <div class="program-title">請假申請截止<span class="kind deadline">截止</span></div>
-        <div class="program-meta">冬季音樂會前最後一次請假登記</div>
-      </div>
-    </div>
-    <div class="program-item">
-      <span class="measure">04</span>
-      <div class="program-date"><div class="d">28</div><div class="m">12月</div></div>
-      <div class="program-body">
-        <div class="program-title">冬季音樂會<span class="kind perf">演出</span></div>
-        <div class="program-meta">19:30 開演 · 文化大學大新館 · 10:00 裝箱集合</div>
-      </div>
-    </div>
-  </div>
+  <div class="program" id="programList"></div>
+  <div class="empty hidden" id="programEmpty">目前沒有即將到來的活動</div>
 
   <!-- Bottom tab bar -->
   <div class="tabbar">
@@ -544,7 +504,12 @@
 </div>
 
 <script type="module">
-  import { requireApprovedMember, logout } from './auth-guard.js';
+  import { requireApprovedMember } from './auth-guard.js';
+  import { initAccountMenu } from './account-menu.js';
+  import { db } from './firebase-init.js';
+  import {
+    collection, query, where, orderBy, limit, onSnapshot, Timestamp
+  } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
   requireApprovedMember().then(function(result){
     if (!result) return; // 未通過驗證，requireApprovedMember 已經處理導轉
@@ -557,8 +522,95 @@
     document.getElementById('authLoading').classList.add('hidden');
     document.getElementById('appRoot').classList.remove('hidden');
 
-    document.getElementById('avatarBtn').addEventListener('click', function(){
-      if (confirm('確定要登出嗎？')) logout();
+    initAccountMenu(profile.name);
+
+    // 首頁資料：下一次團練 + 即將到來的活動，接 events collection 即時更新
+    var KIND_LABEL = { rehearsal: '排練', sectional: '分部練', performance: '演出' };
+    var WEEKDAY = ['日', '一', '二', '三', '四', '五', '六'];
+
+    function formatEventTime(evt){
+      if (evt.allDay) return '全天';
+      var start = evt.date.toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit' });
+      if (!evt.endTime) return start + ' 開始';
+      var end = evt.endTime.toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit' });
+      return start + '–' + end;
+    }
+
+    function formatCountdown(date){
+      var today = new Date();
+      today.setHours(0, 0, 0, 0);
+      var target = new Date(date);
+      target.setHours(0, 0, 0, 0);
+      var days = Math.round((target - today) / 86400000);
+      if (days <= 0) return '今天';
+      if (days === 1) return '明天';
+      return days + ' 天後';
+    }
+
+    function renderHero(nextRehearsal){
+      var content = document.getElementById('heroContent');
+      var empty = document.getElementById('heroEmpty');
+      if (!nextRehearsal){
+        content.classList.add('hidden');
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+      content.classList.remove('hidden');
+      document.getElementById('heroEyebrow').textContent = nextRehearsal.title;
+      document.getElementById('heroCountdown').textContent = formatCountdown(nextRehearsal.date);
+      document.getElementById('heroDateNum').textContent =
+        (nextRehearsal.date.getMonth() + 1) + '.' + nextRehearsal.date.getDate();
+      document.getElementById('heroDateDow').textContent = '星期' + WEEKDAY[nextRehearsal.date.getDay()];
+      document.getElementById('heroTimeVal').textContent = formatEventTime(nextRehearsal);
+      document.getElementById('heroLocationVal').textContent = nextRehearsal.location || '地點未定';
+    }
+
+    function renderProgram(events){
+      var list = document.getElementById('programList');
+      var empty = document.getElementById('programEmpty');
+      if (events.length === 0){
+        list.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+      list.innerHTML = events.map(function(evt, i){
+        return (
+          '<div class="program-item">' +
+            '<span class="measure">' + String(i + 1).padStart(2, '0') + '</span>' +
+            '<div class="program-date"><div class="d">' + evt.date.getDate() + '</div><div class="m">' + (evt.date.getMonth() + 1) + '月</div></div>' +
+            '<div class="program-body">' +
+              '<div class="program-title">' + evt.title + '<span class="kind ' + evt.type + '">' + (KIND_LABEL[evt.type] || evt.type) + '</span></div>' +
+              '<div class="program-meta">' + formatEventTime(evt) + (evt.location ? ' · ' + evt.location : '') + '</div>' +
+            '</div>' +
+          '</div>'
+        );
+      }).join('');
+    }
+
+    var upcomingQuery = query(
+      collection(db, 'events'),
+      where('date', '>=', Timestamp.now()),
+      orderBy('date', 'asc'),
+      limit(20)
+    );
+
+    onSnapshot(upcomingQuery, function(snap){
+      var events = snap.docs.map(function(docSnap){
+        var data = docSnap.data();
+        return {
+          title: data.title,
+          type: data.type,
+          date: data.date.toDate(),
+          allDay: !!data.allDay,
+          endTime: data.endTime && data.endTime.toDate ? data.endTime.toDate() : null,
+          location: data.location
+        };
+      });
+
+      renderHero(events.find(function(evt){ return evt.type === 'rehearsal'; }) || null);
+      renderProgram(events.slice(0, 5));
     });
 
     // 公告展開（示意用）
