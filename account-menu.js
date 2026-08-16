@@ -1,4 +1,5 @@
 import { logout } from './auth-guard.js';
+import { APP_VERSION } from './version.js';
 
 const STYLE_ID = 'acct-menu-style';
 
@@ -18,7 +19,9 @@ function ensureStyle() {
     'text-decoration:none;box-sizing:border-box;}' +
     '.acct-menu a{color:var(--ink);}' +
     '.acct-menu button{color:var(--burgundy);}' +
-    '.acct-menu button:hover,.acct-menu button:active,.acct-menu a:hover,.acct-menu a:active{background:var(--sage-bg);}';
+    '.acct-menu button:hover,.acct-menu button:active,.acct-menu a:hover,.acct-menu a:active{background:var(--sage-bg);}' +
+    '.acct-menu .acct-version{padding:6px 10px 4px;font-family:"Roboto Mono",monospace;font-size:10px;' +
+    'letter-spacing:.04em;color:var(--ink-soft);border-top:1px solid var(--line);margin-top:4px;}';
   document.head.appendChild(style);
 }
 
@@ -39,7 +42,8 @@ export function initAccountMenu(name, adminHref) {
   menu.innerHTML =
     '<div class="acct-name"></div>' +
     (adminHref ? '<a href="' + adminHref + '">後台管理</a>' : '') +
-    '<button type="button" data-action="logout">登出</button>';
+    '<button type="button" data-action="logout">登出</button>' +
+    '<div class="acct-version">v' + APP_VERSION + '</div>';
   menu.querySelector('.acct-name').textContent = name || '';
   document.body.appendChild(menu);
 

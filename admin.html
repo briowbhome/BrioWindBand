@@ -329,35 +329,23 @@
   .list-error.show{ display:block; }
 
   .hidden{ display:none !important; }
-  .auth-loading{
-    min-height:100vh;
-    width:100%;
-    max-width:460px;
-    margin:0 auto;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    gap:12px;
-    color:var(--ink-soft);
-    font-size:13px;
+
+  /* ---------- Skeleton placeholders ---------- */
+  @keyframes skel-pulse{ 0%,100%{ opacity:.55; } 50%{ opacity:1; } }
+  .skel{ background:var(--line); animation:skel-pulse 1.4s ease-in-out infinite; }
+  .avatar.skel{ animation:skel-pulse 1.4s ease-in-out infinite; }
+  .count.skel{ color:transparent; }
+  .skel-bar{ display:inline-block; border-radius:5px; }
+  @media (prefers-reduced-motion: reduce){
+    .skel, .avatar.skel{ animation:none; opacity:.75; }
   }
-  .auth-loading .spinner{
-    width:22px; height:22px;
-    border-radius:50%;
-    border:2.5px solid var(--line);
-    border-top-color:var(--brass);
-    animation:spin .8s linear infinite;
-  }
-  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .item-skel-top{ display:flex; align-items:center; gap:12px; }
+  .item-skel-avatar{ flex:none; width:38px; height:38px; border-radius:50%; }
+  .item-skel-lines{ flex:1; display:flex; flex-direction:column; gap:7px; }
 </style>
 </head>
 <body>
-<div id="authLoading" class="auth-loading">
-  <div class="spinner"></div>
-  <p>驗證登入狀態中…</p>
-</div>
-<div class="app hidden" id="appRoot">
+<div class="app" id="appRoot">
 
   <!-- App Bar -->
   <div class="appbar">
@@ -370,7 +358,7 @@
       <div class="sub">Brio Wind Band</div>
     </div>
     <div class="spacer"></div>
-    <button class="avatar" id="avatarBtn" type="button" aria-label="帳號選單"></button>
+    <button class="avatar skel" id="avatarBtn" type="button" aria-label="帳號選單"></button>
   </div>
 
   <div class="staff"></div>
@@ -382,9 +370,9 @@
   <p class="lede">審核新申請帳號的團員，確認身份與樂器/聲部後即可核准。</p>
 
   <div class="segmented">
-    <button type="button" class="active" data-status="pending">待審核 <span class="count" id="countPending">0</span></button>
-    <button type="button" data-status="approved">已核准 <span class="count" id="countApproved">0</span></button>
-    <button type="button" data-status="rejected">已拒絕 <span class="count" id="countRejected">0</span></button>
+    <button type="button" class="active" data-status="pending">待審核 <span class="count skel" id="countPending">0</span></button>
+    <button type="button" data-status="approved">已核准 <span class="count skel" id="countApproved">0</span></button>
+    <button type="button" data-status="rejected">已拒絕 <span class="count skel" id="countRejected">0</span></button>
   </div>
 
   <p class="lede" id="tabNote"></p>
@@ -399,7 +387,7 @@
 </div>
 
 <script type="module">
-  import { requireAdmin } from './auth-guard.js';
+  import { requireAdmin, peekCachedProfile } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAdminNav } from './admin-nav.js';
   import { initAccountMenu } from './account-menu.js';
@@ -414,12 +402,35 @@
   var REJECTED_TTL_DAYS = 30;
 
   var applicantsByStatus = { pending: [], approved: [], rejected: [] };
+  var statusLoaded = { pending: false, approved: false, rejected: false };
   var currentTab = 'pending';
   var currentAdminUid = null;
+
+  var SKELETON_ITEMS_HTML = [1, 2, 3].map(function(){
+    return (
+      '<div class="item">' +
+        '<div class="item-skel-top">' +
+          '<span class="skel item-skel-avatar"></span>' +
+          '<div class="item-skel-lines">' +
+            '<span class="skel skel-bar" style="width:55%;height:13px;"></span>' +
+            '<span class="skel skel-bar" style="width:35%;height:10px;"></span>' +
+          '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }).join('');
+
+  var cachedProfile = peekCachedProfile();
+  if (cachedProfile && cachedProfile.name){
+    var avatarBtnEl = document.getElementById('avatarBtn');
+    avatarBtnEl.textContent = cachedProfile.name.charAt(0);
+    avatarBtnEl.classList.remove('skel');
+  }
 
   var listContainer = document.getElementById('listContainer');
   var tabNote = document.getElementById('tabNote');
   var listError = document.getElementById('listError');
+  listContainer.innerHTML = SKELETON_ITEMS_HTML;
 
   function initial(name){ return name ? name.charAt(0) : '?'; }
 
@@ -482,6 +493,7 @@
         return tb - ta;
       });
       applicantsByStatus[status] = rows;
+      statusLoaded[status] = true;
       render();
     }, function(error){
       showListError('讀取' + statusLabel(status).text + '清單失敗（' + error.code + '）');
@@ -489,14 +501,31 @@
   }
 
   function updateCounts(){
-    document.getElementById('countPending').textContent = applicantsByStatus.pending.length;
-    document.getElementById('countApproved').textContent = applicantsByStatus.approved.filter(function(a){ return daysSince(a.approvedAt) <= APPROVED_WINDOW_DAYS; }).length;
-    document.getElementById('countRejected').textContent = applicantsByStatus.rejected.length;
+    if (statusLoaded.pending){
+      var pendingEl = document.getElementById('countPending');
+      pendingEl.classList.remove('skel');
+      pendingEl.textContent = applicantsByStatus.pending.length;
+    }
+    if (statusLoaded.approved){
+      var approvedEl = document.getElementById('countApproved');
+      approvedEl.classList.remove('skel');
+      approvedEl.textContent = applicantsByStatus.approved.filter(function(a){ return daysSince(a.approvedAt) <= APPROVED_WINDOW_DAYS; }).length;
+    }
+    if (statusLoaded.rejected){
+      var rejectedEl = document.getElementById('countRejected');
+      rejectedEl.classList.remove('skel');
+      rejectedEl.textContent = applicantsByStatus.rejected.length;
+    }
   }
 
   function render(){
     updateCounts();
     tabNote.textContent = TAB_NOTES[currentTab];
+
+    if (!statusLoaded[currentTab]){
+      listContainer.innerHTML = SKELETON_ITEMS_HTML;
+      return;
+    }
 
     var rows = applicantsByStatus[currentTab].filter(function(a){
       if (currentTab === 'approved') return daysSince(a.approvedAt) <= APPROVED_WINDOW_DAYS;
@@ -611,9 +640,9 @@
     var profile = result.profile;
     currentAdminUid = result.uid;
 
-    document.getElementById('avatarBtn').textContent = profile.name ? profile.name.charAt(0) : '?';
-    document.getElementById('authLoading').classList.add('hidden');
-    document.getElementById('appRoot').classList.remove('hidden');
+    var avatarBtn = document.getElementById('avatarBtn');
+    avatarBtn.textContent = profile.name ? profile.name.charAt(0) : '?';
+    avatarBtn.classList.remove('skel');
 
     initAccountMenu(profile.name);
 

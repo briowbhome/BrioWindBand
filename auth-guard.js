@@ -34,6 +34,20 @@ function clearProfileCache() {
   try { sessionStorage.removeItem(PROFILE_CACHE_KEY); } catch (e) {}
 }
 
+// 骨架畫面用：不需要先知道 uid 就能讀，回傳的只是「上次是誰」的最佳猜測（例如拿姓名縮寫先填大頭貼），
+// 不代表已驗證，也不影響真正的驗證流程——真正的驗證還是會照跑，跟這個猜測完全獨立
+export function peekCachedProfile() {
+  try {
+    var raw = sessionStorage.getItem(PROFILE_CACHE_KEY);
+    if (!raw) return null;
+    var cached = JSON.parse(raw);
+    if (Date.now() - cached.at > PROFILE_CACHE_MAX_AGE_MS) return null;
+    return cached.profile;
+  } catch (e) {
+    return null;
+  }
+}
+
 function waitForAuthUser() {
   return new Promise(function (resolve) {
     var unsubscribe = onAuthStateChanged(auth, function (user) {
