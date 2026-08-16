@@ -62,17 +62,15 @@
   }
 
   .hidden{ display:none !important; }
-  .auth-loading{
-    min-height:100vh; width:100%; max-width:460px; margin:0 auto;
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:12px; color:var(--ink-soft); font-size:13px;
+
+  /* ---------- Skeleton placeholders ---------- */
+  @keyframes skel-pulse{ 0%,100%{ opacity:.55; } 50%{ opacity:1; } }
+  .skel{ background:var(--line); animation:skel-pulse 1.4s ease-in-out infinite; }
+  .avatar.skel{ animation:skel-pulse 1.4s ease-in-out infinite; }
+  .skel-bar{ display:block; border-radius:5px; }
+  @media (prefers-reduced-motion: reduce){
+    .skel, .avatar.skel{ animation:none; opacity:.75; }
   }
-  .auth-loading .spinner{
-    width:22px; height:22px; border-radius:50%;
-    border:2.5px solid var(--line); border-top-color:var(--brass);
-    animation:spin .8s linear infinite;
-  }
-  @keyframes spin{ to{ transform:rotate(360deg); } }
 
   .appbar{ display:flex; align-items:center; gap:12px; padding:18px 20px 14px; }
   .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
@@ -215,11 +213,7 @@
 </style>
 </head>
 <body>
-<div id="authLoading" class="auth-loading">
-  <div class="spinner"></div>
-  <p>驗證登入狀態中…</p>
-</div>
-<div class="app hidden" id="appRoot">
+<div class="app" id="appRoot">
 
   <div class="appbar">
     <button class="hamburger-btn" id="adminMenuBtn" type="button" aria-label="選單">
@@ -231,7 +225,7 @@
       <div class="sub">Brio Wind Band</div>
     </div>
     <div class="spacer"></div>
-    <button class="avatar" id="avatarBtn" type="button" aria-label="帳號選單"></button>
+    <button class="avatar skel" id="avatarBtn" type="button" aria-label="帳號選單"></button>
   </div>
 
   <div class="staff"></div>
@@ -267,7 +261,7 @@
 </div>
 
 <script type="module">
-  import { requireAdmin } from './auth-guard.js';
+  import { requireAdmin, peekCachedProfile } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAdminNav } from './admin-nav.js';
   import { initAccountMenu } from './account-menu.js';
@@ -282,12 +276,30 @@
   var editingId = null;
   var currentAdminUid = null;
 
+  var SKELETON_ITEMS_HTML = [1, 2, 3].map(function(){
+    return (
+      '<div class="ann-item">' +
+        '<span class="skel skel-bar" style="width:90%;height:13px;"></span>' +
+        '<span class="skel skel-bar" style="width:60%;height:13px;margin-top:6px;"></span>' +
+        '<span class="skel skel-bar" style="width:70px;height:10px;margin-top:8px;"></span>' +
+      '</div>'
+    );
+  }).join('');
+
+  var cachedProfile = peekCachedProfile();
+  if (cachedProfile && cachedProfile.name){
+    var avatarBtnEl = document.getElementById('avatarBtn');
+    avatarBtnEl.textContent = cachedProfile.name.charAt(0);
+    avatarBtnEl.classList.remove('skel');
+  }
+
   var annForm = document.getElementById('annForm');
   var annFormError = document.getElementById('annFormError');
   var annSubmitBtn = document.getElementById('annSubmitBtn');
   var annCancelBtn = document.getElementById('annCancelBtn');
   var formTitle = document.getElementById('formTitle');
   var annList = document.getElementById('annList');
+  annList.innerHTML = SKELETON_ITEMS_HTML;
 
   function showFormError(message){
     annFormError.textContent = message;
@@ -415,9 +427,9 @@
     if (!result) return;
     currentAdminUid = result.uid;
 
-    document.getElementById('avatarBtn').textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
-    document.getElementById('authLoading').classList.add('hidden');
-    document.getElementById('appRoot').classList.remove('hidden');
+    var avatarBtn = document.getElementById('avatarBtn');
+    avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
+    avatarBtn.classList.remove('skel');
     initAccountMenu(result.profile.name);
 
     onSnapshot(query(collection(db, 'announcements'), orderBy('createdAt', 'desc')), function(snap){

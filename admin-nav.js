@@ -1,7 +1,7 @@
 // 後台頁面清單，之後新增後台功能只要在這裡加一筆，側邊選單會自動多一個項目
 export const ADMIN_PAGES = [
   { href: "admin-index.html", label: "控制台首頁" },
-  { href: "admin.html", label: "團員審核" },
+  { href: "review-admin.html", label: "團員審核" },
   { href: "members-admin.html", label: "成員資料" },
   { href: "event-admin.html", label: "活動管理" },
   { href: "checkin-admin.html", label: "簽到管理" },

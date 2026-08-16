@@ -104,7 +104,7 @@ export async function requireApprovedMember() {
   return { uid: user.uid, profile: profile };
 }
 
-// 後台頁面（admin.html 等）用：必須登入、審核通過，且角色是幹部或擁有者
+// 後台頁面（review-admin.html 等）用：必須登入、審核通過，且角色是幹部或擁有者
 export async function requireAdmin() {
   var user = await waitForAuthUser();
   if (!user) {
