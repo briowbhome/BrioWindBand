@@ -11,7 +11,8 @@
 <meta name="theme-color" content="#F2EFE5">
 <link rel="apple-touch-icon" href="assets/icons/icon-180.png">
 <script src="./pwa-register.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="./ios-install.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" defer></script>
 <style>
   :root{
     --ink:#20242F;
@@ -287,7 +288,13 @@
     overflow:hidden;
     background:#000;
   }
-  .scan-frame video{ width:100%; height:100%; object-fit:cover; }
+  .scan-frame video{
+    width:100%; height:100%; object-fit:cover;
+    /* 部分 iPhone 機型上，video 元素被父層 border-radius+overflow:hidden 裁切時，
+       WebKit 的 GPU 合成會出現畫面全黑的已知問題，強制獨立合成層讓它正常渲染 */
+    transform:translateZ(0);
+    -webkit-transform:translateZ(0);
+  }
   .scan-guide{
     position:absolute; inset:12%;
     border:3px solid var(--brass);
@@ -693,12 +700,29 @@
       renderProgram(latestEvents.slice(0, 5));
     }
 
+    // 現場人多網路壅塞時，監聽本身可能失敗（原本沒有處理，會讓骨架屏卡住不動、
+    // 就是「畫面一直等待/無法正常顯示」回報的主因之一），失敗時明確告知並讓使用者知道要重新整理
+    function renderEventsError(){
+      document.getElementById('heroSkeleton').classList.add('hidden');
+      var heroEmpty = document.getElementById('heroEmpty');
+      heroEmpty.textContent = '讀取失敗，請重新整理再試一次';
+      heroEmpty.classList.remove('hidden');
+
+      document.getElementById('programSkeleton').classList.add('hidden');
+      var list = document.getElementById('programList');
+      list.classList.add('hidden');
+      list.innerHTML = '';
+      var programEmpty = document.getElementById('programEmpty');
+      programEmpty.textContent = '讀取失敗，請重新整理再試一次';
+      programEmpty.classList.remove('hidden');
+    }
+
     subscribeEventTypes(db, function(types){
       eventTypesById = {};
       types.forEach(function(t){ eventTypesById[t.id] = t; });
       typesLoaded = true;
       renderEventsSection();
-    });
+    }, undefined, renderEventsError);
 
     onSnapshot(upcomingQuery, function(snap){
       latestEvents = snap.docs.map(function(docSnap){
@@ -714,7 +738,7 @@
       });
 
       renderEventsSection();
-    });
+    }, renderEventsError);
 
     // 公告：接 announcements collection，最新一則當標題，其餘展開成清單
     function formatRelativeTime(date){

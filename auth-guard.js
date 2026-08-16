@@ -62,21 +62,57 @@ async function loadProfile(uid) {
   return snap.exists() ? snap.data() : null;
 }
 
+function delay(ms) {
+  return new Promise(function (resolve) { setTimeout(resolve, ms); });
+}
+
+// 現場人多時網路壅塞，Firestore 讀取偶爾會逾時/失敗，重試一次給壅塞網路一個機會，
+// 避免第一次失敗就直接讓使用者卡住看不到任何畫面
+async function loadProfileWithRetry(uid) {
+  try {
+    return await loadProfile(uid);
+  } catch (e) {
+    await delay(1200);
+    return await loadProfile(uid);
+  }
+}
+
 // 先回快取（如果有）讓畫面秒開，背景一定會重新打一次 Firestore 確認最新狀態，
 // 有落差時透過 onStale 通知呼叫端做登出/導轉處理
 function resolveProfile(uid, onStale) {
   var cached = readProfileCache(uid);
-  var fresh = loadProfile(uid).then(function (profile) {
+  var fresh = loadProfileWithRetry(uid).then(function (profile) {
     writeProfileCache(uid, profile);
     if (cached && onStale) onStale(profile);
     return profile;
   });
-  return cached ? Promise.resolve(cached) : fresh;
+  if (cached) {
+    // 背景確認失敗時使用者已經看得到快取內容，靜默忽略即可，不用再次重試打擾使用者
+    fresh.catch(function () {});
+    return Promise.resolve(cached);
+  }
+  return fresh;
 }
 
 function goToLogin() {
   var here = location.pathname + location.search;
   location.href = "login.html?redirect=" + encodeURIComponent(here);
+}
+
+// 沒有快取可用、重試後 Firestore 讀取仍然失敗時顯示，取代讓畫面卡在骨架屏或轉圈圈不動
+function showConnectionError() {
+  var overlay = document.createElement("div");
+  overlay.style.cssText =
+    "position:fixed;inset:0;z-index:999;background:rgba(32,36,47,.94);color:#F2EFE5;" +
+    "display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;" +
+    "padding:24px;text-align:center;font-family:'Noto Sans TC','Noto Sans',sans-serif;";
+  overlay.innerHTML =
+    '<div style="font-size:15px;font-weight:700;">連線不穩，讀取失敗</div>' +
+    '<div style="font-size:13px;color:#C9C2A8;max-width:280px;line-height:1.6;">請確認網路連線後重新整理再試一次</div>' +
+    '<button type="button" style="margin-top:6px;background:#B8863A;color:#20242F;border:none;' +
+    'border-radius:10px;padding:11px 26px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">重新整理</button>';
+  overlay.querySelector("button").addEventListener("click", function () { location.reload(); });
+  document.body.appendChild(overlay);
 }
 
 // 一般團員頁面（index.html / checkin.html）用：必須登入且審核通過
@@ -88,12 +124,18 @@ export async function requireApprovedMember() {
     return null;
   }
 
-  var profile = await resolveProfile(user.uid, function (fresh) {
-    if (!fresh || fresh.status !== "approved") {
-      clearProfileCache();
-      signOut(auth).then(goToLogin);
-    }
-  });
+  var profile;
+  try {
+    profile = await resolveProfile(user.uid, function (fresh) {
+      if (!fresh || fresh.status !== "approved") {
+        clearProfileCache();
+        signOut(auth).then(goToLogin);
+      }
+    });
+  } catch (e) {
+    showConnectionError();
+    return null;
+  }
 
   if (!profile || profile.status !== "approved") {
     clearProfileCache();
@@ -113,15 +155,21 @@ export async function requireAdmin() {
     return null;
   }
 
-  var profile = await resolveProfile(user.uid, function (fresh) {
-    if (!fresh || fresh.status !== "approved") {
-      clearProfileCache();
-      signOut(auth).then(goToLogin);
-    } else if (fresh.role !== "admin" && fresh.role !== "owner") {
-      clearProfileCache();
-      location.href = "index.html";
-    }
-  });
+  var profile;
+  try {
+    profile = await resolveProfile(user.uid, function (fresh) {
+      if (!fresh || fresh.status !== "approved") {
+        clearProfileCache();
+        signOut(auth).then(goToLogin);
+      } else if (fresh.role !== "admin" && fresh.role !== "owner") {
+        clearProfileCache();
+        location.href = "index.html";
+      }
+    });
+  } catch (e) {
+    showConnectionError();
+    return null;
+  }
 
   if (!profile || profile.status !== "approved") {
     clearProfileCache();

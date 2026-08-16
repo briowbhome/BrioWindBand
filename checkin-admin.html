@@ -469,6 +469,11 @@
     );
   }
 
+  // 網路壅塞等原因導致監聽失敗時呼叫，清掉骨架屏並明確告知，不要讓畫面卡住不動
+  function renderCheckinAdminError(){
+    eventList.innerHTML = '<div class="empty">讀取失敗，請重新整理再試一次</div>';
+  }
+
   function renderEventList(){
     var rangeVal = rangeFilter.value;
     var cutoff = rangeVal === 'all' ? -Infinity : Date.now() - Number(rangeVal) * 86400000;
@@ -762,7 +767,7 @@
       types.forEach(function(t){ eventTypesById[t.id] = t; });
       typesLoaded = true;
       if (eventsLoaded) renderEventList();
-    });
+    }, null, renderCheckinAdminError);
 
     onSnapshot(collection(db, 'events'), function(snap){
       eventsById = {};
@@ -777,8 +782,10 @@
       });
       eventsLoaded = true;
       if (typesLoaded) renderEventList();
-    });
+    }, renderCheckinAdminError);
 
+    // 這份監聽失敗不會讓上面兩份的初次顯示卡住（不是同一組 loaded 旗標控制），
+    // 但仍然補上錯誤回呼避免靜默失敗，讓簽到中狀態資料停在舊的快照不會更新
     onSnapshot(collection(db, 'checkinSessions'), function(snap){
       sessionsById = {};
       snap.forEach(function(docSnap){
@@ -790,7 +797,7 @@
         };
       });
       if (typesLoaded && eventsLoaded) renderEventList();
-    });
+    }, function(error){ console.error('checkinSessions 監聽失敗', error); });
   });
 </script>
 </body>

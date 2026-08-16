@@ -42,7 +42,8 @@ function seedDefaults(db, uid) {
 // callback(types) 每次 eventTypes 有變動都會呼叫，types 依 order 排序
 // seedIfEmptyUid：傳目前登入者 uid 才會在清單是空的時候自動建立內建三種類型；
 // 沒有寫入權限的人傳了也沒差，寫入會被 Firestore 規則擋掉、靜默失敗
-export function subscribeEventTypes(db, callback, seedIfEmptyUid) {
+// onError：選填，網路壅塞等原因導致監聽失敗時呼叫，讓呼叫端可以跳出重試提示而不是讓畫面卡住不動
+export function subscribeEventTypes(db, callback, seedIfEmptyUid, onError) {
   var firstSnapshot = true;
   return onSnapshot(query(collection(db, "eventTypes"), orderBy("order", "asc")), function (snap) {
     if (firstSnapshot) {
@@ -59,7 +60,7 @@ export function subscribeEventTypes(db, callback, seedIfEmptyUid) {
         homeHighlight: !!data.homeHighlight
       };
     }));
-  });
+  }, onError);
 }
 
 export function badgeStyle(colorKey) {

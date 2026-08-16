@@ -33,7 +33,8 @@ function seedDefaults(db) {
 // callback(list) 每次異動都會呼叫，list 是 [{name, family}] 陣列
 // seedIfMissing 傳 true 才會在文件不存在時嘗試建立內建初始清單（要有寫入權限才會成功，
 // 一般團員在註冊頁讀取時不會傳，只會拿到下面的內建清單當畫面顯示用，不會嘗試寫入）
-export function subscribeInstruments(db, callback, seedIfMissing) {
+// onError：選填，網路壅塞等原因導致監聽失敗時呼叫，讓呼叫端可以顯示重試提示而不是讓畫面卡住不動
+export function subscribeInstruments(db, callback, seedIfMissing, onError) {
   return onSnapshot(doc(db, "settings", "instruments"), function (snap) {
     if (snap.exists()) {
       callback(snap.data().list || []);
@@ -41,7 +42,7 @@ export function subscribeInstruments(db, callback, seedIfMissing) {
       callback(DEFAULT_INSTRUMENTS);
       if (seedIfMissing) seedDefaults(db);
     }
-  });
+  }, onError);
 }
 
 export function addInstrument(db, name, family) {

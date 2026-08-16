@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'brio-v2';
+const CACHE_VERSION = 'brio-v3';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -19,6 +19,7 @@ const CORE_ASSETS = [
   './version.js',
   './event-types.js',
   './instruments.js',
+  './ios-install.js',
   './manifest.json',
   './assets/BrioLogo.jpg',
   './assets/icons/icon-192.png',

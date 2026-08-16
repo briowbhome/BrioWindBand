@@ -471,6 +471,11 @@
     instFormError.classList.toggle('show', !!message);
   }
 
+  // 網路壅塞等原因導致監聽失敗時呼叫，清掉骨架屏並明確告知，不要讓畫面卡住不動
+  function renderMembersError(){
+    memberList.innerHTML = '<div class="empty">讀取失敗，請重新整理再試一次</div>';
+  }
+
   function renderMembers(){
     if (!membersLoaded){
       memberList.innerHTML = MEMBER_SKELETON_HTML;
@@ -683,6 +688,11 @@
     });
   });
 
+  // 網路壅塞等原因導致監聽失敗時呼叫，清掉骨架屏並明確告知，不要讓畫面卡住不動
+  function renderInstrumentsError(){
+    instList.innerHTML = '<div class="empty">讀取失敗，請重新整理再試一次</div>';
+  }
+
   function renderInstruments(){
     if (!instrumentsLoaded){
       instList.innerHTML = INST_SKELETON_HTML;
@@ -812,14 +822,14 @@
       });
       membersLoaded = true;
       renderMembers();
-    });
+    }, renderMembersError);
 
     subscribeInstruments(db, function(list){
       instrumentsList = list;
       instrumentsLoaded = true;
       renderInstruments();
       renderMembers();
-    }, true);
+    }, true, renderInstrumentsError);
   });
 </script>
 </body>

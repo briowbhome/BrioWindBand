@@ -151,6 +151,15 @@
     background:none; border:none; color:var(--ink-soft);
     font-size:12.5px; text-decoration:underline; text-underline-offset:2px; cursor:pointer;
   }
+
+  .retry-btn{
+    display:block; margin:16px auto 0;
+    background:var(--brass); color:var(--ink);
+    border:none; border-radius:var(--radius-md);
+    padding:11px 26px; font-weight:700; font-size:13.5px;
+    font-family:inherit; cursor:pointer;
+  }
+  .retry-btn:active{ background:var(--brass-deep); }
 </style>
 </head>
 <body>
@@ -204,6 +213,19 @@
       '</div>';
   }
 
+  // 現場人多時網路壅塞，簽到過程中的 Firestore 讀寫偶爾會逾時/失敗，
+  // 跟一般的「已失效」/「重複簽到」不同，這種情況應該讓使用者能重試，而不是卡住不動
+  function renderRetryNotice(iconPath, headline, sub){
+    stage.innerHTML =
+      '<div class="notice">' +
+        '<svg class="ico" viewBox="0 0 24 24" fill="none">' + iconPath + '</svg>' +
+        '<div class="headline">' + headline + '</div>' +
+        '<div class="sub">' + sub + '</div>' +
+        '<button type="button" class="retry-btn" id="retryBtn">重新整理再試一次</button>' +
+      '</div>';
+    document.getElementById('retryBtn').addEventListener('click', function(){ location.reload(); });
+  }
+
   function renderTicket(opts){
     stage.innerHTML =
       '<div class="ticket">' +
@@ -245,37 +267,46 @@
 
     var checkinId = eventId + '_' + result.uid;
 
-    var existingSnap = await getDoc(doc(db, 'checkins', checkinId));
-    if (existingSnap.exists()){
-      var existing = existingSnap.data();
-      var eventSnap = await getDoc(doc(db, 'events', eventId));
-      var evt = eventSnap.exists() ? eventSnap.data() : {};
-      renderTicket({
-        headline: '重複簽到',
-        sub: '這場活動你已經完成簽到，簽到資訊如下。',
-        title: evt.title || '—',
-        date: evt.date && evt.date.toDate ? evt.date.toDate() : null,
-        location: evt.location,
-        checkedInAt: existing.checkedInAt && existing.checkedInAt.toDate ? existing.checkedInAt.toDate() : null,
-        note: '如時間有誤，請洽現場幹部協助確認。'
-      });
+    var existingSnap, sessionSnap, eventSnap2;
+    try {
+      existingSnap = await getDoc(doc(db, 'checkins', checkinId));
+      if (existingSnap.exists()){
+        var existing = existingSnap.data();
+        var eventSnap = await getDoc(doc(db, 'events', eventId));
+        var evt = eventSnap.exists() ? eventSnap.data() : {};
+        renderTicket({
+          headline: '重複簽到',
+          sub: '這場活動你已經完成簽到，簽到資訊如下。',
+          title: evt.title || '—',
+          date: evt.date && evt.date.toDate ? evt.date.toDate() : null,
+          location: evt.location,
+          checkedInAt: existing.checkedInAt && existing.checkedInAt.toDate ? existing.checkedInAt.toDate() : null,
+          note: '如時間有誤，請洽現場幹部協助確認。'
+        });
+        return;
+      }
+
+      sessionSnap = await getDoc(doc(db, 'checkinSessions', eventId));
+      if (!sessionSnap.exists()){
+        renderNotice(ICO_WARN, '此簽到碼已失效', '請洽現場幹部確認，或請幹部重新開放簽到。');
+        return;
+      }
+      var session = sessionSnap.data();
+      var windowEnd = session.windowEnd && session.windowEnd.toDate ? session.windowEnd.toDate() : new Date(0);
+
+      if (session.code !== code || windowEnd <= new Date()){
+        renderNotice(ICO_WARN, '此簽到碼已失效', '請洽現場幹部確認，或請幹部重新開放簽到。');
+        return;
+      }
+
+      eventSnap2 = await getDoc(doc(db, 'events', eventId));
+    } catch (error) {
+      // 現場人多網路壅塞時，讀取步驟本身就可能逾時/失敗，跟上面的「已失效」「重複簽到」不同，
+      // 這種狀況要讓使用者能重試，不能讓畫面停在骨架屏不動（原本這裡完全沒有 catch，是先前「卡住」回報的主因）
+      renderRetryNotice(ICO_WARN, '讀取簽到資料失敗', '網路連線不穩，請重新整理再試一次。');
       return;
     }
 
-    var sessionSnap = await getDoc(doc(db, 'checkinSessions', eventId));
-    if (!sessionSnap.exists()){
-      renderNotice(ICO_WARN, '此簽到碼已失效', '請洽現場幹部確認，或請幹部重新開放簽到。');
-      return;
-    }
-    var session = sessionSnap.data();
-    var windowEnd = session.windowEnd && session.windowEnd.toDate ? session.windowEnd.toDate() : new Date(0);
-
-    if (session.code !== code || windowEnd <= new Date()){
-      renderNotice(ICO_WARN, '此簽到碼已失效', '請洽現場幹部確認，或請幹部重新開放簽到。');
-      return;
-    }
-
-    var eventSnap2 = await getDoc(doc(db, 'events', eventId));
     var evt2 = eventSnap2.exists() ? eventSnap2.data() : {};
 
     try {

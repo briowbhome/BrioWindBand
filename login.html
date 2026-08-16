@@ -11,6 +11,7 @@
 <meta name="theme-color" content="#F2EFE5">
 <link rel="apple-touch-icon" href="assets/icons/icon-180.png">
 <script src="./pwa-register.js" defer></script>
+<script src="./ios-install.js" defer></script>
 <style>
   :root{
     --ink:#20242F;
@@ -718,6 +719,12 @@
     });
   }
 
+  // 網路壅塞等原因導致監聽失敗時呼叫：sheetBody 一開始是空的，沒有骨架屏可以清，
+  // 沒處理的話使用者打開樂器/聲部選單會看到一片空白、以為沒有任何樂器可選，卡在註冊流程裡
+  function renderInstrumentsError(){
+    sheetBody.innerHTML = '<div style="padding:30px 20px;text-align:center;font-size:13px;color:var(--ink-soft);">讀取失敗，請重新整理再試一次</div>';
+  }
+
   subscribeInstruments(db, function(list){
     var byFamily = {};
     list.forEach(function(item){
@@ -741,7 +748,7 @@
     }).join('');
 
     syncSheetChips();
-  });
+  }, undefined, renderInstrumentsError);
 
   sheetBody.addEventListener('click', function(e){
     var chip = e.target.closest('.chip');

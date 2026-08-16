@@ -539,6 +539,12 @@
     return '<span class="kind" style="' + badgeStyle(t ? t.colorKey : null) + '">' + label + '</span>';
   }
 
+  // 網路壅塞等原因導致監聽失敗時呼叫，清掉骨架屏並明確告知，不要讓畫面卡住不動
+  function renderEventsAdminError(){
+    eventList.innerHTML = '<div class="empty">讀取失敗，請重新整理再試一次</div>';
+    document.getElementById('typesList').innerHTML = '<div class="empty">讀取失敗，請重新整理再試一次</div>';
+  }
+
   function render(){
     var ids = Object.keys(eventsById);
     if (ids.length === 0){
@@ -775,7 +781,7 @@
       renderTypeSelect();
       renderTypesList();
       if (eventsLoaded) render();
-    }, canManageTypes ? currentAdminUid : null);
+    }, canManageTypes ? currentAdminUid : null, renderEventsAdminError);
 
     onSnapshot(collection(db, 'events'), function(snap){
       eventsById = {};
@@ -792,7 +798,7 @@
       });
       eventsLoaded = true;
       if (typesLoaded) render();
-    });
+    }, renderEventsAdminError);
 
     setDefaultEventDate();
   });
