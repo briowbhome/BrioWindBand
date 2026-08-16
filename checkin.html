@@ -233,7 +233,7 @@
     var code = params.get('code');
 
     if (!eventId || !code){
-      renderNotice(ICO_WARN, '請掃描現場的簽到 QR Code', '這個頁面需要透過簽到 QR Code 開啟，直接開啟無法完成簽到。');
+      renderNotice(ICO_WARN, '請掃描現場的簽到 QR Code', '直接開啟頁面無法完成簽到。');
       return;
     }
 
@@ -245,8 +245,8 @@
       var eventSnap = await getDoc(doc(db, 'events', eventId));
       var evt = eventSnap.exists() ? eventSnap.data() : {};
       renderTicket({
-        headline: '你已經簽到過了',
-        sub: '這場活動你已經完成簽到，不需要再簽一次。',
+        headline: '重複簽到',
+        sub: '這場活動你已經完成簽到，簽到資訊如下。',
         title: evt.title || '—',
         date: evt.date && evt.date.toDate ? evt.date.toDate() : null,
         location: evt.location,

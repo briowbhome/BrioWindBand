@@ -176,8 +176,49 @@
   .role-badge.member{ background:var(--sage-bg); color:var(--sage); }
   .lock-ico{ font-size:12px; color:var(--ink-soft); margin-left:6px; flex:none; }
 
-  /* ---------- Edit panel ---------- */
-  .edit-panel{ padding:0 16px 16px; }
+  /* ---------- Member edit sheet ---------- */
+  .sheet-overlay{
+    position:fixed; inset:0; z-index:80;
+    background:rgba(32,36,47,.45);
+    display:none;
+    align-items:flex-end;
+    justify-content:center;
+  }
+  .sheet-overlay.active{ display:flex; }
+  .sheet{
+    width:100%; max-width:460px;
+    max-height:85vh;
+    background:var(--paper-raised);
+    border-radius:20px 20px 0 0;
+    display:flex; flex-direction:column;
+    box-shadow:0 -10px 30px rgba(32,36,47,.3);
+  }
+  .sheet-handle{
+    width:36px; height:4px;
+    background:var(--line);
+    border-radius:999px;
+    margin:10px auto 2px;
+  }
+  .sheet-header{ position:relative; padding:6px 44px 12px 20px; border-bottom:1px solid var(--line); }
+  .sheet-header .name{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:16px; }
+  .sheet-header .account{ font-family:'Roboto Mono',monospace; font-size:11px; color:var(--ink-soft); margin-top:2px; }
+  .sheet-close{
+    position:absolute; top:4px; right:10px;
+    width:30px; height:30px; border-radius:50%; border:none; background:none;
+    color:var(--ink-soft); font-size:19px; line-height:1; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .sheet-close:active{ background:var(--paper); }
+  .sheet-body{ overflow-y:auto; padding:14px 20px 8px; }
+  .sheet-footer{
+    display:flex; gap:10px;
+    padding:14px 20px calc(14px + env(safe-area-inset-bottom));
+    border-top:1px solid var(--line);
+  }
+  .cta-btn-secondary{ background:var(--paper); color:var(--ink-soft); border:1px solid var(--line); }
+  .cta-btn-secondary:hover{ background:var(--paper-raised); }
+  .cta-btn-secondary:active{ transform:scale(.98); background:var(--paper); }
+
   .field{ margin-top:12px; display:flex; flex-direction:column; gap:6px; }
   .field:first-child{ margin-top:0; }
   .field label{
@@ -249,6 +290,14 @@
   .inst-row{ display:flex; align-items:center; gap:10px; padding:9px 16px; }
   .inst-row + .inst-row{ border-top:1px solid var(--line); }
   .inst-name{ flex:1; font-size:13px; color:var(--ink); font-weight:500; }
+  .inst-move{ display:flex; flex-direction:column; gap:1px; flex:none; }
+  .inst-move-btn{
+    width:20px; height:16px; border:none; background:none;
+    color:var(--ink-soft); cursor:pointer; font-size:9px; line-height:1;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .inst-move-btn:disabled{ opacity:.25; cursor:default; }
+  .inst-move-btn:active:not(:disabled){ color:var(--brass-deep); }
   .inst-remove{
     flex:none; width:22px; height:22px; border-radius:50%; border:none; background:none;
     color:var(--ink-soft); cursor:pointer; font-size:15px; line-height:1;
@@ -281,10 +330,10 @@
   <div class="staff"></div>
 
   <div class="section-label">
-    <span class="tw">團員權限</span>
+    <span class="tw">成員權限</span>
     <span class="en">Roles</span>
   </div>
-  <p class="lede">點擊團員調整角色與權限。Owner 無法透過這裡調整。</p>
+  <p class="lede">點擊成員調整角色與權限。</p>
 
   <div class="list" id="memberList"></div>
 
@@ -292,7 +341,7 @@
     <span class="tw">樂器/聲部清單</span>
     <span class="en">Instruments</span>
   </div>
-  <p class="lede">這裡管理的清單會同步用在註冊頁的樂器選項，以及上面「分部長」的指派選項。</p>
+  <p class="lede">此清單會同步用在註冊頁的樂器選項，以及「分部長」的指派選項。</p>
 
   <form class="card" id="instForm">
     <div class="field-row">
@@ -306,6 +355,7 @@
           <option value="woodwind">木管</option>
           <option value="brass">銅管</option>
           <option value="percussion">打擊</option>
+          <option value="strings">弦樂</option>
         </select>
       </div>
     </div>
@@ -323,19 +373,36 @@
   <nav class="drawer-panel" id="drawerPanel"></nav>
 </div>
 
+<!-- 成員編輯 Bottom Sheet -->
+<div class="sheet-overlay" id="memberSheetOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button type="button" class="sheet-close" id="memberSheetClose" aria-label="關閉">×</button>
+      <div class="name" id="sheetMemberName">—</div>
+      <div class="account" id="sheetMemberAccount">—</div>
+    </div>
+    <div class="sheet-body" id="memberSheetBody"></div>
+    <div class="sheet-footer">
+      <button type="button" class="cta-btn cta-btn-secondary" id="cancelMemberBtn">取消</button>
+      <button type="button" class="cta-btn" id="saveMemberBtn" disabled>儲存變更</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
   import { requireAdmin } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAdminNav } from './admin-nav.js';
   import { initAccountMenu } from './account-menu.js';
-  import { subscribeInstruments, addInstrument, removeInstrument, FAMILY_LABELS, FAMILY_ORDER } from './instruments.js';
+  import { subscribeInstruments, addInstrument, removeInstrument, setInstrumentsOrder, FAMILY_LABELS, FAMILY_ORDER } from './instruments.js';
   import {
     collection, query, where, onSnapshot, doc, updateDoc
   } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
   initAdminNav('roles-admin.html');
 
-  var ROLE_LABELS = { member: '團員', conductor: '指揮', admin: '幹部', owner: 'Owner' };
+  var ROLE_LABELS = { member: '團員', conductor: '指揮', admin: '管理員', owner: 'Owner' };
   var ROLE_WEIGHT = { owner: 0, admin: 1, conductor: 2, member: 3 };
   var PERMISSION_DEFS = [
     { key: 'canManageRoles', label: '可調整他人角色/權限' },
@@ -347,14 +414,31 @@
   var membersById = {};
   var instrumentsList = [];
   var openMemberId = null;
+  var currentAdminUid = null;
   var draftRole = null;
   var draftPermissions = {};
   var draftSections = [];
+  var draftInstruments = [];
+  var initialRole = null;
+  var initialPermKey = '';
+  var initialSectionsKey = '';
+  var initialInstrumentsKey = '';
+  var sheetRestrictedSelf = false;
+
+  function permissionsKey(perms){
+    return PERMISSION_DEFS.map(function(p){ return p.key + ':' + (!!perms[p.key]); }).sort().join('|');
+  }
+  function sectionsKey(arr){
+    return arr.slice().sort().join('|');
+  }
 
   var memberList = document.getElementById('memberList');
   var instForm = document.getElementById('instForm');
   var instFormError = document.getElementById('instFormError');
   var instList = document.getElementById('instList');
+  var memberSheetOverlay = document.getElementById('memberSheetOverlay');
+  var memberSheetBody = document.getElementById('memberSheetBody');
+  var saveMemberBtn = document.getElementById('saveMemberBtn');
 
   function showInstError(message){
     instFormError.textContent = message;
@@ -364,7 +448,7 @@
   function renderMembers(){
     var ids = Object.keys(membersById);
     if (ids.length === 0){
-      memberList.innerHTML = '<div class="empty">目前沒有已核准的團員</div>';
+      memberList.innerHTML = '<div class="empty">目前沒有已核准的成員</div>';
       return;
     }
 
@@ -378,23 +462,28 @@
 
     memberList.innerHTML = ids.map(function(uid){
       var m = membersById[uid];
-      var locked = m.role === 'owner';
+      var isSelfOwner = m.role === 'owner' && uid === currentAdminUid;
+      var locked = m.role === 'owner' && !isSelfOwner;
       var rowHtml =
-        '<div class="member-row' + (locked ? ' locked' : '') + '"' + (locked ? '' : ' data-toggle="' + uid + '"') + '>' +
+        '<div class="member-row' + (locked ? ' locked' : '') + '"' + (locked ? '' : ' data-open-member="' + uid + '"') + '>' +
           '<div class="m-avatar">' + (m.name ? m.name.charAt(0) : '?') + '</div>' +
           '<div><div class="m-name">' + (m.name || '—') + '</div><div class="m-account">' + (m.account || '') + '</div></div>' +
           '<span class="role-badge ' + m.role + '">' + (ROLE_LABELS[m.role] || m.role) + '</span>' +
           (locked ? '<span class="lock-ico">🔒</span>' : '') +
         '</div>';
 
-      var panelHtml = (!locked && openMemberId === uid) ? renderEditPanel(uid) : '';
-
-      return '<div class="member-item" data-member-item="' + uid + '">' + rowHtml + panelHtml + '</div>';
+      return '<div class="member-item" data-member-item="' + uid + '">' + rowHtml + '</div>';
     }).join('');
   }
 
-  function renderEditPanel(uid){
-    var m = membersById[uid];
+  function isMemberDirty(){
+    return draftRole !== initialRole ||
+      permissionsKey(draftPermissions) !== initialPermKey ||
+      sectionsKey(draftSections) !== initialSectionsKey ||
+      sectionsKey(draftInstruments) !== initialInstrumentsKey;
+  }
+
+  function renderMemberSheetBody(){
     var roles = ['member', 'conductor', 'admin'];
 
     var roleChips = roles.map(function(r){
@@ -411,8 +500,20 @@
       );
     }).join('');
 
+    var instRows = instrumentsList.length === 0
+      ? '<div class="empty">目前沒有樂器清單，請先在下面新增</div>'
+      : instrumentsList.map(function(inst){
+          var on = draftInstruments.indexOf(inst.name) !== -1;
+          return (
+            '<div class="check-row">' +
+              '<div class="checkbox' + (on ? ' on' : '') + '" data-member-inst-toggle="' + inst.name + '">' + (on ? '✓' : '') + '</div>' +
+              '<div class="check-text" data-member-inst-toggle="' + inst.name + '">' + inst.name + '</div>' +
+            '</div>'
+          );
+        }).join('');
+
     var sectionRows = instrumentsList.length === 0
-      ? '<div class="empty">目前沒有樂器清單，先在下面新增</div>'
+      ? '<div class="empty">目前沒有樂器清單，請先在下面新增</div>'
       : instrumentsList.map(function(inst){
           var on = draftSections.indexOf(inst.name) !== -1;
           return (
@@ -423,90 +524,132 @@
           );
         }).join('');
 
-    return (
-      '<div class="edit-panel">' +
-        '<div class="field">' +
-          '<label>角色</label>' +
-          '<div class="role-picker">' + roleChips + '</div>' +
-        '</div>' +
-        '<div class="field">' +
-          '<label>額外權限</label>' +
-          '<div class="check-list">' + permRows + '</div>' +
-        '</div>' +
-        '<div class="field">' +
-          '<label>分部長（選填）</label>' +
-          '<div class="check-list">' + sectionRows + '</div>' +
-        '</div>' +
-        '<p class="form-error" id="memberFormError"></p>' +
-        '<div class="form-buttons">' +
-          '<button type="button" class="cta-btn" id="saveMemberBtn" data-save-member="' + uid + '">儲存變更</button>' +
-        '</div>' +
-      '</div>'
-    );
+    var roleAndPermFields = sheetRestrictedSelf
+      ? '<p class="lede" style="margin:0 0 4px;">只能調整自己的樂器/聲部與分部長，角色與權限無法透過這裡調整。</p>'
+      : (
+          '<div class="field">' +
+            '<label>角色</label>' +
+            '<div class="role-picker">' + roleChips + '</div>' +
+          '</div>' +
+          '<div class="field">' +
+            '<label>額外權限</label>' +
+            '<div class="check-list">' + permRows + '</div>' +
+          '</div>'
+        );
+
+    memberSheetBody.innerHTML =
+      roleAndPermFields +
+      '<div class="field">' +
+        '<label>樂器/聲部</label>' +
+        '<div class="check-list">' + instRows + '</div>' +
+      '</div>' +
+      '<div class="field">' +
+        '<label>分部長（選填）</label>' +
+        '<div class="check-list">' + sectionRows + '</div>' +
+      '</div>' +
+      '<p class="form-error" id="memberFormError"></p>';
+
+    saveMemberBtn.disabled = !isMemberDirty();
+  }
+
+  function openMemberSheet(uid){
+    var m = membersById[uid];
+    if (!m) return;
+    openMemberId = uid;
+    sheetRestrictedSelf = m.role === 'owner' && uid === currentAdminUid;
+    draftRole = m.role;
+    draftPermissions = Object.assign({}, m.permissions || {});
+    draftSections = (m.sectionLeaderFor || []).slice();
+    draftInstruments = (m.instruments || []).slice();
+    initialRole = draftRole;
+    initialPermKey = permissionsKey(draftPermissions);
+    initialSectionsKey = sectionsKey(draftSections);
+    initialInstrumentsKey = sectionsKey(draftInstruments);
+
+    document.getElementById('sheetMemberName').textContent = m.name || '—';
+    document.getElementById('sheetMemberAccount').textContent = '@' + (m.account || '');
+    saveMemberBtn.textContent = '儲存變更';
+    renderMemberSheetBody();
+    memberSheetOverlay.classList.add('active');
+  }
+
+  function closeMemberSheet(){
+    memberSheetOverlay.classList.remove('active');
+    openMemberId = null;
   }
 
   memberList.addEventListener('click', function(e){
-    var toggle = e.target.closest('[data-toggle]');
+    var openBtn = e.target.closest('[data-open-member]');
+    if (!openBtn) return;
+    openMemberSheet(openBtn.getAttribute('data-open-member'));
+  });
+
+  memberSheetBody.addEventListener('click', function(e){
     var roleChip = e.target.closest('[data-role-chip]');
     var permToggle = e.target.closest('[data-perm-toggle]');
+    var instToggle = e.target.closest('[data-member-inst-toggle]');
     var sectionToggle = e.target.closest('[data-section-toggle]');
-    var saveBtn = e.target.closest('[data-save-member]');
 
-    if (toggle){
-      var uid = toggle.getAttribute('data-toggle');
-      if (openMemberId === uid){
-        openMemberId = null;
-      } else {
-        var m = membersById[uid];
-        openMemberId = uid;
-        draftRole = m.role;
-        draftPermissions = Object.assign({}, m.permissions || {});
-        draftSections = (m.sectionLeaderFor || []).slice();
-      }
-      renderMembers();
-      return;
-    }
     if (roleChip){
       draftRole = roleChip.getAttribute('data-role-chip');
-      renderMembers();
+      renderMemberSheetBody();
       return;
     }
     if (permToggle){
       var key = permToggle.getAttribute('data-perm-toggle');
       draftPermissions[key] = !draftPermissions[key];
-      renderMembers();
+      renderMemberSheetBody();
+      return;
+    }
+    if (instToggle){
+      var iname = instToggle.getAttribute('data-member-inst-toggle');
+      var iidx = draftInstruments.indexOf(iname);
+      if (iidx === -1) draftInstruments.push(iname); else draftInstruments.splice(iidx, 1);
+      renderMemberSheetBody();
       return;
     }
     if (sectionToggle){
-      var name = sectionToggle.getAttribute('data-section-toggle');
-      var idx = draftSections.indexOf(name);
-      if (idx === -1) draftSections.push(name); else draftSections.splice(idx, 1);
-      renderMembers();
+      var sname = sectionToggle.getAttribute('data-section-toggle');
+      var sidx = draftSections.indexOf(sname);
+      if (sidx === -1) draftSections.push(sname); else draftSections.splice(sidx, 1);
+      renderMemberSheetBody();
       return;
     }
-    if (saveBtn){
-      var saveUid = saveBtn.getAttribute('data-save-member');
-      saveBtn.disabled = true;
-      saveBtn.textContent = '儲存中…';
-      updateDoc(doc(db, 'users', saveUid), {
-        role: draftRole,
-        permissions: Object.assign(
-          { canManageRoles: false, canDeleteAccounts: false, canManageSheetMusic: false, canManageEventTypes: false },
-          draftPermissions
-        ),
-        sectionLeaderFor: draftSections
-      }).then(function(){
-        openMemberId = null;
-      }).catch(function(err){
-        var errEl = document.getElementById('memberFormError');
-        if (errEl){
-          errEl.textContent = '儲存失敗（' + err.code + '）';
-          errEl.classList.add('show');
-        }
-        saveBtn.disabled = false;
-        saveBtn.textContent = '儲存變更';
-      });
-    }
+  });
+
+  document.getElementById('memberSheetClose').addEventListener('click', closeMemberSheet);
+  document.getElementById('cancelMemberBtn').addEventListener('click', closeMemberSheet);
+  memberSheetOverlay.addEventListener('click', function(e){
+    if (e.target === memberSheetOverlay) closeMemberSheet();
+  });
+
+  saveMemberBtn.addEventListener('click', function(){
+    if (!openMemberId) return;
+    var saveUid = openMemberId;
+    saveMemberBtn.disabled = true;
+    saveMemberBtn.textContent = '儲存中…';
+    var payload = sheetRestrictedSelf
+      ? { sectionLeaderFor: draftSections, instruments: draftInstruments }
+      : {
+          role: draftRole,
+          permissions: Object.assign(
+            { canManageRoles: false, canDeleteAccounts: false, canManageSheetMusic: false, canManageEventTypes: false },
+            draftPermissions
+          ),
+          sectionLeaderFor: draftSections,
+          instruments: draftInstruments
+        };
+    updateDoc(doc(db, 'users', saveUid), payload).then(function(){
+      closeMemberSheet();
+    }).catch(function(err){
+      var errEl = document.getElementById('memberFormError');
+      if (errEl){
+        errEl.textContent = '儲存失敗（' + err.code + '）';
+        errEl.classList.add('show');
+      }
+      saveMemberBtn.disabled = false;
+      saveMemberBtn.textContent = '儲存變更';
+    });
   });
 
   function renderInstruments(){
@@ -523,19 +666,46 @@
       .concat(Object.keys(byFamily).filter(function(f){ return FAMILY_ORDER.indexOf(f) === -1; }));
 
     instList.innerHTML = families.map(function(family){
+      var idxs = byFamily[family];
       return (
         '<div class="inst-group-label">' + (FAMILY_LABELS[family] || family) + '</div>' +
-        byFamily[family].map(function(idx){
+        idxs.map(function(idx, i){
           var inst = instrumentsList[idx];
+          var isFirst = i === 0;
+          var isLast = i === idxs.length - 1;
           return (
             '<div class="inst-row">' +
               '<span class="inst-name">' + inst.name + '</span>' +
+              '<div class="inst-move">' +
+                '<button type="button" class="inst-move-btn" data-inst-up="' + idx + '"' + (isFirst ? ' disabled' : '') + ' aria-label="上移">▲</button>' +
+                '<button type="button" class="inst-move-btn" data-inst-down="' + idx + '"' + (isLast ? ' disabled' : '') + ' aria-label="下移">▼</button>' +
+              '</div>' +
               '<button type="button" class="inst-remove" data-inst-remove="' + idx + '" aria-label="刪除">×</button>' +
             '</div>'
           );
         }).join('')
       );
     }).join('');
+  }
+
+  function moveInstrument(idx, direction){
+    var inst = instrumentsList[idx];
+    if (!inst) return;
+    var groupIdxs = [];
+    instrumentsList.forEach(function(item, i){ if (item.family === inst.family) groupIdxs.push(i); });
+    var pos = groupIdxs.indexOf(idx);
+    var swapPos = direction === 'up' ? pos - 1 : pos + 1;
+    if (swapPos < 0 || swapPos >= groupIdxs.length) return;
+    var otherIdx = groupIdxs[swapPos];
+
+    var newList = instrumentsList.slice();
+    var tmp = newList[idx];
+    newList[idx] = newList[otherIdx];
+    newList[otherIdx] = tmp;
+
+    setInstrumentsOrder(db, newList).catch(function(err){
+      alert('調整順序失敗：' + err.code);
+    });
   }
 
   instForm.addEventListener('submit', function(e){
@@ -559,12 +729,17 @@
   });
 
   instList.addEventListener('click', function(e){
+    var upBtn = e.target.closest('[data-inst-up]');
+    var downBtn = e.target.closest('[data-inst-down]');
+    if (upBtn){ moveInstrument(Number(upBtn.getAttribute('data-inst-up')), 'up'); return; }
+    if (downBtn){ moveInstrument(Number(downBtn.getAttribute('data-inst-down')), 'down'); return; }
+
     var btn = e.target.closest('[data-inst-remove]');
     if (!btn) return;
     var idx = Number(btn.getAttribute('data-inst-remove'));
     var target = instrumentsList[idx];
     if (!target) return;
-    var ok = confirm('確定要刪除「' + target.name + '」嗎？已經選這個樂器的團員資料不會被清掉，只是清單裡不會再出現這個選項。');
+    var ok = confirm('確定要刪除「' + target.name + '」嗎？已經選這個樂器的成員資料不會被清掉，只是清單裡不會再出現這個選項。');
     if (!ok) return;
     removeInstrument(db, target).catch(function(err){
       alert('刪除失敗：' + err.code);
@@ -581,6 +756,7 @@
       return;
     }
 
+    currentAdminUid = result.uid;
     document.getElementById('avatarBtn').textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
     document.getElementById('authLoading').classList.add('hidden');
     document.getElementById('appRoot').classList.remove('hidden');
@@ -595,7 +771,8 @@
           account: data.account,
           role: data.role,
           permissions: data.permissions || {},
-          sectionLeaderFor: data.sectionLeaderFor || []
+          sectionLeaderFor: data.sectionLeaderFor || [],
+          instruments: data.instruments || []
         };
       });
       renderMembers();

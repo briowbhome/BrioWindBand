@@ -27,7 +27,7 @@ function mapAuthError(error) {
   return "發生錯誤，請稍後再試（" + (code || "unknown") + "）";
 }
 
-export async function registerAccount({ account, password, name, instruments }) {
+export async function registerAccount({ account, password, name, birthday, phone, licensePlate, instruments }) {
   var email = usernameToEmail(account);
   var credential;
   try {
@@ -42,6 +42,9 @@ export async function registerAccount({ account, password, name, instruments }) 
       account: account.trim(),
       accountLower: account.trim().toLowerCase(),
       name: name,
+      birthday: birthday,
+      phone: phone,
+      licensePlate: licensePlate ? licensePlate.trim() : null,
       instruments: instruments,
       status: "pending",
       role: "member",

@@ -2,6 +2,7 @@
 export const ADMIN_PAGES = [
   { href: "admin-index.html", label: "控制台首頁" },
   { href: "admin.html", label: "團員審核" },
+  { href: "members-admin.html", label: "成員資料" },
   { href: "event-admin.html", label: "活動管理" },
   { href: "checkin-admin.html", label: "簽到管理" },
   { href: "announce-admin.html", label: "公告管理" },

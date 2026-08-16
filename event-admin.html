@@ -297,7 +297,7 @@
     </div>
     <div class="field-checkbox">
       <input type="checkbox" id="typeHomeHighlight">
-      <label for="typeHomeHighlight">首頁「下一次◯◯」卡片顯示這個類型的活動（通常只勾一個）</label>
+      <label for="typeHomeHighlight">首頁「下一次團練」卡片將顯示這個類型的活動</label>
     </div>
     <p class="form-error" id="typeFormError"></p>
     <div class="form-buttons">
@@ -315,7 +315,7 @@
   <form class="card" id="eventForm">
     <div class="field">
       <label>活動標題</label>
-      <input type="text" id="eventTitle" placeholder="例如：大團練" required>
+      <input type="text" id="eventTitle" placeholder="例如：團練、重奏演出" required>
     </div>
     <div class="field">
       <label>類型</label>
@@ -327,7 +327,7 @@
     </div>
     <div class="field-checkbox">
       <input type="checkbox" id="eventAllDay">
-      <label for="eventAllDay">全天活動（無明確時間點，例如社遊）</label>
+      <label for="eventAllDay">全天活動（無明確開始/結束時間點）</label>
     </div>
     <div class="field-row" id="eventTimeFields">
       <div class="field">
@@ -341,7 +341,7 @@
     </div>
     <div class="field">
       <label>地點</label>
-      <input type="text" id="eventLocation" placeholder="例如：音樂系館 B1 排練室">
+      <input type="text" id="eventLocation" placeholder="例如：體育館一樓-舞台">
     </div>
     <p class="form-error" id="eventFormError"></p>
     <div class="form-buttons">
@@ -565,7 +565,7 @@
       var evt = eventsById[eventId];
       var ok = confirm(
         '確定要刪除「' + (evt ? evt.title : '這場活動') + '」嗎？\n' +
-        '如果這場活動已經有簽到紀錄，刪除後那些紀錄會找不到對應的活動資料。\n' +
+        '如果這場活動已經有簽到紀錄，刪除後將找不到對應的活動資料。\n' +
         '此動作無法復原。'
       );
       if (!ok) return;
@@ -634,7 +634,7 @@
       return t.label === label && t.id !== editingTypeId;
     });
     if (duplicate){
-      typeFormError.textContent = '已經有一個叫「' + label + '」的類型了，請改用別的名稱，或直接編輯既有的那個';
+      typeFormError.textContent = '已經有一個叫「' + label + '」的類型了，請改用別的名稱，或直接編輯既有類型';
       typeFormError.classList.add('show');
       return;
     }

@@ -147,6 +147,8 @@
   form{ display:block; }
   .panel{ display:none; padding-bottom:6px; }
   .panel.active{ display:block; }
+  .reg-step{ display:none; }
+  .reg-step.active{ display:block; }
 
   .field{
     margin:14px 20px 0;
@@ -352,6 +354,49 @@
     border-top:1px solid var(--line);
   }
 
+  /* ---------- Birthday wheel picker ---------- */
+  .wheel-picker{
+    display:flex;
+    position:relative;
+    height:200px;
+    padding:4px 0;
+  }
+  .wheel-highlight{
+    position:absolute;
+    left:0; right:0;
+    top:84px; height:40px;
+    border-top:1px solid var(--line);
+    border-bottom:1px solid var(--line);
+    background:rgba(184,134,58,.08);
+    pointer-events:none;
+    border-radius:8px;
+  }
+  .wheel-col{
+    flex:1;
+    height:200px;
+    overflow-y:auto;
+    scroll-snap-type:y mandatory;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+  .wheel-col::-webkit-scrollbar{ display:none; }
+  .wheel-col .wheel-pad{ height:80px; }
+  .wheel-item{
+    height:40px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    scroll-snap-align:center;
+    font-family:'Roboto Mono',monospace;
+    font-size:15px;
+    color:#B4AD97;
+  }
+  .wheel-item.active{
+    color:var(--ink);
+    font-weight:700;
+    font-size:16px;
+  }
+
   /* ---------- Pending review (ticket) ---------- */
   .pending{
     display:none;
@@ -476,7 +521,7 @@
       <div class="back-row" id="backRow">
         <button type="button" id="toLogin">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M15 5 8 12l7 7" stroke="#4A4F5C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          返回登入
+          <span id="backRowLabel">返回登入</span>
         </button>
       </div>
 
@@ -502,44 +547,77 @@
 
       <!-- 申請帳號 -->
       <form class="panel" id="panelRegister" novalidate>
-        <div class="field" id="f-reg-account">
-          <label>帳號</label>
-          <input type="text" id="regAccount" placeholder="輸入帳號" autocomplete="username">
-          <span class="hint">英文字母開頭，4–20 碼，可包含數字、底線或連字號</span>
-          <span class="error">帳號需以英文字母開頭，4–20 碼，僅能包含英文、數字、底線或連字號</span>
-        </div>
-        <div class="field" id="f-reg-password">
-          <label>密碼</label>
-          <input type="password" id="regPassword" placeholder="包含英文及數字，至少 8 碼" autocomplete="new-password">
-          <span class="error">密碼需包含英文及數字，至少 8 碼</span>
-        </div>
-        <div class="field" id="f-reg-password2">
-          <label>確認密碼</label>
-          <input type="password" id="regPassword2" placeholder="再次輸入密碼" autocomplete="new-password">
-          <span class="error">兩次輸入的密碼不一致</span>
-        </div>
-        <div class="field" id="f-reg-name">
-          <label>姓名</label>
-          <input type="text" id="regName" placeholder="請輸入真實姓名">
-          <span class="error">請輸入姓名</span>
+        <div class="reg-step active" id="regStep1">
+          <div class="field" id="f-reg-account">
+            <label>帳號</label>
+            <input type="text" id="regAccount" placeholder="輸入帳號" autocomplete="username">
+            <span class="hint">英文字母開頭，4–20 碼，可包含數字、底線或連字號</span>
+            <span class="error">帳號需以英文字母開頭，4–20 碼，僅能包含英文、數字、底線或連字號</span>
+          </div>
+          <div class="field" id="f-reg-password">
+            <label>密碼</label>
+            <input type="password" id="regPassword" placeholder="包含英文及數字，至少 6 碼" autocomplete="new-password">
+            <span class="error">密碼需包含英文及數字，至少 6 碼</span>
+          </div>
+          <div class="field" id="f-reg-password2">
+            <label>確認密碼</label>
+            <input type="password" id="regPassword2" placeholder="再次輸入密碼" autocomplete="new-password">
+            <span class="error">兩次輸入的密碼不一致</span>
+          </div>
+
+          <div class="cta-wrap">
+            <button type="button" class="cta-btn" id="regNextBtn">下一步</button>
+          </div>
         </div>
 
-        <div class="field" id="f-reg-instruments">
-          <label>樂器/聲部</label>
-          <button type="button" class="picker-trigger" id="instrumentTrigger">
-            <span class="tagsWrap" id="instrumentTagsWrap">
-              <span class="placeholder" id="instrumentPlaceholder">點擊選擇樂器／聲部（可複選）</span>
-            </span>
-            <svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="#4A4F5C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-          <span class="error">請至少選擇一項樂器／聲部</span>
-        </div>
+        <div class="reg-step" id="regStep2">
+          <div class="field" id="f-reg-name">
+            <label>姓名</label>
+            <input type="text" id="regName" placeholder="請輸入真實姓名">
+            <span class="error">請輸入姓名</span>
+          </div>
 
-        <p class="lede" style="margin:16px 20px 0;">送出後將由幹部審核，核准前無法使用部分功能。</p>
-        <p class="form-error" id="registerFormError"></p>
+          <div class="field" id="f-reg-birthday">
+            <label>生日</label>
+            <button type="button" class="picker-trigger" id="birthdayTrigger">
+              <span class="tagsWrap" id="birthdayTagsWrap">
+                <span class="placeholder" id="birthdayPlaceholder">點擊選擇生日</span>
+              </span>
+              <svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="#4A4F5C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <input type="hidden" id="regBirthday">
+            <span class="error">請選擇生日</span>
+          </div>
 
-        <div class="cta-wrap">
-          <button type="submit" class="cta-btn" id="registerBtn">送出帳號申請</button>
+          <div class="field" id="f-reg-phone">
+            <label>電話</label>
+            <input type="tel" id="regPhone" placeholder="0912345678" autocomplete="tel" inputmode="numeric">
+            <span class="hint">台灣手機號碼，例如 0912345678</span>
+            <span class="error">請輸入正確的台灣手機號碼格式（09 開頭，共 10 碼）</span>
+          </div>
+
+          <div class="field" id="f-reg-instruments">
+            <label>樂器/聲部</label>
+            <button type="button" class="picker-trigger" id="instrumentTrigger">
+              <span class="tagsWrap" id="instrumentTagsWrap">
+                <span class="placeholder" id="instrumentPlaceholder">點擊選擇樂器／聲部（可複選）</span>
+              </span>
+              <svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="#4A4F5C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <span class="error">請至少選擇一項樂器／聲部</span>
+          </div>
+
+          <div class="field" id="f-reg-plate">
+            <label>汽車車牌號碼（選填）</label>
+            <input type="text" id="regPlate" placeholder="例如 ABC-1234">
+          </div>
+
+          <p class="lede" style="margin:16px 20px 0;">送出後將由幹部審核，核准前無法使用部分功能。</p>
+          <p class="form-error" id="registerFormError"></p>
+
+          <div class="cta-wrap">
+            <button type="submit" class="cta-btn" id="registerBtn">送出帳號申請</button>
+          </div>
         </div>
       </form>
     </div>
@@ -572,6 +650,28 @@
     </div>
   </div>
   <button type="button" class="back-link" id="backToLogin" style="display:none;">← 返回登入</button>
+
+  <!-- 生日 年月日滾輪 Bottom Sheet -->
+  <div class="sheet-overlay" id="birthdaySheetOverlay">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div class="tw">選擇生日</div>
+        <div class="hint">上下滑動選擇年、月、日</div>
+      </div>
+      <div class="sheet-body">
+        <div class="wheel-picker">
+          <div class="wheel-highlight"></div>
+          <div class="wheel-col" id="wheelYear"></div>
+          <div class="wheel-col" id="wheelMonth"></div>
+          <div class="wheel-col" id="wheelDay"></div>
+        </div>
+      </div>
+      <div class="sheet-footer">
+        <button type="button" class="cta-btn" id="birthdaySheetDoneBtn">完成</button>
+      </div>
+    </div>
+  </div>
 
   <!-- 樂器/聲部 選擇 Bottom Sheet -->
   <div class="sheet-overlay" id="sheetOverlay">
@@ -676,24 +776,176 @@
     renderTrigger();
   });
 
-  // 登入 ↔ 申請帳號 畫面切換
+  // ---------- 生日：年月日滾輪 ----------
+  var WHEEL_ITEM_H = 40;
+  var YEAR_NOW = new Date().getFullYear();
+  var YEAR_MIN = YEAR_NOW - 100;
+  var YEAR_MAX = YEAR_NOW - 5; // 粗略防呆，避免選到未來或明顯不合理的年份
+  var YEAR_VALUES = [];
+  for (var y = YEAR_MAX; y >= YEAR_MIN; y--) YEAR_VALUES.push(y);
+  var MONTH_VALUES = [1,2,3,4,5,6,7,8,9,10,11,12];
+
+  var birthdayState = { year: YEAR_NOW - 25, month: 1, day: 1 };
+  var birthdaySelected = false;
+
+  var wheelYear = document.getElementById('wheelYear');
+  var wheelMonth = document.getElementById('wheelMonth');
+  var wheelDay = document.getElementById('wheelDay');
+  var birthdaySheetOverlay = document.getElementById('birthdaySheetOverlay');
+  var birthdayTrigger = document.getElementById('birthdayTrigger');
+  var birthdayTagsWrap = document.getElementById('birthdayTagsWrap');
+  var regBirthdayInput = document.getElementById('regBirthday');
+
+  function daysInMonth(year, month){ return new Date(year, month, 0).getDate(); }
+
+  function buildWheelColumn(col, values, formatter){
+    col.innerHTML = '<div class="wheel-pad"></div>' +
+      values.map(function(v){ return '<div class="wheel-item" data-value="' + v + '">' + formatter(v) + '</div>'; }).join('') +
+      '<div class="wheel-pad"></div>';
+  }
+
+  function setWheelPosition(col, values, value){
+    var idx = values.indexOf(value);
+    if (idx === -1) idx = 0;
+    col.scrollTop = idx * WHEEL_ITEM_H;
+    highlightWheelIndex(col, idx);
+  }
+
+  function highlightWheelIndex(col, idx){
+    var items = col.querySelectorAll('.wheel-item');
+    items.forEach(function(el, i){ el.classList.toggle('active', i === idx); });
+  }
+
+  function clampedIndex(col, count){
+    var idx = Math.round(col.scrollTop / WHEEL_ITEM_H);
+    if (idx < 0) idx = 0;
+    if (idx > count - 1) idx = count - 1;
+    return idx;
+  }
+
+  function rebuildDayColumn(){
+    var maxDay = daysInMonth(birthdayState.year, birthdayState.month);
+    if (birthdayState.day > maxDay) birthdayState.day = maxDay;
+    var dayValues = [];
+    for (var d = 1; d <= maxDay; d++) dayValues.push(d);
+    buildWheelColumn(wheelDay, dayValues, function(v){ return v + '日'; });
+    setWheelPosition(wheelDay, dayValues, birthdayState.day);
+    return dayValues;
+  }
+
+  var dayValues = [];
+
+  function attachWheelScroll(col, getValues, onSettle){
+    col.addEventListener('scroll', function(){
+      var idx = clampedIndex(col, getValues().length);
+      highlightWheelIndex(col, idx);
+      clearTimeout(col._settleTimer);
+      col._settleTimer = setTimeout(function(){
+        var settledIdx = clampedIndex(col, getValues().length);
+        onSettle(getValues()[settledIdx]);
+      }, 120);
+    });
+  }
+
+  buildWheelColumn(wheelYear, YEAR_VALUES, function(v){ return v + '年'; });
+  buildWheelColumn(wheelMonth, MONTH_VALUES, function(v){ return v + '月'; });
+
+  attachWheelScroll(wheelYear, function(){ return YEAR_VALUES; }, function(value){
+    birthdayState.year = value;
+    dayValues = rebuildDayColumn();
+  });
+  attachWheelScroll(wheelMonth, function(){ return MONTH_VALUES; }, function(value){
+    birthdayState.month = value;
+    dayValues = rebuildDayColumn();
+  });
+  attachWheelScroll(wheelDay, function(){ return dayValues; }, function(value){
+    birthdayState.day = value;
+  });
+
+  function openBirthdaySheet(){
+    birthdaySheetOverlay.classList.add('active');
+    setWheelPosition(wheelYear, YEAR_VALUES, birthdayState.year);
+    setWheelPosition(wheelMonth, MONTH_VALUES, birthdayState.month);
+    dayValues = rebuildDayColumn();
+  }
+
+  birthdayTrigger.addEventListener('click', openBirthdaySheet);
+
+  birthdaySheetOverlay.addEventListener('click', function(e){
+    if (e.target === birthdaySheetOverlay) birthdaySheetOverlay.classList.remove('active');
+  });
+
+  document.getElementById('birthdaySheetDoneBtn').addEventListener('click', function(){
+    birthdaySelected = true;
+    var iso = birthdayState.year + '-' +
+      String(birthdayState.month).padStart(2, '0') + '-' +
+      String(birthdayState.day).padStart(2, '0');
+    regBirthdayInput.value = iso;
+    birthdayTagsWrap.innerHTML = '<span>' + birthdayState.year + '年' + birthdayState.month + '月' + birthdayState.day + '日</span>';
+    document.getElementById('f-reg-birthday').classList.remove('invalid');
+    birthdaySheetOverlay.classList.remove('active');
+  });
+
+  // 登入 ↔ 申請帳號（分兩步驟）畫面切換
   var panelLogin = document.getElementById('panelLogin');
   var panelRegister = document.getElementById('panelRegister');
+  var regStep1 = document.getElementById('regStep1');
+  var regStep2 = document.getElementById('regStep2');
   var headlineTw = document.getElementById('headlineTw');
   var headlineEn = document.getElementById('headlineEn');
   var backRow = document.getElementById('backRow');
+  var backRowLabel = document.getElementById('backRowLabel');
+  var currentView = 'login'; // 'login' | 'register1' | 'register2'
 
   function showView(name){
+    currentView = name;
     var isLogin = name === 'login';
     panelLogin.classList.toggle('active', isLogin);
     panelRegister.classList.toggle('active', !isLogin);
-    headlineTw.textContent = isLogin ? '帳號登入' : '申請帳號';
-    headlineEn.textContent = isLogin ? 'Member Access' : 'Request Account';
-    backRow.classList.toggle('show', !isLogin);
+    regStep1.classList.toggle('active', name === 'register1');
+    regStep2.classList.toggle('active', name === 'register2');
+
+    if (isLogin){
+      headlineTw.textContent = '帳號登入';
+      headlineEn.textContent = 'Member Access';
+      backRow.classList.remove('show');
+    } else {
+      headlineTw.textContent = '申請帳號';
+      headlineEn.textContent = name === 'register1' ? 'Request Account · Step 1/2' : 'Request Account · Step 2/2';
+      backRow.classList.add('show');
+      backRowLabel.textContent = name === 'register1' ? '返回登入' : '上一步';
+    }
   }
 
-  document.getElementById('toRegister').addEventListener('click', function(){ showView('register'); });
-  document.getElementById('toLogin').addEventListener('click', function(){ showView('login'); });
+  document.getElementById('toRegister').addEventListener('click', function(){ showView('register1'); });
+  document.getElementById('toLogin').addEventListener('click', function(){
+    showView(currentView === 'register2' ? 'register1' : 'login');
+  });
+
+  // 步驟 1 → 步驟 2：先驗證帳號/密碼，通過才前進
+  document.getElementById('regNextBtn').addEventListener('click', function(){
+    var account = document.getElementById('regAccount').value.trim();
+    var password = document.getElementById('regPassword').value;
+    var password2 = document.getElementById('regPassword2').value;
+
+    var ok = true;
+    var accountValid = /^[A-Za-z][A-Za-z0-9_-]{3,19}$/.test(account);
+    setInvalid('f-reg-account', !accountValid); if (!accountValid) ok = false;
+    var passwordValid = password.length >= 6 && /[A-Za-z]/.test(password) && /[0-9]/.test(password);
+    setInvalid('f-reg-password', !passwordValid); if (!passwordValid) ok = false;
+    setInvalid('f-reg-password2', password2 !== password || !password2); if (password2 !== password || !password2) ok = false;
+
+    if (!ok) return;
+    showView('register2');
+  });
+
+  // 步驟 1 按 Enter 視同按「下一步」，避免誤觸表單送出
+  regStep1.addEventListener('keydown', function(e){
+    if (e.key === 'Enter'){
+      e.preventDefault();
+      document.getElementById('regNextBtn').click();
+    }
+  });
 
   function setInvalid(fieldId, invalid){
     document.getElementById(fieldId).classList.toggle('invalid', invalid);
@@ -733,22 +985,24 @@
     });
   });
 
-  // 申請帳號表單
+  // 申請帳號表單（送出動作只會在步驟 2 觸發，步驟 1 的 Enter 已另外攔截）
   panelRegister.addEventListener('submit', function(e){
     e.preventDefault();
+    if (currentView !== 'register2') return;
+
     showFormError('registerFormError', '');
     var account = document.getElementById('regAccount').value.trim();
     var password = document.getElementById('regPassword').value;
-    var password2 = document.getElementById('regPassword2').value;
     var name = document.getElementById('regName').value.trim();
+    var birthday = document.getElementById('regBirthday').value;
+    var phone = document.getElementById('regPhone').value.trim();
+    var plate = document.getElementById('regPlate').value.trim();
 
     var ok = true;
-    var accountValid = /^[A-Za-z][A-Za-z0-9_-]{3,19}$/.test(account);
-    setInvalid('f-reg-account', !accountValid); if (!accountValid) ok = false;
-    var passwordValid = password.length >= 8 && /[A-Za-z]/.test(password) && /[0-9]/.test(password);
-    setInvalid('f-reg-password', !passwordValid); if (!passwordValid) ok = false;
-    setInvalid('f-reg-password2', password2 !== password || !password2); if (password2 !== password || !password2) ok = false;
     setInvalid('f-reg-name', !name); if (!name) ok = false;
+    setInvalid('f-reg-birthday', !birthday); if (!birthday) ok = false;
+    var phoneValid = /^09\d{8}$/.test(phone);
+    setInvalid('f-reg-phone', !phoneValid); if (!phoneValid) ok = false;
     document.getElementById('f-reg-instruments').classList.toggle('invalid', selectedInstruments.length === 0);
     if (selectedInstruments.length === 0) ok = false;
 
@@ -762,6 +1016,9 @@
       account: account,
       password: password,
       name: name,
+      birthday: birthday,
+      phone: phone,
+      licensePlate: plate,
       instruments: selectedInstruments
     }).then(function(result){
       btn.disabled = false;

@@ -2,8 +2,8 @@ import {
   doc, onSnapshot, setDoc, arrayUnion, arrayRemove, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
-export var FAMILY_LABELS = { woodwind: "木管 Woodwind", brass: "銅管 Brass", percussion: "打擊 Percussion" };
-export var FAMILY_ORDER = ["woodwind", "brass", "percussion"];
+export var FAMILY_LABELS = { woodwind: "木管 Woodwind", brass: "銅管 Brass", percussion: "打擊 Percussion", strings: "弦樂 Strings" };
+export var FAMILY_ORDER = ["woodwind", "brass", "percussion", "strings"];
 
 export var DEFAULT_INSTRUMENTS = [
   { name: "長笛", family: "woodwind" },
@@ -54,5 +54,14 @@ export function addInstrument(db, name, family) {
 export function removeInstrument(db, instrument) {
   return setDoc(doc(db, "settings", "instruments"), {
     list: arrayRemove(instrument)
+  }, { merge: true });
+}
+
+// 調整顯示順序用，整份 list 覆寫（跟 add/remove 的 arrayUnion/arrayRemove 不同，
+// 順序調整沒辦法用「加減一筆」表達，只能整份存回去）
+export function setInstrumentsOrder(db, list) {
+  return setDoc(doc(db, "settings", "instruments"), {
+    list: list,
+    updatedAt: serverTimestamp()
   }, { merge: true });
 }
