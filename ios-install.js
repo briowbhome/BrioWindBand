@@ -1,13 +1,16 @@
 /**
  * iOS 加入主畫面提示。
  * iOS 上所有瀏覽器都是 WebKit 核心，沒有 beforeinstallprompt 這種原生安裝提示，
- * 只能自己刻一張提示卡片引導使用者手動操作。Safari／Chrome／LINE 內建瀏覽器的
+ * 只能自己刻一張提示卡片引導使用者手動操作。Safari／Chrome／App 內嵌瀏覽器的
  * 操作路徑不一樣，要分開給文案：
  * - Safari：分享圖示（工具列）→ 加入主畫面
  * - Chrome：iOS 16.4 起，Chrome 分享選單裡的「加入主畫面」也會裝成真正的全螢幕
  *   App（不再是舊版那種還留著網址列的陽春捷徑），所以直接照 Chrome 自己的分享
  *   圖示走即可，不用引導使用者跳去 Safari
- * - LINE 內建瀏覽器：完全沒有分享/加入主畫面選項，要先跳出到外部瀏覽器才能繼續
+ * - App 內嵌瀏覽器（LINE／Facebook／Messenger 等）：完全沒有分享/加入主畫面選項，
+ *   要先跳出到外部瀏覽器才能繼續。這些 App 各自的 UA 特徵不同（LINE 是 `Line`，
+ *   Facebook／Messenger 是 `FBAN`/`FB_IAB`），但引導文案都一樣，統一用同一個
+ *   判斷式處理，之後如果還有其他 App 有一樣的回報，加關鍵字進去就好
  *
  * 使用方式：頁面 </body> 前引入 <script src="./ios-install.js" defer></script>
  */
@@ -27,8 +30,12 @@
     return localStorage.getItem(DISMISS_KEY) === 'true';
   }
 
-  function isLine() {
-    return /Line/i.test(navigator.userAgent);
+  // 完全沒有分享/加入主畫面選項的 App 內嵌瀏覽器，要先跳出到外部瀏覽器才能繼續：
+  // LINE 的 UA 特徵是 `Line`，Facebook／Messenger 是 `FBAN`（Facebook App Name）或
+  // `FB_IAB`（Facebook In-App Browser）。之後如果還有其他 App 有一樣的回報，
+  // 在這個判斷式加關鍵字就好，不用另外複製一份文案分支
+  function isEmbeddedWebview() {
+    return /Line|FBAN|FB_IAB/i.test(navigator.userAgent);
   }
 
   function isChrome() {
@@ -40,7 +47,7 @@
   }
 
   function bannerText() {
-    if (isLine()) {
+    if (isEmbeddedWebview()) {
       return {
         headline: '請先用外部瀏覽器開啟，才能加入主畫面',
         sub: '點擊右上角「⋯」選單 → 選擇「用外部瀏覽器開啟」，開啟後再依畫面提示操作'
@@ -48,12 +55,12 @@
     }
     if (isChrome()) {
       return {
-        headline: '將布利歐加入主畫面，開啟更快速',
+        headline: '將布利歐管樂團加入主畫面，開啟更快速',
         sub: '點擊分享圖示 → 加入主畫面'
       };
     }
     return {
-      headline: '將布利歐加入主畫面，開啟更快速',
+      headline: '將布利歐管樂團加入主畫面，開啟更快速',
       sub: '點擊下方分享圖示 → 加入主畫面'
     };
   }
