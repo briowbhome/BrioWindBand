@@ -765,6 +765,7 @@
     // 才開始畫活動列表/下拉選單，避免出現「類型還沒載入時顯示原始 ID」的畫面，
     // 也避免使用者在那個空窗期點編輯，選單選不到正確值卡住的問題
     var typesLoaded = false;
+    var eventsLoaded = false;
 
     subscribeEventTypes(db, function(types){
       eventTypesList = types;
@@ -773,7 +774,7 @@
       typesLoaded = true;
       renderTypeSelect();
       renderTypesList();
-      render();
+      if (eventsLoaded) render();
     }, canManageTypes ? currentAdminUid : null);
 
     onSnapshot(collection(db, 'events'), function(snap){
@@ -789,6 +790,7 @@
           location: data.location
         };
       });
+      eventsLoaded = true;
       if (typesLoaded) render();
     });
 

@@ -755,12 +755,13 @@
     // 活動類型跟活動本身是兩份分開即時更新的資料，先等類型資料到齊過一次才開始畫，
     // 避免類型還沒載入時先顯示原始 ID 的畫面
     var typesLoaded = false;
+    var eventsLoaded = false;
 
     subscribeEventTypes(db, function(types){
       eventTypesById = {};
       types.forEach(function(t){ eventTypesById[t.id] = t; });
       typesLoaded = true;
-      renderEventList();
+      if (eventsLoaded) renderEventList();
     });
 
     onSnapshot(collection(db, 'events'), function(snap){
@@ -774,6 +775,7 @@
           location: data.location
         };
       });
+      eventsLoaded = true;
       if (typesLoaded) renderEventList();
     });
 
@@ -787,7 +789,7 @@
           generatedAt: data.generatedAt && data.generatedAt.toDate ? data.generatedAt.toDate() : null
         };
       });
-      if (typesLoaded) renderEventList();
+      if (typesLoaded && eventsLoaded) renderEventList();
     });
   });
 </script>
