@@ -400,6 +400,18 @@
   }
   .tab.active{ color:var(--burgundy); }
   .tab .ico{ width:20px; height:20px; }
+  .tab.tab-soon{ opacity:.42; }
+
+  .soon-toast{
+    position:fixed; left:50%; bottom:calc(72px + env(safe-area-inset-bottom));
+    transform:translate(-50%,8px);
+    background:var(--ink); color:var(--paper);
+    font-family:'Noto Sans TC',sans-serif; font-size:12px; font-weight:600;
+    padding:8px 16px; border-radius:999px;
+    opacity:0; pointer-events:none; z-index:60;
+    transition:opacity .2s ease, transform .2s ease;
+  }
+  .soon-toast.show{ opacity:1; transform:translate(-50%,0); }
 
   @media (prefers-reduced-motion: reduce){
     .checkin-btn{ transition:none; }
@@ -551,19 +563,21 @@
       <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M4 11 12 4l8 7" stroke="#7A2331" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10v9h12v-9" stroke="#7A2331" stroke-width="1.6" stroke-linejoin="round"/></svg>
       首頁
     </button>
-    <button class="tab">
+    <button class="tab tab-soon">
       <svg class="ico" viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="16" rx="2" stroke="#4A4F5C" stroke-width="1.6"/><path d="M4 10h16M9 3v4M15 3v4" stroke="#4A4F5C" stroke-width="1.6" stroke-linecap="round"/></svg>
       行事曆
     </button>
-    <button class="tab">
+    <button class="tab tab-soon">
       <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M6 4h9l3 3v13H6z" stroke="#4A4F5C" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 11h6M9 14h6M9 17h4" stroke="#4A4F5C" stroke-width="1.6" stroke-linecap="round"/></svg>
       譜夾
     </button>
-    <button class="tab">
+    <button class="tab tab-soon">
       <svg class="ico" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="#4A4F5C" stroke-width="1.6"/><path d="M5 20c1.2-3.8 4-5.5 7-5.5s5.8 1.7 7 5.5" stroke="#4A4F5C" stroke-width="1.6" stroke-linecap="round"/></svg>
       我的
     </button>
   </div>
+
+  <div class="soon-toast" id="soonToast">即將推出</div>
 
 </div>
 
@@ -584,6 +598,18 @@
   import {
     collection, query, where, orderBy, limit, onSnapshot, Timestamp
   } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+
+  // 還沒做的分頁（行事曆/譜夾/我的）：反灰 + 點擊顯示「即將推出」提示，
+  // 不依賴登入驗證結果，跟下面的骨架畫面一樣頁面一開始就能動作
+  var soonToast = document.getElementById('soonToast');
+  var soonTimer = null;
+  document.querySelectorAll('.tab-soon').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      if (soonTimer) clearTimeout(soonTimer);
+      soonToast.classList.add('show');
+      soonTimer = setTimeout(function(){ soonToast.classList.remove('show'); }, 1500);
+    });
+  });
 
   // 骨架畫面：頁面一開始就顯示（不等驗證），大頭貼縮寫不是敏感資訊，
   // 有快取先猜著填，猜錯也不影響安全性，真正驗證完成後下面還是會覆寫成正確結果

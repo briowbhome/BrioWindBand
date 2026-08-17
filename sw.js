@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'brio-v3';
+const CACHE_VERSION = 'brio-v4';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -14,7 +14,6 @@ const CORE_ASSETS = [
   './auth-guard.js',
   './auth-service.js',
   './firebase-init.js',
-  './admin-nav.js',
   './account-menu.js',
   './version.js',
   './event-types.js',

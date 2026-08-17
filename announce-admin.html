@@ -87,12 +87,12 @@
     padding:0; cursor:pointer;
   }
 
-  .hamburger-btn{
-    width:36px; height:36px; flex:none;
-    background:none; border:1px solid var(--line); border-radius:var(--radius-sm);
-    display:flex; align-items:center; justify-content:center; cursor:pointer;
+  .back-btn{
+    width:30px; height:30px; flex:none;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--ink); text-decoration:none;
   }
-  .hamburger-btn:active{ background:var(--paper-raised); }
+  .brand-link{ display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; }
 
   .staff{
     height:16px; margin:0 20px 6px;
@@ -100,43 +100,6 @@
     opacity:.9;
   }
 
-  /* ---------- Admin drawer ---------- */
-  .drawer-overlay{
-    position:fixed; inset:0; z-index:70;
-    background:rgba(32,36,47,.5);
-    display:none;
-  }
-  .drawer-overlay.active{ display:block; }
-  .drawer-panel{
-    position:absolute; top:0; left:0; bottom:0;
-    width:78%; max-width:300px;
-    background:var(--paper-raised);
-    box-shadow:8px 0 30px rgba(0,0,0,.25);
-    padding:env(safe-area-inset-top) 0 calc(20px + env(safe-area-inset-bottom));
-    display:flex; flex-direction:column;
-    transform:translateX(-100%);
-    transition:transform .22s ease;
-  }
-  .drawer-overlay.active .drawer-panel{ transform:translateX(0); }
-  .drawer-header{
-    padding:20px 20px 14px; border-bottom:1px solid var(--line);
-  }
-  .drawer-header .name{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:16px; }
-  .drawer-home{
-    display:flex; align-items:center; gap:9px;
-    padding:14px 20px; font-size:13.5px; font-weight:700; color:var(--ink-soft);
-    text-decoration:none; border-bottom:1px solid var(--line);
-  }
-  .drawer-section-label{
-    padding:16px 20px 6px; font-family:'Roboto Mono',monospace; font-size:10px;
-    letter-spacing:.1em; color:var(--ink-soft); text-transform:uppercase;
-  }
-  .drawer-link{
-    display:flex; align-items:center;
-    padding:12px 20px; font-size:13.5px; font-weight:600; color:var(--ink);
-    text-decoration:none;
-  }
-  .drawer-link.active{ background:var(--sage-bg); color:var(--sage); font-weight:700; }
 
   .section-label{ display:flex; align-items:baseline; gap:8px; margin:20px 20px 4px; }
   .section-label .tw{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:15.5px; }
@@ -216,14 +179,16 @@
 <div class="app" id="appRoot">
 
   <div class="appbar">
-    <button class="hamburger-btn" id="adminMenuBtn" type="button" aria-label="選單">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="#20242F" stroke-width="1.8" stroke-linecap="round"/></svg>
-    </button>
-    <img class="mark" src="assets/BrioLogo.jpg" alt="布利歐管樂團 Logo">
-    <div class="brandtext">
-      <div class="name">布利歐管樂團</div>
-      <div class="sub">Brio Wind Band</div>
-    </div>
+    <a class="back-btn" href="admin-index.html" aria-label="回控制台首頁">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="m15 5-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <a class="brand-link" href="index.html">
+      <img class="mark" src="assets/BrioLogo.jpg" alt="布利歐管樂團 Logo">
+      <div class="brandtext">
+        <div class="name">布利歐管樂團</div>
+        <div class="sub">Brio Wind Band</div>
+      </div>
+    </a>
     <div class="spacer"></div>
     <button class="avatar skel" id="avatarBtn" type="button" aria-label="帳號選單"></button>
   </div>
@@ -256,25 +221,36 @@
 
 </div>
 
-<div class="drawer-overlay" id="drawerOverlay">
-  <nav class="drawer-panel" id="drawerPanel"></nav>
-</div>
-
 <script type="module">
   import { requireAdmin, peekCachedProfile } from './auth-guard.js';
   import { db } from './firebase-init.js';
-  import { initAdminNav } from './admin-nav.js';
   import { initAccountMenu } from './account-menu.js';
   import {
-    collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot,
+    collection, addDoc, doc, getDoc, updateDoc, deleteDoc, onSnapshot,
     query, orderBy, serverTimestamp
   } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
-
-  initAdminNav('announce-admin.html');
 
   var annById = {};
   var editingId = null;
   var currentAdminUid = null;
+
+  // 發布者查詢紀錄，供後台查看操作紀錄用（前台不顯示，見 schema.md 公告系統說明）。
+  // 用 uid 快取姓名，避免每次 render() 都重新查一次；查詢中先回 null 不顯示，
+  // 查到之後補一次 render() 補上名字
+  var creatorNameCache = {};
+  function getCreatorName(uid){
+    if (!uid) return null;
+    if (uid in creatorNameCache) return creatorNameCache[uid] || null;
+    creatorNameCache[uid] = undefined;
+    getDoc(doc(db, 'users', uid)).then(function(snap){
+      creatorNameCache[uid] = snap.exists() ? (snap.data().name || snap.data().account || '未知') : '未知';
+      render();
+    }).catch(function(){
+      creatorNameCache[uid] = '未知';
+      render();
+    });
+    return null;
+  }
 
   var SKELETON_ITEMS_HTML = [1, 2, 3].map(function(){
     return (
@@ -394,10 +370,12 @@
 
     annList.innerHTML = ids.map(function(id){
       var ann = annById[id];
+      var creatorName = getCreatorName(ann.createdBy);
+      var metaText = (ann.createdAt ? formatRelativeTime(ann.createdAt) : '') + (creatorName ? ' · ' + creatorName + ' 新增' : '');
       return (
         '<div class="ann-item">' +
           '<div class="ann-text">' + ann.content + '</div>' +
-          '<div class="ann-meta">' + (ann.createdAt ? formatRelativeTime(ann.createdAt) : '') + '</div>' +
+          '<div class="ann-meta">' + metaText + '</div>' +
           '<div class="ann-actions">' +
             '<button type="button" data-edit="' + id + '">編輯</button>' +
             '<button type="button" class="btn-ann-delete" data-delete="' + id + '">刪除</button>' +
@@ -443,7 +421,8 @@
         var data = docSnap.data();
         annById[docSnap.id] = {
           content: data.content,
-          createdAt: data.createdAt && data.createdAt.toDate ? data.createdAt.toDate() : null
+          createdAt: data.createdAt && data.createdAt.toDate ? data.createdAt.toDate() : null,
+          createdBy: data.createdBy || null
         };
       });
       render();
