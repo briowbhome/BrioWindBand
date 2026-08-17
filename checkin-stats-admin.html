@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>布利歐管樂團｜簽到統計</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#F2EFE5">
+<link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+<script src="./pwa-register.js" defer></script>
+<style>
+  :root{
+    --ink:#20242F;
+    --ink-soft:#4A4F5C;
+    --paper:#F2EFE5;
+    --paper-raised:#FBFAF4;
+    --line:#DAD3BE;
+    --brass:#B8863A;
+    --brass-deep:#8F6A2C;
+    --burgundy:#7A2331;
+    --burgundy-deep:#5C1A26;
+    --sage:#5F6E58;
+    --sage-bg:#E7EBDF;
+    --radius-lg:20px;
+    --radius-md:14px;
+    --radius-sm:9px;
+    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% -10%, #EFE9D6 0%, transparent 45%),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Noto Sans TC','Noto Sans',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    min-height:100dvh;
+    display:flex;
+    justify-content:center;
+    padding: 0 0 calc(48px + env(safe-area-inset-bottom));
+  }
+
+  button, a, select{ -webkit-tap-highlight-color: transparent; font-family:inherit; }
+  :focus-visible{ outline:2.5px solid var(--brass-deep); outline-offset:2px; border-radius:6px; }
+
+  .app{
+    width:100%;
+    max-width:460px;
+    min-height:100vh;
+    min-height:100dvh;
+    background:var(--paper);
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .hidden{ display:none !important; }
+
+  /* ---------- Skeleton placeholders ---------- */
+  @keyframes skel-pulse{ 0%,100%{ opacity:.55; } 50%{ opacity:1; } }
+  .skel{ background:var(--line); animation:skel-pulse 1.4s ease-in-out infinite; }
+  .avatar.skel{ animation:skel-pulse 1.4s ease-in-out infinite; }
+  .skel-bar{ display:inline-block; border-radius:5px; }
+  @media (prefers-reduced-motion: reduce){
+    .skel, .avatar.skel{ animation:none; opacity:.75; }
+  }
+  .ev-skel-date{ flex:none; width:40px; height:30px; border-radius:6px; }
+  .ev-skel-lines{ flex:1; display:flex; flex-direction:column; gap:7px; padding-top:2px; }
+
+  /* ---------- App Bar ---------- */
+  .appbar{ display:flex; align-items:center; gap:12px; padding:18px 20px 14px; }
+  .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
+  .brandtext{ display:flex; flex-direction:column; line-height:1.1; }
+  .brandtext .name{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:19px; letter-spacing:.02em; }
+  .brandtext .sub{ font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.14em; color:var(--ink-soft); margin-top:3px; text-transform:uppercase; }
+  .appbar .spacer{ flex:1; }
+  .back-btn{
+    width:30px; height:30px; flex:none;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--ink); text-decoration:none;
+  }
+  .brand-link{ display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; }
+  .avatar{
+    width:38px; height:38px; border-radius:50%;
+    background:var(--burgundy); color:#F2EFE5;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Noto Serif TC',serif; font-weight:700; font-size:14px;
+    border:2px solid var(--paper-raised); box-shadow:0 0 0 1.5px var(--line);
+    padding:0; cursor:pointer;
+  }
+
+  .staff{
+    height:16px; margin:0 20px 6px;
+    background-image: repeating-linear-gradient(var(--line), var(--line) 1px, transparent 1px, transparent 4px);
+    opacity:.9;
+  }
+
+  .section-label{ display:flex; align-items:baseline; gap:8px; margin:20px 20px 4px; }
+  .section-label .tw{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:15.5px; }
+  .section-label .en{ font-family:'Roboto Mono',monospace; font-size:10px; letter-spacing:.12em; color:var(--ink-soft); text-transform:uppercase; }
+  .lede{ margin:6px 20px 10px; font-size:12.5px; line-height:1.6; color:var(--ink-soft); }
+
+  /* ---------- Time range filter ---------- */
+  .filter-row{
+    display:flex; align-items:center; justify-content:space-between;
+    margin:0 20px 14px;
+  }
+  .filter-row label{ font-size:12px; color:var(--ink-soft); font-weight:600; }
+  .filter-row select{
+    border:1px solid var(--line); background:var(--paper-raised);
+    border-radius:999px; padding:6px 14px; font-size:12px; color:var(--ink);
+    font-weight:700;
+  }
+
+  /* ---------- Event list with attendance count ---------- */
+  .list{
+    margin:0 20px 24px;
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-card);
+    overflow:hidden;
+  }
+  .stat-item{ display:flex; align-items:center; gap:12px; padding:14px 16px; width:100%; text-align:left; background:none; border:none; cursor:pointer; }
+  .stat-item + .stat-item{ border-top:1px solid var(--line); }
+  .stat-item:active{ background:var(--sage-bg); }
+  .event-date{ flex:none; width:40px; text-align:center; }
+  .event-date .d{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:18px; color:var(--ink); line-height:1.05; }
+  .event-date .m{ font-family:'Roboto Mono',monospace; font-size:9px; color:var(--ink-soft); letter-spacing:.04em; }
+  .event-body{ flex:1; min-width:0; }
+  .event-title{ font-weight:700; font-size:13.5px; color:var(--ink); display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .kind{
+    font-family:'Roboto Mono',monospace; font-size:9.5px; letter-spacing:.05em;
+    padding:1.5px 6px; border-radius:5px; font-weight:600;
+  }
+  .event-meta{ margin-top:3px; font-size:11.5px; color:var(--ink-soft); }
+  .stat-count{ flex:none; text-align:right; }
+  .stat-count .num{ font-family:'Roboto Mono',monospace; font-weight:700; font-size:18px; color:var(--sage); }
+  .stat-count .lbl{ font-size:9.5px; color:var(--ink-soft); margin-top:1px; }
+
+  .empty{ padding:36px 20px; text-align:center; font-size:13px; color:var(--ink-soft); }
+
+  /* ---------- Attendance detail bottom sheet ---------- */
+  .sheet-overlay{
+    position:fixed; inset:0;
+    background:rgba(32,36,47,.45);
+    display:none;
+    align-items:flex-end;
+    justify-content:center;
+    z-index:50;
+  }
+  .sheet-overlay.active{ display:flex; }
+  .sheet{
+    width:100%; max-width:460px;
+    max-height:80vh;
+    background:var(--paper-raised);
+    border-radius:20px 20px 0 0;
+    display:flex; flex-direction:column;
+    box-shadow:0 -10px 30px rgba(32,36,47,.3);
+  }
+  .sheet-handle{
+    width:36px; height:4px;
+    background:var(--line);
+    border-radius:999px;
+    margin:10px auto 2px;
+  }
+  .sheet-header{ padding:6px 20px 10px; }
+  .sheet-header .tw{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:15.5px; }
+  .sheet-header .hint{ margin-top:3px; font-size:11.5px; color:var(--ink-soft); }
+  .sheet-body{
+    overflow-y:auto;
+    padding:0 20px 8px;
+    border-top:1px solid var(--line);
+  }
+  .sheet-group{ margin-top:16px; }
+  .sheet-group-label{
+    display:flex; align-items:baseline; gap:6px;
+    font-family:'Roboto Mono',monospace; font-size:10px; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--ink-soft);
+    margin-bottom:6px;
+  }
+  .sheet-group-label .cnt{ color:var(--sage); font-weight:700; font-size:11px; }
+  .sheet-name-row{
+    padding:7px 0; font-size:12.5px; color:var(--ink);
+    display:flex; justify-content:space-between; gap:8px;
+    border-bottom:1px solid var(--line);
+  }
+  .sheet-name-row:last-child{ border-bottom:none; }
+  .sheet-name-row .acc{ color:var(--ink-soft); font-family:'Roboto Mono',monospace; font-size:10.5px; }
+  .sheet-group-empty{ font-size:11.5px; color:var(--ink-soft); padding:4px 0 10px; }
+  .sheet-footer{
+    padding:14px 20px calc(14px + env(safe-area-inset-bottom));
+    border-top:1px solid var(--line);
+  }
+  .sheet-close-btn{
+    width:100%; background:var(--brass); color:var(--ink); border:none;
+    border-radius:var(--radius-md); padding:12px; font-weight:700; font-size:13.5px; cursor:pointer;
+  }
+</style>
+</head>
+<body>
+<div class="app" id="appRoot">
+
+  <div class="appbar">
+    <a class="back-btn" href="stats-admin.html" aria-label="回統計首頁">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="m15 5-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <a class="brand-link" href="index.html">
+      <img class="mark" src="assets/BrioLogo.jpg" alt="布利歐管樂團 Logo">
+      <div class="brandtext">
+        <div class="name">布利歐管樂團</div>
+        <div class="sub">Brio Wind Band</div>
+      </div>
+    </a>
+    <div class="spacer"></div>
+    <button class="avatar skel" id="avatarBtn" type="button" aria-label="帳號選單"></button>
+  </div>
+
+  <div class="staff"></div>
+
+  <div class="section-label">
+    <span class="tw">簽到統計</span>
+    <span class="en">Check-in Stats</span>
+  </div>
+  <p class="lede">依活動查看簽到人數，只列出已經發生的活動。</p>
+
+  <div class="filter-row">
+    <label for="rangeFilter">顯示範圍</label>
+    <select id="rangeFilter">
+      <option value="30" selected>最近 1 個月</option>
+      <option value="90">最近 3 個月</option>
+      <option value="all">全部</option>
+    </select>
+  </div>
+
+  <div class="list" id="statList"></div>
+
+</div>
+
+<div class="sheet-overlay" id="detailSheetOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="tw" id="detailSheetTitle">活動名稱</div>
+      <div class="hint" id="detailSheetHint">依樂器分組，只計算已核准團員</div>
+    </div>
+    <div class="sheet-body" id="detailSheetBody"></div>
+    <div class="sheet-footer">
+      <button type="button" class="sheet-close-btn" id="detailSheetClose">關閉</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { requireAdmin, peekCachedProfile } from './auth-guard.js';
+  import { db } from './firebase-init.js';
+  import { initAccountMenu } from './account-menu.js';
+  import { subscribeEventTypes, badgeStyle } from './event-types.js';
+  import { FAMILY_LABELS, FAMILY_ORDER } from './instruments.js';
+  import {
+    collection, getDocs, query, where, doc, getDoc, Timestamp
+  } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+
+  var SKELETON_ROWS_HTML = [1, 2, 3].map(function(){
+    return (
+      '<div class="stat-item">' +
+        '<span class="skel ev-skel-date"></span>' +
+        '<div class="ev-skel-lines">' +
+          '<span class="skel skel-bar" style="width:55%;height:13px;"></span>' +
+          '<span class="skel skel-bar" style="width:35%;height:10px;"></span>' +
+        '</div>' +
+      '</div>'
+    );
+  }).join('');
+
+  var cachedProfile = peekCachedProfile();
+  if (cachedProfile && cachedProfile.name){
+    var avatarBtnEl = document.getElementById('avatarBtn');
+    avatarBtnEl.textContent = cachedProfile.name.charAt(0);
+    avatarBtnEl.classList.remove('skel');
+  }
+
+  var eventTypesById = {};
+  function typeBadge(typeId){
+    var t = eventTypesById[typeId];
+    var label = t ? t.label : typeId;
+    return '<span class="kind" style="' + badgeStyle(t ? t.colorKey : null) + '">' + label + '</span>';
+  }
+
+  var statList = document.getElementById('statList');
+  var rangeFilter = document.getElementById('rangeFilter');
+  statList.innerHTML = SKELETON_ROWS_HTML;
+
+  // eventId -> [{ uid, name, account }]，跟頁面列表用同一次查詢的資料，點開分區明細不用再打一次 Firestore
+  var checkinsByEvent = {};
+  // eventId -> 活動標題，開 sheet 時當標題用
+  var eventTitleById = {};
+  // uid -> { instruments }，approved 團員的樂器清單，第一次點開明細才抓、抓過快取
+  var membersInstrumentsByUid = null;
+  // settings/instruments 的清單（樂器名稱+分類），決定分區的順序，第一次點開明細才抓、抓過快取
+  var instrumentsList = null;
+
+  function renderRows(rows){
+    if (rows.length === 0){
+      statList.innerHTML = '<div class="empty">這個範圍內沒有已發生的活動</div>';
+      return;
+    }
+    statList.innerHTML = rows.map(function(evt){
+      var dateLabel = evt.date.toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit', hour12:false });
+      return (
+        '<button type="button" class="stat-item" data-event="' + evt.id + '">' +
+          '<div class="event-date"><div class="d">' + evt.date.getDate() + '</div><div class="m">' + (evt.date.getMonth() + 1) + '月</div></div>' +
+          '<div class="event-body">' +
+            '<div class="event-title">' + evt.title + typeBadge(evt.type) + '</div>' +
+            '<div class="event-meta">' + dateLabel + (evt.location ? ' · ' + evt.location : '') + '</div>' +
+          '</div>' +
+          '<div class="stat-count"><div class="num">' + evt.count + '</div><div class="lbl">人簽到</div></div>' +
+        '</button>'
+      );
+    }).join('');
+  }
+
+  // 網路壅塞等原因導致失敗時呼叫，清掉骨架屏並明確告知，不要讓畫面卡住不動
+  function renderStatsError(){
+    statList.innerHTML = '<div class="empty">讀取失敗，請重新整理再試一次</div>';
+  }
+
+  // 一次性查詢（不用 onSnapshot）：這頁是回顧性統計，不需要即時更新，篩選範圍改變時重新查一次就好。
+  // checkins 依 checkedInAt 篩選範圍時直接在 Firestore 端過濾，只有「全部」才整份撈回來
+  async function loadStats(){
+    var rangeVal = rangeFilter.value;
+    var cutoffMs = rangeVal === 'all' ? -Infinity : Date.now() - Number(rangeVal) * 86400000;
+    statList.innerHTML = SKELETON_ROWS_HTML;
+
+    try {
+      var eventsSnap = await getDocs(collection(db, 'events'));
+      var checkinsQuery = rangeVal === 'all'
+        ? collection(db, 'checkins')
+        : query(collection(db, 'checkins'), where('checkedInAt', '>=', Timestamp.fromMillis(cutoffMs)));
+      var checkinsSnap = await getDocs(checkinsQuery);
+
+      checkinsByEvent = {};
+      checkinsSnap.forEach(function(docSnap){
+        var data = docSnap.data();
+        var eid = data.eventId;
+        if (!checkinsByEvent[eid]) checkinsByEvent[eid] = [];
+        checkinsByEvent[eid].push({ uid: data.uid, name: data.name, account: data.account });
+      });
+
+      var now = Date.now();
+      var rows = [];
+      eventTitleById = {};
+      eventsSnap.forEach(function(docSnap){
+        var data = docSnap.data();
+        var d = data.date && data.date.toDate ? data.date.toDate() : null;
+        if (!d) return;
+        var t = d.getTime();
+        if (t > now || t < cutoffMs) return; // 只看範圍內、已經發生的活動
+        eventTitleById[docSnap.id] = data.title;
+        rows.push({
+          id: docSnap.id,
+          title: data.title,
+          type: data.type,
+          date: d,
+          location: data.location,
+          count: (checkinsByEvent[docSnap.id] || []).length
+        });
+      });
+
+      rows.sort(function(a, b){ return b.date.getTime() - a.date.getTime(); });
+      renderRows(rows);
+    } catch (err) {
+      renderStatsError();
+    }
+  }
+
+  // 依樂器清單的順序（家族分類 → 清單原順序）分區列出簽到名單。
+  // 一人可能同時列在多個樂器分區裡（users.instruments 不分主副修，本來就是多選），
+  // 這是目前刻意接受的簡化：等「出缺席調查」的活動參與名單做出來、可以在名單裡指派單一樂器後，
+  // 才會改成依當次指派為準、重複只算一次。
+  // 沒人簽到的樂器分區也照樣顯示（不隱藏），因為分母不是「應到人數」而是「這個樂器全團有幾個人」，
+  // 純粹描述現況，不是在暗示「應該要到幾個」，不會有 checkin-admin.html 那種比例誤導的問題。
+  async function ensureInstrumentsData(){
+    if (!instrumentsList){
+      var instSnap = await getDoc(doc(db, 'settings', 'instruments'));
+      instrumentsList = instSnap.exists() ? (instSnap.data().list || []) : [];
+    }
+    if (!membersInstrumentsByUid){
+      var usersSnap = await getDocs(query(collection(db, 'users'), where('status', '==', 'approved')));
+      membersInstrumentsByUid = {};
+      usersSnap.forEach(function(docSnap){
+        var data = docSnap.data();
+        membersInstrumentsByUid[docSnap.id] = data.instruments || [];
+      });
+    }
+  }
+
+  function groupCheckinsByInstrument(checkins){
+    var byName = {};
+    instrumentsList.forEach(function(inst){
+      byName[inst.name] = { family: inst.family, people: [] };
+    });
+
+    checkins.forEach(function(c){
+      var instruments = membersInstrumentsByUid[c.uid] || [];
+      if (instruments.length === 0){
+        if (!byName['未設定樂器']) byName['未設定樂器'] = { family: null, people: [] };
+        byName['未設定樂器'].people.push(c);
+        return;
+      }
+      instruments.forEach(function(name){
+        if (!byName[name]) byName[name] = { family: null, people: [] };
+        byName[name].people.push(c);
+      });
+    });
+
+    var orderedNames = instrumentsList.map(function(inst){ return inst.name; });
+    if (byName['未設定樂器']) orderedNames.push('未設定樂器');
+
+    return orderedNames.map(function(name){
+      return { name: name, people: byName[name].people };
+    });
+  }
+
+  function renderDetailSheet(eventId){
+    var checkins = checkinsByEvent[eventId] || [];
+    document.getElementById('detailSheetTitle').textContent = eventTitleById[eventId] || '活動明細';
+
+    var groups = groupCheckinsByInstrument(checkins);
+    var body = document.getElementById('detailSheetBody');
+    body.innerHTML = groups.map(function(g){
+      var namesHtml = g.people.length === 0
+        ? '<div class="sheet-group-empty">尚無人簽到</div>'
+        : g.people.map(function(p){
+            return '<div class="sheet-name-row"><span>' + (p.name || p.account || '未知') + '</span><span class="acc">' + (p.account || '') + '</span></div>';
+          }).join('');
+      return (
+        '<div class="sheet-group">' +
+          '<div class="sheet-group-label">' + g.name + ' <span class="cnt">' + g.people.length + ' 人</span></div>' +
+          namesHtml +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  var detailSheetOverlay = document.getElementById('detailSheetOverlay');
+
+  function openDetailSheet(eventId){
+    detailSheetOverlay.classList.add('active');
+    ensureInstrumentsData().then(function(){
+      renderDetailSheet(eventId);
+    }).catch(function(){
+      document.getElementById('detailSheetBody').innerHTML = '<div class="empty">讀取失敗，請重新整理再試一次</div>';
+    });
+  }
+
+  function closeDetailSheet(){
+    detailSheetOverlay.classList.remove('active');
+  }
+
+  document.getElementById('detailSheetClose').addEventListener('click', closeDetailSheet);
+  detailSheetOverlay.addEventListener('click', function(e){
+    if (e.target === detailSheetOverlay) closeDetailSheet();
+  });
+
+  statList.addEventListener('click', function(e){
+    var item = e.target.closest('[data-event]');
+    if (!item) return;
+    openDetailSheet(item.getAttribute('data-event'));
+  });
+
+  var typesLoaded = false;
+
+  rangeFilter.addEventListener('change', function(){
+    if (typesLoaded) loadStats();
+  });
+
+  requireAdmin().then(function(result){
+    if (!result) return;
+
+    var avatarBtn = document.getElementById('avatarBtn');
+    avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
+    avatarBtn.classList.remove('skel');
+    initAccountMenu(result.profile.name);
+
+    subscribeEventTypes(db, function(types){
+      eventTypesById = {};
+      types.forEach(function(t){ eventTypesById[t.id] = t; });
+      typesLoaded = true;
+      loadStats();
+    }, null, renderStatsError);
+  });
+</script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>布利歐管樂團｜控制台</title>
+<title>布利歐管樂團｜統計資料</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -88,7 +88,7 @@
   .back-btn{
     width:30px; height:30px; flex:none;
     display:flex; align-items:center; justify-content:center;
-    color:var(--ink); text-decoration:none;
+    color:var(--ink); text-decoration:none; background:none; border:none; padding:0; cursor:pointer;
   }
   .brand-link{ display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; }
 
@@ -110,31 +110,40 @@
     background:var(--paper-raised); border:1px solid var(--line);
     border-radius:var(--radius-lg); box-shadow:var(--shadow-card);
     padding:18px 16px; text-decoration:none; color:var(--ink);
+    width:100%; text-align:left; cursor:pointer;
   }
   .dash-card:active{ background:var(--sage-bg); }
+  .dash-card.dash-soon{ opacity:.45; }
   .dash-icon{
     width:46px; height:46px; border-radius:50%; flex:none;
     display:flex; align-items:center; justify-content:center;
   }
-  .dash-icon.sage{ background:var(--sage-bg); color:var(--sage); }
-  .dash-icon.brass{ background:#EFE7D2; color:var(--brass-deep); }
   .dash-icon.burgundy{ background:var(--burgundy); color:#F2EFE5; }
+  .dash-icon.sage{ background:var(--sage-bg); color:var(--sage); }
   .dash-icon.navy{ background:#E4E9F2; color:#33507D; }
-  .dash-icon.plum{ background:#F0E3EE; color:#7C3F6C; }
-  .dash-icon.teal{ background:#DFF0ED; color:#2E7268; }
-  .dash-icon.mustard{ background:#F7EACD; color:#8F6D12; }
   .dash-body{ flex:1; min-width:0; }
   .dash-title{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:15px; }
   .dash-sub{ font-size:12px; color:var(--ink-soft); margin-top:2px; }
   .dash-arrow{ flex:none; color:var(--ink-soft); }
+
+  .soon-toast{
+    position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom));
+    transform:translate(-50%,8px);
+    background:var(--ink); color:var(--paper);
+    font-family:'Noto Sans TC',sans-serif; font-size:12px; font-weight:600;
+    padding:8px 16px; border-radius:999px;
+    opacity:0; pointer-events:none; z-index:60;
+    transition:opacity .2s ease, transform .2s ease;
+  }
+  .soon-toast.show{ opacity:1; transform:translate(-50%,0); }
 </style>
 </head>
 <body>
 <div class="app" id="appRoot">
 
   <div class="appbar">
-    <a class="back-btn" href="index.html" aria-label="回團員首頁">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 11 12 4l8 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10v9h12v-9" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+    <a class="back-btn" href="admin-index.html" aria-label="回控制台首頁">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="m15 5-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </a>
     <a class="brand-link" href="index.html">
       <img class="mark" src="assets/BrioLogo.jpg" alt="布利歐管樂團 Logo">
@@ -150,89 +159,58 @@
   <div class="staff"></div>
 
   <div class="section-label">
-    <span class="tw">控制台</span>
-    <span class="en">Console</span>
+    <span class="tw">統計資料</span>
+    <span class="en">Statistics</span>
   </div>
-  <p class="lede">選擇要管理的項目。</p>
 
   <div class="dash-grid">
-    <a class="dash-card" href="review-admin.html">
-      <span class="dash-icon sage">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="1.6"/><path d="M3.5 19c1-3.4 3.3-5 5.5-5s4.5 1.6 5.5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M15.5 5.5c1.4.3 2.5 1.6 2.5 3.1s-1.1 2.8-2.5 3.1M18 14c1.8.5 3 1.9 3.5 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-      </span>
-      <span class="dash-body">
-        <span class="dash-title">團員審核</span>
-        <span class="dash-sub">核准/拒絕新申請帳號</span>
-      </span>
-      <svg class="dash-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </a>
-    <a class="dash-card" href="members-admin.html">
-      <span class="dash-icon teal">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/><circle cx="9" cy="11" r="2" stroke="currentColor" stroke-width="1.6"/><path d="M6 16c.5-1.6 1.8-2.5 3-2.5s2.5.9 3 2.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M14 10h4M14 13h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-      </span>
-      <span class="dash-body">
-        <span class="dash-title">成員資料</span>
-        <span class="dash-sub">檢視全部成員資料</span>
-      </span>
-      <svg class="dash-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </a>
-    <a class="dash-card" href="event-admin.html">
-      <span class="dash-icon brass">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 10h16M9 3v4M15 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-      </span>
-      <span class="dash-body">
-        <span class="dash-title">活動管理</span>
-        <span class="dash-sub">建立/編輯活動</span>
-      </span>
-      <svg class="dash-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </a>
-    <a class="dash-card" href="checkin-admin.html">
+    <a class="dash-card" href="checkin-stats-admin.html">
       <span class="dash-icon burgundy">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.6"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.6"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z" fill="currentColor"/></svg>
       </span>
       <span class="dash-body">
-        <span class="dash-title">簽到管理</span>
-        <span class="dash-sub">開簽到 QR Code、查看簽到記錄</span>
+        <span class="dash-title">簽到統計</span>
+        <span class="dash-sub">依活動查看簽到人數</span>
       </span>
       <svg class="dash-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </a>
-    <a class="dash-card" href="announce-admin.html">
+    <button type="button" class="dash-card dash-soon" data-soon>
+      <span class="dash-icon sage">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 10h16M9 3v4M15 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </span>
+      <span class="dash-body">
+        <span class="dash-title">活動統計</span>
+        <span class="dash-sub">即將推出</span>
+      </span>
+    </button>
+    <button type="button" class="dash-card dash-soon" data-soon>
       <span class="dash-icon navy">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 10v4a1 1 0 0 0 1 1h2l6 4V5L6 9H4a1 1 0 0 0-1 1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M16 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
       </span>
       <span class="dash-body">
-        <span class="dash-title">公告管理</span>
-        <span class="dash-sub">發布/編輯/刪除首頁公告</span>
+        <span class="dash-title">表單統計</span>
+        <span class="dash-sub">即將推出</span>
       </span>
-      <svg class="dash-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </a>
-    <a class="dash-card" href="roles-admin.html">
-      <span class="dash-icon plum">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2l7 3v6c0 4.8-3 8.6-7 11-4-2.4-7-6.2-7-11V5l7-3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </span>
-      <span class="dash-body">
-        <span class="dash-title">權限管理</span>
-        <span class="dash-sub">調整成員角色、權限、樂器清單</span>
-      </span>
-      <svg class="dash-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </a>
-    <a class="dash-card" href="stats-admin.html">
-      <span class="dash-icon mustard">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 20V10M11 20V4M18 20v-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </span>
-      <span class="dash-body">
-        <span class="dash-title">統計資料</span>
-        <span class="dash-sub">簽到、活動、表單等統計資料</span>
-      </span>
-      <svg class="dash-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </a>
+    </button>
   </div>
 
 </div>
 
+<div class="soon-toast" id="soonToast">即將推出</div>
+
 <script type="module">
   import { requireAdmin, peekCachedProfile } from './auth-guard.js';
   import { initAccountMenu } from './account-menu.js';
+
+  var soonToast = document.getElementById('soonToast');
+  var soonTimer = null;
+  document.querySelectorAll('[data-soon]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      if (soonTimer) clearTimeout(soonTimer);
+      soonToast.classList.add('show');
+      soonTimer = setTimeout(function(){ soonToast.classList.remove('show'); }, 1500);
+    });
+  });
 
   var cachedProfile = peekCachedProfile();
   if (cachedProfile && cachedProfile.name){
