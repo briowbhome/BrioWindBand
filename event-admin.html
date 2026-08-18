@@ -516,19 +516,26 @@
         <div id="infoEditMode" class="hidden"></div>
       </div>
       <div id="sheetAttendanceTab">
-        <div class="survey-section-label" id="rosterCounterLabel">應到名單</div>
-        <div class="survey-bulk-row">
-          <button type="button" id="rosterSelectAllBtn">全選</button>
-          <button type="button" id="rosterClearAllBtn">全部取消</button>
+        <div id="rosterViewMode">
+          <div class="info-row"><span class="k">應到名單</span><span class="v" id="rosterViewCount">—</span></div>
+          <div class="survey-namelist" id="rosterViewNames"></div>
+          <button type="button" class="info-edit-btn" id="rosterEditBtn">✎ 編輯名單</button>
         </div>
-        <div class="check-list" id="rosterChecklist"></div>
+        <div id="rosterEditMode" class="hidden">
+          <div class="survey-section-label" id="rosterCounterLabel">應到名單</div>
+          <div class="survey-bulk-row">
+            <button type="button" id="rosterSelectAllBtn">全選</button>
+            <button type="button" id="rosterClearAllBtn">全部取消</button>
+          </div>
+          <div class="check-list" id="rosterChecklist"></div>
+        </div>
 
         <div class="survey-section-label">回報狀況</div>
         <div id="rosterReportsSlot"><div class="survey-empty">載入中…</div></div>
       </div>
     </div>
-    <div class="sheet-footer" id="rosterFooter">
-      <button type="button" class="cta-btn cta-btn-secondary" id="rosterCancelBtn">關閉</button>
+    <div class="sheet-footer hidden" id="rosterFooter">
+      <button type="button" class="cta-btn cta-btn-secondary" id="rosterCancelBtn">取消</button>
       <button type="button" class="cta-btn" id="rosterSaveBtn" disabled>儲存名單變更</button>
     </div>
   </div>
@@ -872,6 +879,13 @@
   var rosterCounterLabel = document.getElementById('rosterCounterLabel');
   var rosterSaveBtn = document.getElementById('rosterSaveBtn');
   var rosterReportsSlot = document.getElementById('rosterReportsSlot');
+  var rosterViewMode = document.getElementById('rosterViewMode');
+  var rosterEditMode = document.getElementById('rosterEditMode');
+  var rosterViewCount = document.getElementById('rosterViewCount');
+  var rosterViewNames = document.getElementById('rosterViewNames');
+  var rosterEditBtn = document.getElementById('rosterEditBtn');
+  var rosterFooter = document.getElementById('rosterFooter');
+  var rosterEditingActive = false; // 是否正在編輯名單（決定 rosterFooter 是否顯示），比照 editingId 對「活動資訊」分頁的作用
 
   // 三個分頁目前只有「出缺席」有內容，「活動資訊」預設唯讀、點編輯才把 eventForm 搬進來，「簽到」還沒做（見 tabCheckin 的 soon-toast）
   function setSheetTab(tab){
@@ -880,7 +894,7 @@
     document.getElementById('tabAttendance').classList.toggle('active', tab === 'attendance');
     document.getElementById('sheetInfoTab').classList.toggle('hidden', tab !== 'info');
     document.getElementById('sheetAttendanceTab').classList.toggle('hidden', tab !== 'attendance');
-    document.getElementById('rosterFooter').classList.toggle('hidden', tab !== 'attendance');
+    rosterFooter.classList.toggle('hidden', !(tab === 'attendance' && rosterEditingActive));
   }
 
   // 「活動資訊」分頁一律先顯示唯讀摘要，不會一點開就進編輯狀態；正在編輯中途切走再切回來
@@ -898,12 +912,15 @@
 
   document.getElementById('tabInfo').addEventListener('click', function(){
     if (!openRosterEventId) return;
-    if (editingId) enterCreateMode(); // 放棄任何還沒存檔的編輯草稿
+    if (editingId) enterCreateMode(); // 放棄任何還沒存檔的活動資訊編輯草稿
+    showRosterView(); // 放棄任何還沒存檔的名單編輯草稿
     showInfoView();
     setSheetTab('info');
   });
 
   document.getElementById('tabAttendance').addEventListener('click', function(){
+    if (!openRosterEventId) return;
+    showRosterView(); // 一律先回到唯讀摘要，不會保留上次切走時的編輯中途狀態
     setSheetTab('attendance');
   });
 
@@ -952,6 +969,47 @@
     }).join('');
   }
 
+  // 把 rosterDraftSet 重置回目前已存檔的名單（沒存過就是空名單，不預設全體——之後名單來源
+  // 可能改成依活動類型指定，不該先假設全體已核准團員），唯讀摘要跟每次重新進入編輯模式
+  // 都要從這個乾淨的基準開始，不能延用上次被放棄的編輯草稿
+  function resetRosterDraftFromSaved(){
+    var roster = rostersById[openRosterEventId];
+    var initial = roster ? roster.members : [];
+    rosterDraftSet = {};
+    initial.forEach(function(uid){ rosterDraftSet[uid] = true; });
+    return initial;
+  }
+
+  // 「出缺席」分頁比照「活動資訊」分頁：預設唯讀摘要（人數 + 名單人名），點「建立/編輯名單」才進入勾選畫面，
+  // 不會一點開就是可勾選狀態；切走分頁/存檔/取消都會回到這裡，放棄尚未存檔的勾選草稿
+  function showRosterView(){
+    rosterEditingActive = false;
+    rosterViewMode.classList.remove('hidden');
+    rosterEditMode.classList.add('hidden');
+    rosterFooter.classList.add('hidden');
+    if (!openRosterEventId) return;
+    var uids = resetRosterDraftFromSaved();
+    var roster = rostersById[openRosterEventId];
+    var namesByUid = {};
+    (approvedMembers || []).forEach(function(m){ namesByUid[m.uid] = m; });
+    rosterViewCount.textContent = roster ? (roster.members.length + ' 人') : '尚未建立名單';
+    rosterEditBtn.textContent = roster ? '✎ 編輯名單' : '✎ 建立名單';
+    rosterViewNames.textContent = uids.length === 0 ? '（無）' : uids.map(function(uid){
+      var m = namesByUid[uid];
+      return m ? m.name : uid;
+    }).join('、');
+  }
+
+  rosterEditBtn.addEventListener('click', function(){
+    if (!openRosterEventId) return;
+    rosterEditingActive = true;
+    rosterViewMode.classList.add('hidden');
+    rosterEditMode.classList.remove('hidden');
+    rosterFooter.classList.remove('hidden');
+    renderRosterChecklist();
+    updateRosterCounter();
+  });
+
   async function openRosterSheet(eventId){
     var evt = eventsById[eventId];
     if (!evt) return;
@@ -966,18 +1024,17 @@
     document.getElementById('rosterSheetMeta').textContent =
       (evt.date ? (evt.date.getMonth() + 1) + '/' + evt.date.getDate() : '') + (evt.location ? ' · ' + evt.location : '');
 
-    rosterChecklist.innerHTML = '<div class="survey-empty">載入中…</div>';
+    rosterEditingActive = false;
+    rosterViewMode.classList.remove('hidden');
+    rosterEditMode.classList.add('hidden');
+    rosterFooter.classList.add('hidden');
+    rosterViewCount.textContent = '載入中…';
+    rosterViewNames.textContent = '';
     rosterReportsSlot.innerHTML = '<div class="survey-empty">載入中…</div>';
-    rosterSaveBtn.disabled = true;
     rosterSheetOverlay.classList.add('active');
 
-    var members = await ensureApprovedMembers();
-    var roster = rostersById[eventId];
-    var initial = roster ? roster.members : members.map(function(m){ return m.uid; });
-    rosterDraftSet = {};
-    initial.forEach(function(uid){ rosterDraftSet[uid] = true; });
-    renderRosterChecklist();
-    updateRosterCounter();
+    await ensureApprovedMembers();
+    showRosterView();
 
     loadReports(eventId);
   }
@@ -985,6 +1042,7 @@
   function closeRosterSheet(){
     rosterSheetOverlay.classList.remove('active');
     if (editingId) enterCreateMode(); // 關閉時放棄還沒存檔的活動資訊編輯
+    rosterEditingActive = false; // 關閉時放棄還沒存檔的名單編輯
     openRosterEventId = null;
     rosterDraftSet = null;
     editingReportUid = null;
@@ -1025,14 +1083,19 @@
     if (isNew) payload.createdBy = currentAdminUid;
     rosterSaveBtn.disabled = true;
     setDoc(doc(db, 'eventRosters', eventId), payload, { merge: true }).then(function(){
-      closeRosterSheet();
+      // 保險：搶在 eventRosters 的 onSnapshot 回來前，先用剛存的結果更新本地資料，
+      // 讓緊接著呼叫的 showRosterView() 不會顯示存檔前的舊人數
+      rostersById[eventId] = { members: members };
+      showRosterView(); // 存檔後回到唯讀摘要，不關閉整個活動明細 sheet，方便接著切去其他分頁
     }).catch(function(err){
       alert('儲存失敗：' + err.code);
       rosterSaveBtn.disabled = false;
     });
   });
 
-  document.getElementById('rosterCancelBtn').addEventListener('click', closeRosterSheet);
+  document.getElementById('rosterCancelBtn').addEventListener('click', function(){
+    showRosterView(); // 取消名單編輯，回到唯讀摘要，不關閉整個 sheet
+  });
   document.getElementById('rosterSheetClose').addEventListener('click', closeRosterSheet);
   rosterSheetOverlay.addEventListener('click', function(e){
     if (e.target === rosterSheetOverlay) closeRosterSheet();
