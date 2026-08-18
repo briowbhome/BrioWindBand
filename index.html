@@ -379,6 +379,91 @@
     line-height:1.5;
   }
 
+  /* ---------- 出缺席回報橫幅 ---------- */
+  /* 深色語彙跟 .ticker 呼應，避免夾在公告 ticker 跟團練 hero 卡片中間時深淺跳動的割裂感；
+     只靠左側色條 + 文字色（粉調）區分「這是待辦提醒」不是「這是公告」 */
+  .rsvp-banner{
+    display:flex; align-items:center; gap:10px;
+    margin:2px 20px 18px;
+    background:var(--ink); color:#E8A9B4;
+    border-radius:var(--radius-md); padding:12px 14px;
+    box-shadow:var(--shadow-card); border:none;
+    cursor:pointer; text-align:left; width:calc(100% - 40px);
+  }
+  .rsvp-banner .stripe{ flex:none; width:3px; align-self:stretch; background:#D4788C; border-radius:2px; }
+  .rsvp-banner .ico{ flex:none; width:20px; height:20px; }
+  .rsvp-banner .txt{ flex:1; font-size:13px; font-weight:500; line-height:1.5; }
+  .rsvp-banner .chev{ flex:none; opacity:.7; }
+
+  /* ---------- RSVP bottom sheet ---------- */
+  .sheet-overlay{
+    position:fixed; inset:0; z-index:80;
+    background:rgba(32,36,47,.45);
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  .sheet-overlay.active{ display:flex; }
+  .sheet{
+    width:100%; max-width:460px; max-height:85vh;
+    background:var(--paper-raised);
+    border-radius:20px 20px 0 0;
+    display:flex; flex-direction:column;
+    box-shadow:0 -10px 30px rgba(32,36,47,.3);
+  }
+  .sheet-handle{ width:36px; height:4px; background:var(--line); border-radius:999px; margin:10px auto 2px; }
+  .sheet-header{ position:relative; padding:6px 44px 12px 20px; border-bottom:1px solid var(--line); }
+  .sheet-header .name{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:16px; }
+  .sheet-header .account{ font-family:'Roboto Mono',monospace; font-size:11px; color:var(--ink-soft); margin-top:2px; }
+  .sheet-close{
+    position:absolute; top:4px; right:10px;
+    width:30px; height:30px; border-radius:50%; border:none; background:none;
+    color:var(--ink-soft); font-size:19px; line-height:1; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .sheet-close:active{ background:var(--paper); }
+  .sheet-body{ overflow-y:auto; padding:16px 20px 8px; }
+  .sheet-footer{
+    display:flex; gap:10px;
+    padding:14px 20px calc(14px + env(safe-area-inset-bottom));
+    border-top:1px solid var(--line);
+  }
+  .status-picker{ display:flex; gap:8px; }
+  .status-chip-btn{
+    flex:1; text-align:center; padding:11px 4px;
+    border-radius:var(--radius-sm); border:1px solid var(--line);
+    font-size:13px; font-weight:700; color:var(--ink-soft); background:var(--paper); cursor:pointer;
+  }
+  .status-chip-btn.selected.attending{ background:var(--sage); color:#F2EFE5; border-color:var(--sage); }
+  .status-chip-btn.selected.leave{ background:var(--burgundy); color:#F2EFE5; border-color:var(--burgundy); }
+  .field{ margin-top:14px; display:flex; flex-direction:column; gap:6px; }
+  .field label{
+    font-family:'Roboto Mono',monospace; font-size:10.5px; font-weight:600;
+    letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft);
+  }
+  .field textarea{
+    border:1px solid var(--line); background:var(--paper);
+    border-radius:var(--radius-sm); padding:11px 13px;
+    font-size:14px; color:var(--ink); width:100%; font-family:inherit; resize:vertical; min-height:72px;
+  }
+  .form-error{
+    margin-top:12px; font-size:12.5px; color:var(--burgundy);
+    background:#FBF3F3; border:1px solid #EFD4D8; border-radius:var(--radius-sm);
+    padding:10px 12px;
+  }
+  .cta-btn{
+    flex:1;
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    background:var(--brass); color:var(--ink); border:none;
+    border-radius:var(--radius-md); padding:13px 16px;
+    font-weight:700; font-size:14px; cursor:pointer;
+    transition:transform .12s ease, background .12s ease;
+  }
+  .cta-btn:hover{ background:#C7963F; }
+  .cta-btn:active{ transform:scale(.98); background:var(--brass-deep); }
+  .cta-btn:disabled{ opacity:.55; cursor:default; transform:none; }
+  .cta-btn-secondary{ background:var(--paper); color:var(--ink-soft); border:1px solid var(--line); }
+  .cta-btn-secondary:hover{ background:var(--paper-raised); }
+  .cta-btn-secondary:active{ transform:scale(.98); background:var(--paper); }
+
   /* ---------- Bottom tab bar ---------- */
   .tabbar{
     position:sticky;
@@ -468,6 +553,14 @@
     </div>
     <div class="announce-list hidden" id="announceList"></div>
   </div>
+
+  <!-- 出缺席回報橫幅：只有自己在某場活動的參與名單內、且尚未回報時才顯示 -->
+  <button type="button" class="rsvp-banner hidden" id="rsvpBanner">
+    <span class="stripe"></span>
+    <svg class="ico" viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 10h16M9 3v4M15 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M9 14l2 2 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span class="txt" id="rsvpBannerText"></span>
+    <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
 
   <!-- 練習資訊 Hero -->
   <div class="section-label">
@@ -590,13 +683,41 @@
   <button type="button" class="scan-cancel" id="scanCancelBtn">取消</button>
 </div>
 
+<!-- 出缺席回報 Bottom Sheet -->
+<div class="sheet-overlay" id="rsvpSheetOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button type="button" class="sheet-close" id="rsvpSheetClose" aria-label="關閉">×</button>
+      <div class="name" id="rsvpSheetTitle">—</div>
+      <div class="account" id="rsvpSheetMeta">—</div>
+    </div>
+    <div class="sheet-body">
+      <div class="status-picker">
+        <button type="button" class="status-chip-btn attending" data-rsvp-status="attending">出席</button>
+        <button type="button" class="status-chip-btn leave" data-rsvp-status="leave">請假</button>
+      </div>
+      <div class="field hidden" id="rsvpReasonField">
+        <label>請假原因(選填)</label>
+        <textarea id="rsvpReasonInput" placeholder=""></textarea>
+      </div>
+      <p class="form-error hidden" id="rsvpFormError"></p>
+    </div>
+    <div class="sheet-footer">
+      <button type="button" class="cta-btn cta-btn-secondary" id="rsvpCancelBtn">取消</button>
+      <button type="button" class="cta-btn" id="rsvpSubmitBtn">送出回報</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
   import { requireApprovedMember, peekCachedProfile } from './auth-guard.js';
   import { initAccountMenu } from './account-menu.js';
   import { subscribeEventTypes, badgeStyle } from './event-types.js';
   import { db } from './firebase-init.js';
   import {
-    collection, query, where, orderBy, limit, onSnapshot, Timestamp
+    collection, query, where, orderBy, limit, onSnapshot, Timestamp,
+    doc, getDoc, setDoc, serverTimestamp
   } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
   // 還沒做的分頁（行事曆/譜夾/我的）：反灰 + 點擊顯示「即將推出」提示，
@@ -824,6 +945,150 @@
         );
       }).join('');
     });
+
+    // 出缺席回報：查詢自己在哪些活動的參與名單內，橫幅提示尚未回報的活動，點擊直接開啟回報 sheet
+    var rsvpEventCache = {}; // eventId -> { title, date, location }
+    var rsvpReportsByEvent = {}; // eventId -> { status, reason }
+    var rsvpRosterEventIds = [];
+
+    async function ensureRsvpEventInfo(eventId){
+      if (rsvpEventCache[eventId]) return rsvpEventCache[eventId];
+      var snap = await getDoc(doc(db, 'events', eventId));
+      if (!snap.exists()) return null;
+      var data = snap.data();
+      var info = {
+        title: data.title,
+        date: data.date && data.date.toDate ? data.date.toDate() : null,
+        location: data.location
+      };
+      rsvpEventCache[eventId] = info;
+      return info;
+    }
+
+    // 橫幅只提示「在名單內但還沒回報」的活動，跟「在名單內」（不論是否已回報）是不同的條件，要分開算
+    function renderRsvpBanner(){
+      var banner = document.getElementById('rsvpBanner');
+      var pendingIds = rsvpRosterEventIds.filter(function(id){
+        return rsvpEventCache[id] && !rsvpReportsByEvent[id];
+      });
+
+      if (pendingIds.length === 0){
+        banner.classList.add('hidden');
+        return;
+      }
+
+      pendingIds.sort(function(a, b){
+        var ta = rsvpEventCache[a].date ? rsvpEventCache[a].date.getTime() : 0;
+        var tb = rsvpEventCache[b].date ? rsvpEventCache[b].date.getTime() : 0;
+        return ta - tb;
+      });
+
+      var nearestId = pendingIds[0];
+      var text = pendingIds.length === 1
+        ? '你尚未回報「' + rsvpEventCache[nearestId].title + '」的出缺席'
+        : '你有 ' + pendingIds.length + ' 場活動尚未回報出缺席';
+
+      document.getElementById('rsvpBannerText').textContent = text;
+      banner.setAttribute('data-rsvp-open', nearestId);
+      banner.classList.remove('hidden');
+    }
+
+    document.getElementById('rsvpBanner').addEventListener('click', function(){
+      var id = this.getAttribute('data-rsvp-open');
+      if (id) openRsvpSheet(id);
+    });
+
+    var rsvpSheetOverlay = document.getElementById('rsvpSheetOverlay');
+    var rsvpOpenEventId = null;
+    var rsvpSelectedStatus = 'attending';
+
+    function updateRsvpStatusUI(){
+      document.querySelectorAll('[data-rsvp-status]').forEach(function(btn){
+        btn.classList.toggle('selected', btn.getAttribute('data-rsvp-status') === rsvpSelectedStatus);
+      });
+      document.getElementById('rsvpReasonField').classList.toggle('hidden', rsvpSelectedStatus !== 'leave');
+    }
+
+    function openRsvpSheet(eventId){
+      var info = rsvpEventCache[eventId];
+      if (!info) return;
+      rsvpOpenEventId = eventId;
+      var existing = rsvpReportsByEvent[eventId];
+      rsvpSelectedStatus = existing ? existing.status : 'attending';
+      document.getElementById('rsvpSheetTitle').textContent = info.title;
+      document.getElementById('rsvpSheetMeta').textContent =
+        (info.date ? (info.date.getMonth() + 1) + '/' + info.date.getDate() : '') + (info.location ? ' · ' + info.location : '');
+      document.getElementById('rsvpReasonInput').value = existing && existing.reason ? existing.reason : '';
+      document.getElementById('rsvpFormError').classList.add('hidden');
+      updateRsvpStatusUI();
+      rsvpSheetOverlay.classList.add('active');
+    }
+
+    function closeRsvpSheet(){
+      rsvpSheetOverlay.classList.remove('active');
+      rsvpOpenEventId = null;
+    }
+
+    document.querySelectorAll('[data-rsvp-status]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        rsvpSelectedStatus = btn.getAttribute('data-rsvp-status');
+        updateRsvpStatusUI();
+      });
+    });
+
+    document.getElementById('rsvpCancelBtn').addEventListener('click', closeRsvpSheet);
+    document.getElementById('rsvpSheetClose').addEventListener('click', closeRsvpSheet);
+    rsvpSheetOverlay.addEventListener('click', function(e){
+      if (e.target === rsvpSheetOverlay) closeRsvpSheet();
+    });
+
+    document.getElementById('rsvpSubmitBtn').addEventListener('click', function(){
+      if (!rsvpOpenEventId) return;
+      var errorEl = document.getElementById('rsvpFormError');
+      var reason = document.getElementById('rsvpReasonInput').value.trim();
+      if (rsvpSelectedStatus === 'leave' && !reason){
+        errorEl.textContent = '請填寫請假原因';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+      errorEl.classList.add('hidden');
+      var submitBtn = document.getElementById('rsvpSubmitBtn');
+      submitBtn.disabled = true;
+      var eventId = rsvpOpenEventId;
+      setDoc(doc(db, 'attendanceReports', eventId + '_' + result.uid), {
+        eventId: eventId,
+        uid: result.uid,
+        account: profile.account,
+        name: profile.name,
+        status: rsvpSelectedStatus,
+        reason: rsvpSelectedStatus === 'leave' ? reason : '',
+        respondedAt: serverTimestamp()
+      }).then(function(){
+        submitBtn.disabled = false;
+        closeRsvpSheet();
+      }).catch(function(err){
+        submitBtn.disabled = false;
+        errorEl.textContent = '送出失敗（' + err.code + '），請再試一次';
+        errorEl.classList.remove('hidden');
+      });
+    });
+
+    onSnapshot(query(collection(db, 'eventRosters'), where('members', 'array-contains', result.uid)), function(snap){
+      rsvpRosterEventIds = snap.docs.map(function(d){ return d.id; });
+      rsvpRosterEventIds.forEach(function(id){
+        ensureRsvpEventInfo(id).then(renderRsvpBanner);
+      });
+      renderRsvpBanner();
+    }, function(err){ console.error('eventRosters 監聽失敗', err); });
+
+    onSnapshot(query(collection(db, 'attendanceReports'), where('uid', '==', result.uid)), function(snap){
+      rsvpReportsByEvent = {};
+      snap.forEach(function(d){
+        var data = d.data();
+        rsvpReportsByEvent[data.eventId] = { status: data.status, reason: data.reason };
+      });
+      renderRsvpBanner();
+    }, function(err){ console.error('attendanceReports 監聽失敗', err); });
 
     // 簽到：即時開相機畫面，持續解碼直到找到 QR Code
     var checkinBtn = document.getElementById('checkinBtn');

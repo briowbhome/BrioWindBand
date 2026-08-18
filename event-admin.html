@@ -227,6 +227,119 @@
     background:none; border:1px solid var(--line); color:var(--ink-soft);
   }
   .btn-type-delete{ color:var(--burgundy-deep); }
+
+  /* ---------- Attendance roster button ---------- */
+  .event-actions{ flex-wrap:wrap; row-gap:6px; }
+  .btn-roster{ background:none; border:1px solid var(--line); color:var(--brass-deep); }
+  .btn-roster:active{ background:var(--paper); }
+
+  /* ---------- 出缺席名單 Bottom Sheet ---------- */
+  .sheet-overlay{
+    position:fixed; inset:0; z-index:80;
+    background:rgba(32,36,47,.45);
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  .sheet-overlay.active{ display:flex; }
+  .sheet{
+    width:100%; max-width:460px; max-height:85vh;
+    background:var(--paper-raised);
+    border-radius:20px 20px 0 0;
+    display:flex; flex-direction:column;
+    box-shadow:0 -10px 30px rgba(32,36,47,.3);
+  }
+  .sheet-handle{ width:36px; height:4px; background:var(--line); border-radius:999px; margin:10px auto 2px; }
+  .sheet-header{ position:relative; padding:6px 44px 12px 20px; border-bottom:1px solid var(--line); }
+  .sheet-header .name{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:16px; }
+  .sheet-header .account{ font-family:'Roboto Mono',monospace; font-size:11px; color:var(--ink-soft); margin-top:2px; }
+  .sheet-close{
+    position:absolute; top:4px; right:10px;
+    width:30px; height:30px; border-radius:50%; border:none; background:none;
+    color:var(--ink-soft); font-size:19px; line-height:1; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .sheet-close:active{ background:var(--paper); }
+  .sheet-body{ overflow-y:auto; padding:14px 20px 8px; }
+  .sheet-footer{
+    display:flex; gap:10px;
+    padding:14px 20px calc(14px + env(safe-area-inset-bottom));
+    border-top:1px solid var(--line);
+  }
+  .cta-btn-secondary{ background:var(--paper); color:var(--ink-soft); border:1px solid var(--line); }
+  .cta-btn-secondary:hover{ background:var(--paper-raised); }
+  .cta-btn-secondary:active{ transform:scale(.98); background:var(--paper); }
+
+  .survey-section-label{
+    font-family:'Roboto Mono',monospace; font-size:10.5px; font-weight:700;
+    letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft);
+    margin:16px 0 8px;
+  }
+  .survey-section-label:first-child{ margin-top:0; }
+  .survey-bulk-row{ display:flex; gap:8px; margin-bottom:8px; }
+  .survey-bulk-row button{
+    border:1px solid var(--line); background:var(--paper); color:var(--ink-soft);
+    border-radius:999px; padding:5px 12px; font-size:11px; font-weight:700; cursor:pointer;
+  }
+  .survey-bulk-row button:active{ background:var(--sage-bg); color:var(--sage); }
+
+  .check-list{ display:flex; flex-direction:column; gap:2px; max-height:240px; overflow-y:auto; background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm); padding:4px 10px; }
+  .check-row{ display:flex; align-items:center; gap:10px; padding:7px 2px; }
+  .check-row + .check-row{ border-top:1px solid var(--line); }
+  .checkbox{
+    width:18px; height:18px; border-radius:5px; border:1.5px solid var(--line);
+    flex:none; display:flex; align-items:center; justify-content:center;
+    font-size:11px; color:#fff; cursor:pointer; background:none; padding:0;
+  }
+  .checkbox.on{ background:var(--brass); border-color:var(--brass); }
+  .check-text{ flex:1; font-size:12.5px; color:var(--ink); cursor:pointer; background:none; border:none; text-align:left; padding:0; }
+
+  .survey-empty{ padding:10px 2px; text-align:center; font-size:12px; color:var(--ink-soft); }
+  .survey-summary{
+    display:flex; gap:10px;
+    padding:9px 12px; background:var(--sage-bg); color:var(--sage);
+    font-size:11.5px; font-weight:700; border-radius:var(--radius-sm);
+  }
+  .survey-list{ margin-top:8px; background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm); overflow:hidden; }
+  .survey-row{ padding:9px 12px; font-size:12px; }
+  .survey-row + .survey-row{ border-top:1px solid var(--line); }
+  .survey-row-top{ display:flex; align-items:flex-start; gap:10px; }
+  .survey-name{ font-weight:500; color:var(--ink); }
+  .survey-reason{ font-size:11px; color:var(--ink-soft); margin-top:2px; white-space:pre-wrap; }
+  .survey-tag{
+    font-size:9.5px; font-weight:700; color:var(--burgundy-deep);
+    background:#FBF3F3; border:1px solid #EFD4D8; border-radius:999px; padding:1px 6px; margin-left:4px;
+  }
+  .survey-status{ flex:none; font-family:'Roboto Mono',monospace; font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; }
+  .survey-status.attending{ background:var(--sage-bg); color:var(--sage); }
+  .survey-status.leave{ background:#EFE1E3; color:var(--burgundy-deep); }
+  .survey-edit-btn{
+    flex:none; width:22px; height:22px; border-radius:50%; border:none; background:none;
+    color:var(--ink-soft); cursor:pointer; font-size:12px; display:flex; align-items:center; justify-content:center;
+  }
+  .survey-edit-btn:active{ color:var(--brass-deep); }
+  .survey-subhead{ margin-top:12px; font-size:11.5px; font-weight:700; color:var(--ink-soft); }
+  .survey-namelist{ margin-top:4px; font-size:12px; color:var(--ink); line-height:1.7; }
+
+  .survey-edit-form{ margin-top:8px; padding-top:8px; border-top:1px dashed var(--line); }
+  .status-picker{ display:flex; gap:8px; }
+  .status-chip-btn{
+    flex:1; text-align:center; padding:8px 4px;
+    border-radius:var(--radius-sm); border:1px solid var(--line);
+    font-size:12px; font-weight:700; color:var(--ink-soft); background:var(--paper); cursor:pointer;
+  }
+  .status-chip-btn.selected.attending{ background:var(--sage); color:#F2EFE5; border-color:var(--sage); }
+  .status-chip-btn.selected.leave{ background:var(--burgundy); color:#F2EFE5; border-color:var(--burgundy); }
+  .survey-edit-form textarea{
+    margin-top:8px; border:1px solid var(--line); background:var(--paper);
+    border-radius:var(--radius-sm); padding:9px 11px;
+    font-size:13px; color:var(--ink); width:100%; font-family:inherit; resize:vertical; min-height:56px;
+  }
+  .survey-edit-actions{ display:flex; gap:8px; margin-top:8px; }
+  .survey-edit-actions button{
+    border-radius:var(--radius-sm); padding:7px 12px; font-size:11.5px; font-weight:700; cursor:pointer;
+    border:1px solid var(--line); background:var(--paper);
+  }
+  .survey-edit-actions .btn-save{ background:var(--brass); color:var(--ink); border:none; }
+  .survey-edit-actions .btn-save:disabled{ opacity:.5; }
 </style>
 </head>
 <body>
@@ -332,6 +445,33 @@
 
 </div>
 
+<!-- 出缺席名單 Bottom Sheet -->
+<div class="sheet-overlay" id="rosterSheetOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button type="button" class="sheet-close" id="rosterSheetClose" aria-label="關閉">×</button>
+      <div class="name" id="rosterSheetTitle">—</div>
+      <div class="account" id="rosterSheetMeta">—</div>
+    </div>
+    <div class="sheet-body">
+      <div class="survey-section-label" id="rosterCounterLabel">應到名單</div>
+      <div class="survey-bulk-row">
+        <button type="button" id="rosterSelectAllBtn">全選</button>
+        <button type="button" id="rosterClearAllBtn">全部取消</button>
+      </div>
+      <div class="check-list" id="rosterChecklist"></div>
+
+      <div class="survey-section-label">回報狀況</div>
+      <div id="rosterReportsSlot"><div class="survey-empty">載入中…</div></div>
+    </div>
+    <div class="sheet-footer">
+      <button type="button" class="cta-btn cta-btn-secondary" id="rosterCancelBtn">關閉</button>
+      <button type="button" class="cta-btn" id="rosterSaveBtn" disabled>儲存名單變更</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
   import { requireAdmin, peekCachedProfile } from './auth-guard.js';
   import { db } from './firebase-init.js';
@@ -339,8 +479,14 @@
   import { subscribeEventTypes, COLOR_THEMES, badgeStyle } from './event-types.js';
   import {
     collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot,
-    serverTimestamp, Timestamp
+    serverTimestamp, Timestamp, getDocs, query, where, setDoc
   } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+
+  function escapeHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
 
   // 活動類型管理用到的次數不多，預設收合、之後記住使用者上次的展開/收合狀態
   var TYPES_COLLAPSE_KEY = 'brio_event_types_collapsed';
@@ -551,6 +697,8 @@
     eventList.innerHTML = ids.map(function(eventId){
       var evt = eventsById[eventId];
       var d = evt.date;
+      var roster = rostersById[eventId];
+      var rosterLabel = roster ? ('出缺席名單（' + roster.members.length + ' 人）') : '設定出缺席名單';
       return (
         '<div class="event-item" data-event="' + eventId + '">' +
           '<div class="event-top">' +
@@ -565,6 +713,7 @@
           '</div>' +
           '<div class="event-actions">' +
             '<button type="button" class="btn-edit" data-edit="' + eventId + '">編輯</button>' +
+            '<button type="button" class="btn-roster" data-open-roster="' + eventId + '">' + rosterLabel + '</button>' +
             '<button type="button" class="btn-delete" data-delete="' + eventId + '">刪除</button>' +
           '</div>' +
         '</div>'
@@ -575,9 +724,13 @@
   eventList.addEventListener('click', function(e){
     var editBtn = e.target.closest('[data-edit]');
     var deleteBtn = e.target.closest('[data-delete]');
+    var rosterBtn = e.target.closest('[data-open-roster]');
 
     if (editBtn){
       enterEditMode(editBtn.getAttribute('data-edit'));
+    }
+    if (rosterBtn){
+      openRosterSheet(rosterBtn.getAttribute('data-open-roster'));
     }
     if (deleteBtn){
       var eventId = deleteBtn.getAttribute('data-delete');
@@ -591,12 +744,286 @@
       deleteBtn.disabled = true;
       Promise.all([
         deleteDoc(doc(db, 'events', eventId)),
-        deleteDoc(doc(db, 'checkinSessions', eventId)).catch(function(){})
+        deleteDoc(doc(db, 'checkinSessions', eventId)).catch(function(){}),
+        deleteDoc(doc(db, 'eventRosters', eventId)).catch(function(){})
       ]).then(function(){
         if (editingId === eventId) enterCreateMode();
       }).catch(function(err){
         alert('刪除失敗：' + err.code);
         deleteBtn.disabled = false;
+      });
+    }
+  });
+
+  // ---------- 出缺席名單 Bottom Sheet ----------
+  var rostersById = {}; // eventId -> { members: [uid...] }
+  var approvedMembers = null;
+  var openRosterEventId = null;
+  var rosterDraftSet = null; // {uid: true}
+  var reportsByEvent = {}; // eventId -> array<report>
+  var editingReportUid = null;
+  var reportEditDraft = null; // { status, reason }
+
+  var rosterSheetOverlay = document.getElementById('rosterSheetOverlay');
+  var rosterChecklist = document.getElementById('rosterChecklist');
+  var rosterCounterLabel = document.getElementById('rosterCounterLabel');
+  var rosterSaveBtn = document.getElementById('rosterSaveBtn');
+  var rosterReportsSlot = document.getElementById('rosterReportsSlot');
+
+  async function ensureApprovedMembers(){
+    if (approvedMembers) return approvedMembers;
+    var snap = await getDocs(query(collection(db, 'users'), where('status', '==', 'approved')));
+    approvedMembers = snap.docs.map(function(docSnap){
+      var data = docSnap.data();
+      return { uid: docSnap.id, name: data.name, account: data.account };
+    });
+    return approvedMembers;
+  }
+
+  function rosterDirty(){
+    var roster = rostersById[openRosterEventId];
+    var saved = roster ? roster.members : [];
+    var draft = Object.keys(rosterDraftSet || {});
+    if (draft.length !== saved.length) return true;
+    return draft.some(function(uid){ return saved.indexOf(uid) === -1; });
+  }
+
+  function updateRosterCounter(){
+    var total = (approvedMembers || []).length;
+    var count = Object.keys(rosterDraftSet || {}).length;
+    rosterCounterLabel.textContent = '應到名單（' + count + ' / ' + total + ' 人）';
+    rosterSaveBtn.disabled = !rosterDirty();
+  }
+
+  function renderRosterChecklist(){
+    rosterChecklist.innerHTML = (approvedMembers || []).map(function(m){
+      var on = !!rosterDraftSet[m.uid];
+      return (
+        '<div class="check-row">' +
+          '<button type="button" class="checkbox' + (on ? ' on' : '') + '" data-uid="' + m.uid + '">' + (on ? '✓' : '') + '</button>' +
+          '<button type="button" class="check-text" data-uid="' + m.uid + '">' + escapeHtml(m.name) + '（' + escapeHtml(m.account) + '）</button>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  async function openRosterSheet(eventId){
+    var evt = eventsById[eventId];
+    if (!evt) return;
+    openRosterEventId = eventId;
+    editingReportUid = null;
+    reportEditDraft = null;
+    document.getElementById('rosterSheetTitle').textContent = evt.title;
+    document.getElementById('rosterSheetMeta').textContent =
+      (evt.date ? (evt.date.getMonth() + 1) + '/' + evt.date.getDate() : '') + (evt.location ? ' · ' + evt.location : '');
+
+    rosterChecklist.innerHTML = '<div class="survey-empty">載入中…</div>';
+    rosterReportsSlot.innerHTML = '<div class="survey-empty">載入中…</div>';
+    rosterSaveBtn.disabled = true;
+    rosterSheetOverlay.classList.add('active');
+
+    var members = await ensureApprovedMembers();
+    var roster = rostersById[eventId];
+    var initial = roster ? roster.members : members.map(function(m){ return m.uid; });
+    rosterDraftSet = {};
+    initial.forEach(function(uid){ rosterDraftSet[uid] = true; });
+    renderRosterChecklist();
+    updateRosterCounter();
+
+    loadReports(eventId);
+  }
+
+  function closeRosterSheet(){
+    rosterSheetOverlay.classList.remove('active');
+    openRosterEventId = null;
+    rosterDraftSet = null;
+    editingReportUid = null;
+    reportEditDraft = null;
+  }
+
+  rosterChecklist.addEventListener('click', function(e){
+    var btn = e.target.closest('[data-uid]');
+    if (!btn) return;
+    var uid = btn.getAttribute('data-uid');
+    if (rosterDraftSet[uid]) delete rosterDraftSet[uid]; else rosterDraftSet[uid] = true;
+    var row = btn.closest('.check-row');
+    var checkboxEl = row.querySelector('.checkbox');
+    var on = !!rosterDraftSet[uid];
+    checkboxEl.classList.toggle('on', on);
+    checkboxEl.textContent = on ? '✓' : '';
+    updateRosterCounter();
+  });
+
+  document.getElementById('rosterSelectAllBtn').addEventListener('click', function(){
+    (approvedMembers || []).forEach(function(m){ rosterDraftSet[m.uid] = true; });
+    renderRosterChecklist();
+    updateRosterCounter();
+  });
+
+  document.getElementById('rosterClearAllBtn').addEventListener('click', function(){
+    rosterDraftSet = {};
+    renderRosterChecklist();
+    updateRosterCounter();
+  });
+
+  rosterSaveBtn.addEventListener('click', function(){
+    if (!openRosterEventId) return;
+    var eventId = openRosterEventId;
+    var members = Object.keys(rosterDraftSet);
+    var isNew = !rostersById[eventId];
+    var payload = { members: members, updatedAt: serverTimestamp() };
+    if (isNew) payload.createdBy = currentAdminUid;
+    rosterSaveBtn.disabled = true;
+    setDoc(doc(db, 'eventRosters', eventId), payload, { merge: true }).then(function(){
+      closeRosterSheet();
+    }).catch(function(err){
+      alert('儲存失敗：' + err.code);
+      rosterSaveBtn.disabled = false;
+    });
+  });
+
+  document.getElementById('rosterCancelBtn').addEventListener('click', closeRosterSheet);
+  document.getElementById('rosterSheetClose').addEventListener('click', closeRosterSheet);
+  rosterSheetOverlay.addEventListener('click', function(e){
+    if (e.target === rosterSheetOverlay) closeRosterSheet();
+  });
+
+  async function loadReports(eventId){
+    try {
+      var snap = await getDocs(query(collection(db, 'attendanceReports'), where('eventId', '==', eventId)));
+      reportsByEvent[eventId] = snap.docs.map(function(d){ return d.data(); });
+      if (openRosterEventId === eventId) renderReportsSlot();
+    } catch (err) {
+      if (openRosterEventId === eventId) rosterReportsSlot.innerHTML = '<div class="survey-empty">載入失敗（' + err.code + '）</div>';
+    }
+  }
+
+  function renderReportEditForm(r){
+    var draft = reportEditDraft;
+    return (
+      '<div class="survey-edit-form">' +
+        '<div class="status-picker">' +
+          '<button type="button" class="status-chip-btn attending' + (draft.status === 'attending' ? ' selected' : '') + '" data-edit-status="attending">出席</button>' +
+          '<button type="button" class="status-chip-btn leave' + (draft.status === 'leave' ? ' selected' : '') + '" data-edit-status="leave">請假</button>' +
+        '</div>' +
+        '<textarea data-edit-reason placeholder="請假原因">' + escapeHtml(draft.reason) + '</textarea>' +
+        '<div class="survey-edit-actions">' +
+          '<button type="button" data-edit-cancel>取消</button>' +
+          '<button type="button" class="btn-save" data-edit-save="' + r.uid + '">儲存</button>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function renderReportsSlot(){
+    var eventId = openRosterEventId;
+    if (!eventId) return;
+    var roster = rostersById[eventId];
+    var reports = reportsByEvent[eventId] || [];
+    var rosterSet = {};
+    (roster ? roster.members : []).forEach(function(uid){ rosterSet[uid] = true; });
+    var reportedUids = {};
+    reports.forEach(function(r){ reportedUids[r.uid] = true; });
+
+    var attendingCount = reports.filter(function(r){ return r.status === 'attending'; }).length;
+    var leaveCount = reports.filter(function(r){ return r.status === 'leave'; }).length;
+    var notReported = (roster ? roster.members : []).filter(function(uid){ return !reportedUids[uid]; });
+
+    var namesByUid = {};
+    (approvedMembers || []).forEach(function(m){ namesByUid[m.uid] = m; });
+
+    var summaryHtml = '<div class="survey-summary"><span>出席 ' + attendingCount + '</span><span>請假 ' + leaveCount + '</span><span>未回報 ' + notReported.length + '</span></div>';
+
+    var listHtml = reports.length === 0 ? '<div class="survey-empty">目前還沒有人回報</div>' :
+      '<div class="survey-list">' + reports.map(function(r){
+        var outOfRoster = !rosterSet[r.uid];
+        var isEditing = editingReportUid === r.uid;
+        return (
+          '<div class="survey-row" data-report-row="' + r.uid + '">' +
+            '<div class="survey-row-top">' +
+              '<div style="flex:1;min-width:0;">' +
+                '<div class="survey-name">' + escapeHtml(r.name || r.account || '未知') + (outOfRoster ? '<span class="survey-tag">已不在名單內</span>' : '') + '</div>' +
+                (r.status === 'leave' && r.reason ? '<div class="survey-reason">' + escapeHtml(r.reason) + '</div>' : '') +
+              '</div>' +
+              '<span class="survey-status ' + r.status + '">' + (r.status === 'attending' ? '出席' : '請假') + '</span>' +
+              '<button type="button" class="survey-edit-btn" data-edit-report="' + r.uid + '" aria-label="代改回報">✎</button>' +
+            '</div>' +
+            (isEditing ? renderReportEditForm(r) : '') +
+          '</div>'
+        );
+      }).join('') + '</div>';
+
+    var notReportedHtml = notReported.length === 0 ? '' :
+      '<div class="survey-subhead">尚未回報</div>' +
+      '<div class="survey-namelist">' + notReported.map(function(uid){
+        var m = namesByUid[uid];
+        return escapeHtml(m ? m.name : uid);
+      }).join('、') + '</div>';
+
+    rosterReportsSlot.innerHTML = summaryHtml + listHtml + notReportedHtml;
+  }
+
+  function openReportEdit(uid){
+    var reports = reportsByEvent[openRosterEventId] || [];
+    var r = reports.find(function(x){ return x.uid === uid; });
+    if (!r) return;
+    editingReportUid = uid;
+    reportEditDraft = { status: r.status, reason: r.reason || '' };
+    renderReportsSlot();
+  }
+
+  function closeReportEdit(){
+    editingReportUid = null;
+    reportEditDraft = null;
+    renderReportsSlot();
+  }
+
+  rosterReportsSlot.addEventListener('input', function(e){
+    if (e.target.matches('[data-edit-reason]') && reportEditDraft){
+      reportEditDraft.reason = e.target.value;
+    }
+  });
+
+  rosterReportsSlot.addEventListener('click', function(e){
+    var editBtn = e.target.closest('[data-edit-report]');
+    var statusBtn = e.target.closest('[data-edit-status]');
+    var cancelBtn = e.target.closest('[data-edit-cancel]');
+    var saveBtn = e.target.closest('[data-edit-save]');
+
+    if (editBtn){
+      openReportEdit(editBtn.getAttribute('data-edit-report'));
+      return;
+    }
+    if (statusBtn){
+      reportEditDraft.status = statusBtn.getAttribute('data-edit-status');
+      renderReportsSlot();
+      return;
+    }
+    if (cancelBtn){
+      closeReportEdit();
+      return;
+    }
+    if (saveBtn){
+      var uid = saveBtn.getAttribute('data-edit-save');
+      var reason = reportEditDraft.reason.trim();
+      if (reportEditDraft.status === 'leave' && !reason){
+        alert('請填寫請假原因');
+        return;
+      }
+      var eventId = openRosterEventId;
+      saveBtn.disabled = true;
+      setDoc(doc(db, 'attendanceReports', eventId + '_' + uid), {
+        eventId: eventId,
+        uid: uid,
+        status: reportEditDraft.status,
+        reason: reportEditDraft.status === 'leave' ? reason : '',
+        respondedAt: serverTimestamp()
+      }, { merge: true }).then(function(){
+        closeReportEdit();
+        loadReports(eventId);
+      }).catch(function(err){
+        alert('儲存失敗：' + err.code);
+        saveBtn.disabled = false;
       });
     }
   });
@@ -762,6 +1189,11 @@
     // 也避免使用者在那個空窗期點編輯，選單選不到正確值卡住的問題
     var typesLoaded = false;
     var eventsLoaded = false;
+    var rostersLoaded = false;
+
+    function maybeRender(){
+      if (typesLoaded && eventsLoaded && rostersLoaded) render();
+    }
 
     subscribeEventTypes(db, function(types){
       eventTypesList = types;
@@ -770,7 +1202,7 @@
       typesLoaded = true;
       renderTypeSelect();
       renderTypesList();
-      if (eventsLoaded) render();
+      maybeRender();
     }, canManageTypes ? currentAdminUid : null, renderEventsAdminError);
 
     onSnapshot(collection(db, 'events'), function(snap){
@@ -787,8 +1219,17 @@
         };
       });
       eventsLoaded = true;
-      if (typesLoaded) render();
+      maybeRender();
     }, renderEventsAdminError);
+
+    onSnapshot(collection(db, 'eventRosters'), function(snap){
+      rostersById = {};
+      snap.forEach(function(docSnap){
+        rostersById[docSnap.id] = { members: docSnap.data().members || [] };
+      });
+      rostersLoaded = true;
+      maybeRender();
+    }, function(err){ console.error('eventRosters 監聽失敗', err); });
 
     setDefaultEventDate();
   });
