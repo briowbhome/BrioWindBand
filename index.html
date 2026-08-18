@@ -1046,11 +1046,6 @@
       if (!rsvpOpenEventId) return;
       var errorEl = document.getElementById('rsvpFormError');
       var reason = document.getElementById('rsvpReasonInput').value.trim();
-      if (rsvpSelectedStatus === 'leave' && !reason){
-        errorEl.textContent = '請填寫請假原因';
-        errorEl.classList.remove('hidden');
-        return;
-      }
       errorEl.classList.add('hidden');
       var submitBtn = document.getElementById('rsvpSubmitBtn');
       submitBtn.disabled = true;

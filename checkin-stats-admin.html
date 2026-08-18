@@ -179,6 +179,20 @@
     padding:0 20px 8px;
     border-top:1px solid var(--line);
   }
+  .sheet-caption{
+    font-family:'Roboto Mono',monospace; font-size:10px; font-weight:700;
+    letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft);
+    margin:14px 0 8px;
+  }
+  .sheet-caption:first-child{ margin-top:0; }
+  .sheet-summary{ display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
+  .sheet-summary-item{
+    background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm);
+    padding:8px 6px; text-align:center;
+  }
+  .sheet-summary-item .n{ font-family:'Roboto Mono',monospace; font-weight:700; font-size:15px; color:var(--sage); }
+  .sheet-summary-item .l{ font-size:9.5px; color:var(--ink-soft); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
   .sheet-group{ margin-top:16px; }
   .sheet-group-label{
     display:flex; align-items:baseline; gap:6px;
@@ -435,7 +449,13 @@
 
     var groups = groupCheckinsByInstrument(checkins);
     var body = document.getElementById('detailSheetBody');
-    body.innerHTML = groups.map(function(g){
+
+    var summaryHtml = '<div class="sheet-caption">各分部簽到數量</div>' +
+      '<div class="sheet-summary">' + groups.map(function(g){
+        return '<div class="sheet-summary-item"><div class="n">' + g.people.length + '</div><div class="l">' + g.name + '</div></div>';
+      }).join('') + '</div>';
+
+    var detailHtml = '<div class="sheet-caption">詳細名單</div>' + groups.map(function(g){
       var namesHtml = g.people.length === 0
         ? '<div class="sheet-group-empty">尚無人簽到</div>'
         : g.people.map(function(p){
@@ -448,6 +468,8 @@
         '</div>'
       );
     }).join('');
+
+    body.innerHTML = summaryHtml + detailHtml;
   }
 
   var detailSheetOverlay = document.getElementById('detailSheetOverlay');

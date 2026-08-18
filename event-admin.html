@@ -113,6 +113,12 @@
   .collapse-toggle .chev{ transition:transform .18s ease; }
   .collapse-toggle.open .chev{ transform:rotate(180deg); }
   #typesBody.collapsed{ display:none; }
+  .add-btn{
+    margin-left:auto; align-self:center;
+    border:1px solid var(--line); background:var(--paper); color:var(--brass-deep);
+    border-radius:999px; padding:6px 14px; font-size:11.5px; font-weight:700; cursor:pointer;
+  }
+  .add-btn:active{ background:var(--sage-bg); }
 
   /* ---------- Event form ---------- */
   .card{
@@ -178,8 +184,17 @@
     box-shadow:var(--shadow-card);
     overflow:hidden;
   }
-  .event-item{ padding:14px 16px; }
+  .event-item{ padding:10px 10px 10px 16px; display:flex; align-items:center; gap:4px; }
   .event-item + .event-item{ border-top:1px solid var(--line); }
+
+  .event-open{ flex:1; min-width:0; background:none; border:none; padding:4px 0; text-align:left; cursor:pointer; }
+  .event-open:active{ opacity:.7; }
+  .btn-delete-icon{
+    flex:none; width:32px; height:32px; border-radius:50%; border:none; background:none;
+    color:var(--ink-soft); cursor:pointer; padding:0;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .btn-delete-icon:active{ background:#F6EDEE; color:var(--burgundy-deep); }
 
   .event-top{ display:flex; align-items:flex-start; gap:10px; }
   .event-date{
@@ -195,17 +210,6 @@
     padding:1.5px 6px; border-radius:5px; font-weight:600;
   }
   .event-meta{ margin-top:4px; font-size:12px; color:var(--ink-soft); line-height:1.5; }
-
-  .event-actions{ display:flex; gap:8px; margin-top:10px; margin-left:54px; }
-  .event-actions button{
-    flex:none;
-    border-radius:var(--radius-sm); padding:7px 14px;
-    font-weight:700; font-size:11.5px; cursor:pointer;
-  }
-  .btn-edit{ background:none; border:1px solid var(--line); color:var(--ink-soft); }
-  .btn-edit:active{ background:var(--paper); }
-  .btn-delete{ background:none; border:1px solid var(--line); color:var(--burgundy-deep); }
-  .btn-delete:active{ background:#F6EDEE; }
 
   .empty{ padding:36px 20px; text-align:center; font-size:13px; color:var(--ink-soft); }
 
@@ -227,11 +231,6 @@
     background:none; border:1px solid var(--line); color:var(--ink-soft);
   }
   .btn-type-delete{ color:var(--burgundy-deep); }
-
-  /* ---------- Attendance roster button ---------- */
-  .event-actions{ flex-wrap:wrap; row-gap:6px; }
-  .btn-roster{ background:none; border:1px solid var(--line); color:var(--brass-deep); }
-  .btn-roster:active{ background:var(--paper); }
 
   /* ---------- 出缺席名單 Bottom Sheet ---------- */
   .sheet-overlay{
@@ -258,7 +257,29 @@
     display:flex; align-items:center; justify-content:center;
   }
   .sheet-close:active{ background:var(--paper); }
+  .sheet-tabs{ display:flex; gap:8px; padding:12px 20px 0; }
+  .sheet-tab{
+    flex:1; text-align:center; padding:8px 4px; border-radius:var(--radius-sm);
+    border:1px solid var(--line); background:var(--paper); color:var(--ink-soft);
+    font-size:12.5px; font-weight:700; cursor:pointer;
+  }
+  .sheet-tab.active{ background:var(--ink); color:#F2EFE5; border-color:var(--ink); }
+  .sheet-tab.disabled{ opacity:.42; cursor:default; }
   .sheet-body{ overflow-y:auto; padding:14px 20px 8px; }
+
+  /* ---------- 活動資訊：唯讀檢視 + 編輯觸發 ---------- */
+  .info-row{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:9px 0; font-size:13px; border-bottom:1px solid var(--line); }
+  .info-row .k{ flex:none; color:var(--ink-soft); font-family:'Roboto Mono',monospace; font-size:10px; letter-spacing:.05em; }
+  .info-row .v{ font-weight:500; color:var(--ink); text-align:right; }
+  .info-edit-btn{
+    margin-top:14px; border:1px solid var(--line); background:var(--paper); color:var(--brass-deep);
+    border-radius:999px; padding:8px 18px; font-size:12.5px; font-weight:700; cursor:pointer;
+  }
+  .info-edit-btn:active{ background:var(--sage-bg); }
+  .create-success{
+    margin-bottom:12px; background:var(--sage-bg); color:var(--sage);
+    border-radius:var(--radius-sm); padding:9px 12px; font-size:12px; font-weight:600;
+  }
   .sheet-footer{
     display:flex; gap:10px;
     padding:14px 20px calc(14px + env(safe-area-inset-bottom));
@@ -340,6 +361,17 @@
   }
   .survey-edit-actions .btn-save{ background:var(--brass); color:var(--ink); border:none; }
   .survey-edit-actions .btn-save:disabled{ opacity:.5; }
+
+  .soon-toast{
+    position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom));
+    transform:translate(-50%,8px);
+    background:var(--ink); color:var(--paper);
+    font-family:'Noto Sans TC',sans-serif; font-size:12px; font-weight:600;
+    padding:8px 16px; border-radius:999px;
+    opacity:0; pointer-events:none; z-index:90;
+    transition:opacity .2s ease, transform .2s ease;
+  }
+  .soon-toast.show{ opacity:1; transform:translate(-50%,0); }
 </style>
 </head>
 <body>
@@ -394,58 +426,71 @@
   </div>
 
   <div class="section-label">
-    <span class="tw" id="formTitle">建立活動</span>
-    <span class="en">Events</span>
-  </div>
-
-  <form class="card" id="eventForm">
-    <div class="field">
-      <label>活動標題</label>
-      <input type="text" id="eventTitle" placeholder="例如：團練、重奏演出" required>
-    </div>
-    <div class="field">
-      <label>類型</label>
-      <select id="eventType"></select>
-    </div>
-    <div class="field">
-      <label>日期</label>
-      <input type="date" id="eventDate" required>
-    </div>
-    <div class="field-checkbox">
-      <input type="checkbox" id="eventAllDay">
-      <label for="eventAllDay">全天活動（無明確開始/結束時間點）</label>
-    </div>
-    <div class="field-row" id="eventTimeFields">
-      <div class="field">
-        <label>開始時間</label>
-        <input type="time" id="eventStartTime">
-      </div>
-      <div class="field">
-        <label>結束時間（選填）</label>
-        <input type="time" id="eventEndTime">
-      </div>
-    </div>
-    <div class="field">
-      <label>地點</label>
-      <input type="text" id="eventLocation" placeholder="例如：體育館一樓-舞台">
-    </div>
-    <p class="form-error" id="eventFormError"></p>
-    <div class="form-buttons">
-      <button type="submit" class="cta-btn" id="eventSubmitBtn">建立活動</button>
-      <button type="button" class="cancel-btn hidden" id="eventCancelBtn">取消</button>
-    </div>
-  </form>
-
-  <div class="section-label">
     <span class="tw">所有活動</span>
     <span class="en">All Events</span>
+    <button type="button" class="add-btn" id="createEventBtn">＋ 建立活動</button>
   </div>
 
   <div class="list" id="eventList"></div>
 
 </div>
 
-<!-- 出缺席名單 Bottom Sheet -->
+<!-- 建立活動 Bottom Sheet：點「所有活動」旁的＋按鈕開啟。#eventForm 這個 DOM 節點預設就放在
+     #createFormSlot 裡，編輯既有活動時會被暫時搬到活動明細 sheet 的「活動資訊」分頁用 -->
+<div class="sheet-overlay" id="createSheetOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button type="button" class="sheet-close" id="createSheetClose" aria-label="關閉">×</button>
+      <div class="name">建立活動</div>
+    </div>
+    <div class="sheet-body">
+      <p class="create-success hidden" id="createSuccessMsg"></p>
+      <div id="createFormSlot">
+        <form id="eventForm">
+          <div class="field">
+            <label>活動標題</label>
+            <input type="text" id="eventTitle" placeholder="例如：團練、重奏演出" required>
+          </div>
+          <div class="field">
+            <label>類型</label>
+            <select id="eventType"></select>
+          </div>
+          <div class="field">
+            <label>日期</label>
+            <input type="date" id="eventDate" required>
+          </div>
+          <div class="field-checkbox">
+            <input type="checkbox" id="eventAllDay">
+            <label for="eventAllDay">全天活動（無明確開始/結束時間點）</label>
+          </div>
+          <div class="field-row" id="eventTimeFields">
+            <div class="field">
+              <label>開始時間</label>
+              <input type="time" id="eventStartTime">
+            </div>
+            <div class="field">
+              <label>結束時間（選填）</label>
+              <input type="time" id="eventEndTime">
+            </div>
+          </div>
+          <div class="field">
+            <label>地點</label>
+            <input type="text" id="eventLocation" placeholder="例如：體育館一樓-舞台">
+          </div>
+          <p class="form-error" id="eventFormError"></p>
+          <div class="form-buttons">
+            <button type="submit" class="cta-btn" id="eventSubmitBtn">建立活動</button>
+            <button type="button" class="cancel-btn hidden" id="eventCancelBtn">取消</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 活動明細 Bottom Sheet：活動資訊/出缺席/簽到三個分頁。「活動資訊」預設是唯讀摘要，
+     點「編輯」才把 #eventForm 這個 DOM 節點搬進來用（不是複製一份表單） -->
 <div class="sheet-overlay" id="rosterSheetOverlay">
   <div class="sheet">
     <div class="sheet-handle"></div>
@@ -454,23 +499,42 @@
       <div class="name" id="rosterSheetTitle">—</div>
       <div class="account" id="rosterSheetMeta">—</div>
     </div>
-    <div class="sheet-body">
-      <div class="survey-section-label" id="rosterCounterLabel">應到名單</div>
-      <div class="survey-bulk-row">
-        <button type="button" id="rosterSelectAllBtn">全選</button>
-        <button type="button" id="rosterClearAllBtn">全部取消</button>
-      </div>
-      <div class="check-list" id="rosterChecklist"></div>
-
-      <div class="survey-section-label">回報狀況</div>
-      <div id="rosterReportsSlot"><div class="survey-empty">載入中…</div></div>
+    <div class="sheet-tabs">
+      <button type="button" class="sheet-tab" id="tabInfo">活動資訊</button>
+      <button type="button" class="sheet-tab active" id="tabAttendance">出缺席</button>
+      <button type="button" class="sheet-tab disabled" id="tabCheckin">簽到</button>
     </div>
-    <div class="sheet-footer">
+    <div class="sheet-body">
+      <div id="sheetInfoTab" class="hidden">
+        <div id="infoViewMode">
+          <div class="info-row"><span class="k">類型</span><span class="v" id="infoType">—</span></div>
+          <div class="info-row"><span class="k">日期</span><span class="v" id="infoDate">—</span></div>
+          <div class="info-row"><span class="k">時間</span><span class="v" id="infoTime">—</span></div>
+          <div class="info-row"><span class="k">地點</span><span class="v" id="infoLocation">—</span></div>
+          <button type="button" class="info-edit-btn" id="infoEditBtn">✎ 編輯</button>
+        </div>
+        <div id="infoEditMode" class="hidden"></div>
+      </div>
+      <div id="sheetAttendanceTab">
+        <div class="survey-section-label" id="rosterCounterLabel">應到名單</div>
+        <div class="survey-bulk-row">
+          <button type="button" id="rosterSelectAllBtn">全選</button>
+          <button type="button" id="rosterClearAllBtn">全部取消</button>
+        </div>
+        <div class="check-list" id="rosterChecklist"></div>
+
+        <div class="survey-section-label">回報狀況</div>
+        <div id="rosterReportsSlot"><div class="survey-empty">載入中…</div></div>
+      </div>
+    </div>
+    <div class="sheet-footer" id="rosterFooter">
       <button type="button" class="cta-btn cta-btn-secondary" id="rosterCancelBtn">關閉</button>
       <button type="button" class="cta-btn" id="rosterSaveBtn" disabled>儲存名單變更</button>
     </div>
   </div>
 </div>
+
+<div class="soon-toast" id="soonToast">即將推出</div>
 
 <script type="module">
   import { requireAdmin, peekCachedProfile } from './auth-guard.js';
@@ -542,10 +606,10 @@
   }
 
   var eventForm = document.getElementById('eventForm');
+  var activeSheetTab = 'attendance'; // 'info' | 'attendance'，決定活動明細 sheet 目前顯示哪個分頁
   var eventFormError = document.getElementById('eventFormError');
   var eventSubmitBtn = document.getElementById('eventSubmitBtn');
   var eventCancelBtn = document.getElementById('eventCancelBtn');
-  var formTitle = document.getElementById('formTitle');
   var eventList = document.getElementById('eventList');
   eventList.innerHTML = SKELETON_ROWS_HTML(3);
   document.getElementById('typesList').innerHTML = SKELETON_ROWS_HTML(2);
@@ -581,12 +645,13 @@
     document.getElementById('eventEndTime').value = '';
   }
 
+  // 純粹重置欄位/按鈕狀態，不處理 eventForm 這個 DOM 節點目前在哪裡——
+  // 節點該搬去哪裡由呼叫端（openCreateSheet／infoEditBtn 等）自己決定
   function enterCreateMode(){
     editingId = null;
     eventForm.reset();
     setDefaultEventDate();
     updateTimeFieldsVisibility();
-    formTitle.textContent = '建立活動';
     eventSubmitBtn.disabled = false;
     eventSubmitBtn.textContent = '建立活動';
     eventCancelBtn.classList.add('hidden');
@@ -605,15 +670,16 @@
     document.getElementById('eventEndTime').value = evt.endTime ? toTimeValue(evt.endTime) : '';
     document.getElementById('eventLocation').value = evt.location || '';
     updateTimeFieldsVisibility();
-    formTitle.textContent = '編輯活動';
     eventSubmitBtn.disabled = false;
     eventSubmitBtn.textContent = '儲存變更';
     eventCancelBtn.classList.remove('hidden');
     showEventFormError('');
-    eventForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  eventCancelBtn.addEventListener('click', enterCreateMode);
+  eventCancelBtn.addEventListener('click', function(){
+    enterCreateMode();
+    showInfoView(); // 取消編輯時回到活動資訊分頁的唯讀畫面（這個按鈕只會在編輯狀態下出現，一定是在活動明細 sheet 裡點的）
+  });
 
   eventForm.addEventListener('submit', function(e){
     e.preventDefault();
@@ -632,8 +698,10 @@
       return;
     }
 
+    var wasEditing = !!editingId;
+    var editingEventId = editingId;
     eventSubmitBtn.disabled = true;
-    eventSubmitBtn.textContent = editingId ? '儲存中…' : '建立中…';
+    eventSubmitBtn.textContent = wasEditing ? '儲存中…' : '建立中…';
 
     var payload = {
       title: title,
@@ -644,20 +712,49 @@
       location: location
     };
 
-    var task = editingId
-      ? updateDoc(doc(db, 'events', editingId), payload)
+    var task = wasEditing
+      ? updateDoc(doc(db, 'events', editingEventId), payload)
       : addDoc(collection(db, 'events'), Object.assign({}, payload, {
           createdBy: currentAdminUid,
           createdAt: serverTimestamp()
         }));
 
     task.then(function(){
-      enterCreateMode();
+      if (wasEditing){
+        // 編輯是在活動明細 sheet 裡做的，存完回到「活動資訊」分頁的唯讀畫面，不關掉整個 sheet
+        enterCreateMode();
+        showInfoView();
+      } else {
+        // 建立活動的 sheet 存完不關閉，清空欄位、顯示成功提示，方便連續新增多筆
+        enterCreateMode();
+        document.getElementById('createSuccessMsg').textContent = '已建立「' + title + '」，可以繼續新增';
+        document.getElementById('createSuccessMsg').classList.remove('hidden');
+      }
     }).catch(function(error){
       eventSubmitBtn.disabled = false;
-      eventSubmitBtn.textContent = editingId ? '儲存變更' : '建立活動';
+      eventSubmitBtn.textContent = wasEditing ? '儲存變更' : '建立活動';
       showEventFormError('操作失敗（' + error.code + '）');
     });
+  });
+
+  // ---------- 建立活動 Bottom Sheet ----------
+  var createSheetOverlay = document.getElementById('createSheetOverlay');
+
+  function openCreateSheet(){
+    document.getElementById('createFormSlot').appendChild(eventForm);
+    enterCreateMode();
+    document.getElementById('createSuccessMsg').classList.add('hidden');
+    createSheetOverlay.classList.add('active');
+  }
+
+  function closeCreateSheet(){
+    createSheetOverlay.classList.remove('active');
+  }
+
+  document.getElementById('createEventBtn').addEventListener('click', openCreateSheet);
+  document.getElementById('createSheetClose').addEventListener('click', closeCreateSheet);
+  createSheetOverlay.addEventListener('click', function(e){
+    if (e.target === createSheetOverlay) closeCreateSheet();
   });
 
   function formatEventTime(evt){
@@ -673,6 +770,16 @@
     var t = eventTypesById[typeId];
     var label = t ? t.label : typeId;
     return '<span class="kind" style="' + badgeStyle(t ? t.colorKey : null) + '">' + label + '</span>';
+  }
+
+  function typeLabelText(typeId){
+    var t = eventTypesById[typeId];
+    return t ? t.label : typeId;
+  }
+
+  function infoDateText(evt){
+    if (!evt.date) return '未定';
+    return (evt.date.getMonth() + 1) + '/' + evt.date.getDate();
   }
 
   // 網路壅塞等原因導致監聽失敗時呼叫，清掉骨架屏並明確告知，不要讓畫面卡住不動
@@ -698,39 +805,35 @@
       var evt = eventsById[eventId];
       var d = evt.date;
       var roster = rostersById[eventId];
-      var rosterLabel = roster ? ('出缺席名單（' + roster.members.length + ' 人）') : '設定出缺席名單';
+      var rosterMeta = roster ? ('名單 ' + roster.members.length + ' 人') : '尚未建立名單';
       return (
         '<div class="event-item" data-event="' + eventId + '">' +
-          '<div class="event-top">' +
-            '<div class="event-date">' +
-              '<div class="d">' + (d ? d.getDate() : '—') + '</div>' +
-              '<div class="m">' + (d ? (d.getMonth() + 1) + '月' : '') + '</div>' +
+          '<button type="button" class="event-open" data-open-event="' + eventId + '">' +
+            '<div class="event-top">' +
+              '<div class="event-date">' +
+                '<div class="d">' + (d ? d.getDate() : '—') + '</div>' +
+                '<div class="m">' + (d ? (d.getMonth() + 1) + '月' : '') + '</div>' +
+              '</div>' +
+              '<div class="event-body">' +
+                '<div class="event-title">' + evt.title + typeBadge(evt.type) + '</div>' +
+                '<div class="event-meta">' + formatEventTime(evt) + (evt.location ? ' · ' + evt.location : '') + ' · ' + rosterMeta + '</div>' +
+              '</div>' +
             '</div>' +
-            '<div class="event-body">' +
-              '<div class="event-title">' + evt.title + typeBadge(evt.type) + '</div>' +
-              '<div class="event-meta">' + formatEventTime(evt) + (evt.location ? ' · ' + evt.location : '') + '</div>' +
-            '</div>' +
-          '</div>' +
-          '<div class="event-actions">' +
-            '<button type="button" class="btn-edit" data-edit="' + eventId + '">編輯</button>' +
-            '<button type="button" class="btn-roster" data-open-roster="' + eventId + '">' + rosterLabel + '</button>' +
-            '<button type="button" class="btn-delete" data-delete="' + eventId + '">刪除</button>' +
-          '</div>' +
+          '</button>' +
+          '<button type="button" class="btn-delete-icon" data-delete="' + eventId + '" aria-label="刪除活動">' +
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0-1 13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+          '</button>' +
         '</div>'
       );
     }).join('');
   }
 
   eventList.addEventListener('click', function(e){
-    var editBtn = e.target.closest('[data-edit]');
+    var openBtn = e.target.closest('[data-open-event]');
     var deleteBtn = e.target.closest('[data-delete]');
-    var rosterBtn = e.target.closest('[data-open-roster]');
 
-    if (editBtn){
-      enterEditMode(editBtn.getAttribute('data-edit'));
-    }
-    if (rosterBtn){
-      openRosterSheet(rosterBtn.getAttribute('data-open-roster'));
+    if (openBtn){
+      openRosterSheet(openBtn.getAttribute('data-open-event'));
     }
     if (deleteBtn){
       var eventId = deleteBtn.getAttribute('data-delete');
@@ -769,6 +872,48 @@
   var rosterCounterLabel = document.getElementById('rosterCounterLabel');
   var rosterSaveBtn = document.getElementById('rosterSaveBtn');
   var rosterReportsSlot = document.getElementById('rosterReportsSlot');
+
+  // 三個分頁目前只有「出缺席」有內容，「活動資訊」預設唯讀、點編輯才把 eventForm 搬進來，「簽到」還沒做（見 tabCheckin 的 soon-toast）
+  function setSheetTab(tab){
+    activeSheetTab = tab;
+    document.getElementById('tabInfo').classList.toggle('active', tab === 'info');
+    document.getElementById('tabAttendance').classList.toggle('active', tab === 'attendance');
+    document.getElementById('sheetInfoTab').classList.toggle('hidden', tab !== 'info');
+    document.getElementById('sheetAttendanceTab').classList.toggle('hidden', tab !== 'attendance');
+    document.getElementById('rosterFooter').classList.toggle('hidden', tab !== 'attendance');
+  }
+
+  // 「活動資訊」分頁一律先顯示唯讀摘要，不會一點開就進編輯狀態；正在編輯中途切走再切回來
+  // 也會回到唯讀畫面（放棄還沒存檔的草稿），行為單純、可預期
+  function showInfoView(){
+    document.getElementById('infoViewMode').classList.remove('hidden');
+    document.getElementById('infoEditMode').classList.add('hidden');
+    var evt = eventsById[openRosterEventId];
+    if (!evt) return;
+    document.getElementById('infoType').textContent = typeLabelText(evt.type);
+    document.getElementById('infoDate').textContent = infoDateText(evt);
+    document.getElementById('infoTime').textContent = formatEventTime(evt) || '未定';
+    document.getElementById('infoLocation').textContent = evt.location || '未填寫';
+  }
+
+  document.getElementById('tabInfo').addEventListener('click', function(){
+    if (!openRosterEventId) return;
+    if (editingId) enterCreateMode(); // 放棄任何還沒存檔的編輯草稿
+    showInfoView();
+    setSheetTab('info');
+  });
+
+  document.getElementById('tabAttendance').addEventListener('click', function(){
+    setSheetTab('attendance');
+  });
+
+  document.getElementById('infoEditBtn').addEventListener('click', function(){
+    if (!openRosterEventId) return;
+    document.getElementById('infoEditMode').appendChild(eventForm);
+    enterEditMode(openRosterEventId);
+    document.getElementById('infoViewMode').classList.add('hidden');
+    document.getElementById('infoEditMode').classList.remove('hidden');
+  });
 
   async function ensureApprovedMembers(){
     if (approvedMembers) return approvedMembers;
@@ -810,7 +955,11 @@
   async function openRosterSheet(eventId){
     var evt = eventsById[eventId];
     if (!evt) return;
+    // 保險：萬一還留著上一場活動沒存檔的編輯狀態，開新的 sheet 前先清掉
+    if (editingId) enterCreateMode();
     openRosterEventId = eventId;
+    showInfoView(); // 預設先顯示「活動資訊」分頁的唯讀摘要，不是「出缺席」
+    setSheetTab('info');
     editingReportUid = null;
     reportEditDraft = null;
     document.getElementById('rosterSheetTitle').textContent = evt.title;
@@ -835,6 +984,7 @@
 
   function closeRosterSheet(){
     rosterSheetOverlay.classList.remove('active');
+    if (editingId) enterCreateMode(); // 關閉時放棄還沒存檔的活動資訊編輯
     openRosterEventId = null;
     rosterDraftSet = null;
     editingReportUid = null;
@@ -888,6 +1038,16 @@
     if (e.target === rosterSheetOverlay) closeRosterSheet();
   });
 
+
+  // 「簽到」分頁還沒做（簽到管理併入活動管理是之後才排的工程），先反灰＋提示「即將推出」
+  var soonToast = document.getElementById('soonToast');
+  var soonTimer = null;
+  document.getElementById('tabCheckin').addEventListener('click', function(){
+    if (soonTimer) clearTimeout(soonTimer);
+    soonToast.classList.add('show');
+    soonTimer = setTimeout(function(){ soonToast.classList.remove('show'); }, 1500);
+  });
+
   async function loadReports(eventId){
     try {
       var snap = await getDocs(query(collection(db, 'attendanceReports'), where('eventId', '==', eventId)));
@@ -906,7 +1066,7 @@
           '<button type="button" class="status-chip-btn attending' + (draft.status === 'attending' ? ' selected' : '') + '" data-edit-status="attending">出席</button>' +
           '<button type="button" class="status-chip-btn leave' + (draft.status === 'leave' ? ' selected' : '') + '" data-edit-status="leave">請假</button>' +
         '</div>' +
-        '<textarea data-edit-reason placeholder="請假原因">' + escapeHtml(draft.reason) + '</textarea>' +
+        '<textarea data-edit-reason placeholder="請假原因（選填）">' + escapeHtml(draft.reason) + '</textarea>' +
         '<div class="survey-edit-actions">' +
           '<button type="button" data-edit-cancel>取消</button>' +
           '<button type="button" class="btn-save" data-edit-save="' + r.uid + '">儲存</button>' +
@@ -1006,10 +1166,6 @@
     if (saveBtn){
       var uid = saveBtn.getAttribute('data-edit-save');
       var reason = reportEditDraft.reason.trim();
-      if (reportEditDraft.status === 'leave' && !reason){
-        alert('請填寫請假原因');
-        return;
-      }
       var eventId = openRosterEventId;
       saveBtn.disabled = true;
       setDoc(doc(db, 'attendanceReports', eventId + '_' + uid), {
