@@ -184,6 +184,48 @@ export async function requireAdmin() {
   return { uid: user.uid, profile: profile };
 }
 
+// 指揮專用頁面（conductor-admin.html）用：必須登入、審核通過，角色是幹部/擁有者「或」指揮。
+// 刻意跟 requireAdmin() 分開、不共用同一個函式改參數判斷——這個放寬只給這一個新頁面用，
+// 不影響既有七個 admin-only 後台頁面的守門邏輯
+export async function requireAdminOrConductor() {
+  var user = await waitForAuthUser();
+  if (!user) {
+    clearProfileCache();
+    goToLogin();
+    return null;
+  }
+
+  var allowedRoles = ["admin", "owner", "conductor"];
+
+  var profile;
+  try {
+    profile = await resolveProfile(user.uid, function (fresh) {
+      if (!fresh || fresh.status !== "approved") {
+        clearProfileCache();
+        signOut(auth).then(goToLogin);
+      } else if (allowedRoles.indexOf(fresh.role) === -1) {
+        clearProfileCache();
+        location.href = "index.html";
+      }
+    });
+  } catch (e) {
+    showConnectionError();
+    return null;
+  }
+
+  if (!profile || profile.status !== "approved") {
+    clearProfileCache();
+    await signOut(auth);
+    goToLogin();
+    return null;
+  }
+  if (allowedRoles.indexOf(profile.role) === -1) {
+    location.href = "index.html";
+    return null;
+  }
+  return { uid: user.uid, profile: profile };
+}
+
 export async function logout() {
   clearProfileCache();
   await signOut(auth);

@@ -196,6 +196,9 @@
   }
   .field-row{ display:flex; gap:10px; }
   .field-row .field{ flex:1; min-width:0; margin-top:12px; }
+  .field-checkbox{ margin-top:12px; display:flex; align-items:center; gap:8px; }
+  .field-checkbox input{ width:16px; height:16px; accent-color:var(--brass-deep); }
+  .field-checkbox label{ font-size:13px; font-weight:500; color:var(--ink); }
 
   .role-picker{ display:flex; gap:8px; }
   .role-chip{
@@ -267,6 +270,10 @@
     color:var(--ink-soft); cursor:pointer; font-size:15px; line-height:1;
   }
   .inst-remove:active{ color:var(--burgundy-deep); }
+  .seat-row-input{
+    flex:none; width:38px; text-align:center; font-size:12px; padding:4px 2px;
+    border:1px solid var(--line); border-radius:6px; background:var(--paper); color:var(--ink);
+  }
 
   .empty{ padding:36px 20px; text-align:center; font-size:13px; color:var(--ink-soft); }
 </style>
@@ -329,6 +336,47 @@
 
   <div class="list" id="instList"></div>
 
+  <div id="seatSectionWrap" class="hidden">
+    <div class="section-label">
+      <span class="tw">座位圖分區設定</span>
+      <span class="en">Seating Chart</span>
+    </div>
+    <p class="lede">指揮頁面座位圖用，決定哪個分區對應哪個樂器、在第幾排、同排內的左右順序跟寬度。「排」是離指揮的遠近，1 是最靠近指揮那排，數字越大越後排；「寬度權重」預設 1（同排平均分配），數字越大這塊佔的角度越寬；同一個樂器可以新增多個分區（例如分兩排坐）。</p>
+
+    <form class="card" id="seatForm">
+      <div class="field-row">
+        <div class="field">
+          <label>對應樂器</label>
+          <select id="seatInstrument"></select>
+        </div>
+        <div class="field">
+          <label>第幾排</label>
+          <input type="number" id="seatRow" min="1" value="1">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>分區文字（選填）</label>
+          <input type="text" id="seatLabel" placeholder="例如：單簧管（第一排）">
+        </div>
+        <div class="field">
+          <label>寬度權重</label>
+          <input type="number" id="seatWeight" min="1" value="1">
+        </div>
+      </div>
+      <div class="field-checkbox">
+        <input type="checkbox" id="seatPercussion">
+        <label for="seatPercussion">打擊樂矩形區塊（固定在最後方，不用選排數/權重）</label>
+      </div>
+      <p class="form-error" id="seatFormError"></p>
+      <div class="form-buttons">
+        <button type="submit" class="cta-btn">新增分區</button>
+      </div>
+    </form>
+
+    <div class="list" id="seatList"></div>
+  </div>
+
 </div>
 
 <!-- 成員編輯 Bottom Sheet -->
@@ -353,6 +401,7 @@
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { subscribeInstruments, addInstrument, removeInstrument, setInstrumentsOrder, FAMILY_LABELS, FAMILY_ORDER } from './instruments.js';
+  import { subscribeSeatingSections, setSeatingSections } from './seating-chart.js';
   import {
     collection, query, where, onSnapshot, doc, updateDoc
   } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
@@ -377,6 +426,14 @@
     );
   }).join('');
 
+  var SEAT_SKELETON_HTML = [1, 2, 3].map(function(){
+    return (
+      '<div class="inst-row">' +
+        '<span class="skel skel-bar" style="width:40%;height:13px;"></span>' +
+      '</div>'
+    );
+  }).join('');
+
   var ROLE_LABELS = { member: '團員', conductor: '指揮', admin: '管理員', owner: 'Owner' };
   var ROLE_WEIGHT = { owner: 0, admin: 1, conductor: 2, member: 3 };
   var PERMISSION_DEFS = [
@@ -390,6 +447,8 @@
   var membersLoaded = false;
   var instrumentsList = [];
   var instrumentsLoaded = false;
+  var seatSectionsList = [];
+  var seatSectionsLoaded = false;
   var openMemberId = null;
   var currentAdminUid = null;
   var draftRole = null;
@@ -413,11 +472,16 @@
   var instForm = document.getElementById('instForm');
   var instFormError = document.getElementById('instFormError');
   var instList = document.getElementById('instList');
+  var seatForm = document.getElementById('seatForm');
+  var seatFormError = document.getElementById('seatFormError');
+  var seatList = document.getElementById('seatList');
+  var seatInstrumentSelect = document.getElementById('seatInstrument');
   var memberSheetOverlay = document.getElementById('memberSheetOverlay');
   var memberSheetBody = document.getElementById('memberSheetBody');
   var saveMemberBtn = document.getElementById('saveMemberBtn');
   memberList.innerHTML = MEMBER_SKELETON_HTML;
   instList.innerHTML = INST_SKELETON_HTML;
+  seatList.innerHTML = SEAT_SKELETON_HTML;
 
   var cachedProfile = peekCachedProfile();
   if (cachedProfile && cachedProfile.name){
@@ -429,6 +493,11 @@
   function showInstError(message){
     instFormError.textContent = message;
     instFormError.classList.toggle('show', !!message);
+  }
+
+  function showSeatError(message){
+    seatFormError.textContent = message;
+    seatFormError.classList.toggle('show', !!message);
   }
 
   // 網路壅塞等原因導致監聽失敗時呼叫，清掉骨架屏並明確告知，不要讓畫面卡住不動
@@ -751,6 +820,172 @@
     });
   });
 
+  // ---------- 座位圖分區設定 ----------
+  // 下拉選單的樂器選項要跟著 instrumentsList 一起更新（在 subscribeInstruments 的回呼裡一併呼叫）
+  function renderSeatInstrumentOptions(){
+    var current = seatInstrumentSelect.value;
+    seatInstrumentSelect.innerHTML = instrumentsList.map(function(inst){
+      return '<option value="' + inst.name + '">' + inst.name + '</option>';
+    }).join('');
+    if (current && instrumentsList.some(function(i){ return i.name === current; })){
+      seatInstrumentSelect.value = current;
+    }
+  }
+
+  function renderSeatSectionsError(){
+    seatList.innerHTML = '<div class="empty">讀取失敗，請重新整理再試一次</div>';
+  }
+
+  // 分區清單依「排」分組顯示（percussion 各自獨立一組，永遠排在最後，因為不參與排數），
+  // 群組內的上下移動只在同一排內交換相鄰兩項，做法比照 moveInstrument() 依家族分組的邏輯，
+  // 分組鍵從「家族」換成「排數」
+  function seatGroupKey(sec){
+    return sec.percussion ? 'percussion' : ('row:' + sec.row);
+  }
+
+  function renderSeatSections(){
+    if (!seatSectionsLoaded){
+      seatList.innerHTML = SEAT_SKELETON_HTML;
+      return;
+    }
+    if (seatSectionsList.length === 0){
+      seatList.innerHTML = '<div class="empty">目前沒有任何分區</div>';
+      return;
+    }
+    var byGroup = {};
+    seatSectionsList.forEach(function(sec, idx){
+      var key = seatGroupKey(sec);
+      if (!byGroup[key]) byGroup[key] = [];
+      byGroup[key].push(idx);
+    });
+    var rowKeys = Object.keys(byGroup).filter(function(k){ return k !== 'percussion'; })
+      .sort(function(a, b){ return Number(a.split(':')[1]) - Number(b.split(':')[1]); });
+    if (byGroup.percussion) rowKeys.push('percussion');
+
+    seatList.innerHTML = rowKeys.map(function(key){
+      var idxs = byGroup[key];
+      var groupLabel = key === 'percussion' ? '打擊樂區塊' : ('第 ' + key.split(':')[1] + ' 排');
+      return (
+        '<div class="inst-group-label">' + groupLabel + '</div>' +
+        idxs.map(function(idx, i){
+          var sec = seatSectionsList[idx];
+          var isFirst = i === 0;
+          var isLast = i === idxs.length - 1;
+          var displayName = sec.label || sec.instrumentName;
+          var rowInputHtml = sec.percussion ? '' :
+            '<input type="number" class="seat-row-input" min="1" value="' + sec.row + '" data-seat-row-input="' + idx + '" aria-label="調整排數" title="第幾排">';
+          var weightInputHtml = sec.percussion ? '' :
+            '<input type="number" class="seat-row-input" min="1" value="' + (sec.weight || 1) + '" data-seat-weight-input="' + idx + '" aria-label="調整寬度權重" title="寬度權重">';
+          return (
+            '<div class="inst-row">' +
+              '<span class="inst-name">' + displayName + '</span>' +
+              rowInputHtml +
+              weightInputHtml +
+              '<div class="inst-move">' +
+                '<button type="button" class="inst-move-btn" data-seat-up="' + idx + '"' + (isFirst ? ' disabled' : '') + ' aria-label="上移">▲</button>' +
+                '<button type="button" class="inst-move-btn" data-seat-down="' + idx + '"' + (isLast ? ' disabled' : '') + ' aria-label="下移">▼</button>' +
+              '</div>' +
+              '<button type="button" class="inst-remove" data-seat-remove="' + idx + '" aria-label="刪除">×</button>' +
+            '</div>'
+          );
+        }).join('')
+      );
+    }).join('');
+  }
+
+  function moveSeatSection(idx, direction){
+    var sec = seatSectionsList[idx];
+    if (!sec) return;
+    var key = seatGroupKey(sec);
+    var groupIdxs = [];
+    seatSectionsList.forEach(function(item, i){ if (seatGroupKey(item) === key) groupIdxs.push(i); });
+    var pos = groupIdxs.indexOf(idx);
+    var swapPos = direction === 'up' ? pos - 1 : pos + 1;
+    if (swapPos < 0 || swapPos >= groupIdxs.length) return;
+    var otherIdx = groupIdxs[swapPos];
+
+    var newList = seatSectionsList.slice();
+    var tmp = newList[idx];
+    newList[idx] = newList[otherIdx];
+    newList[otherIdx] = tmp;
+    setSeatingSections(db, newList).catch(function(err){
+      alert('調整順序失敗：' + err.code);
+    });
+  }
+
+  function changeSeatSectionRow(idx, newRow){
+    var sec = seatSectionsList[idx];
+    if (!sec || sec.percussion) return;
+    if (!newRow || newRow < 1) return;
+    var newList = seatSectionsList.slice();
+    newList[idx] = Object.assign({}, sec, { row: newRow });
+    setSeatingSections(db, newList).catch(function(err){
+      alert('調整排數失敗：' + err.code);
+    });
+  }
+
+  function changeSeatSectionWeight(idx, newWeight){
+    var sec = seatSectionsList[idx];
+    if (!sec || sec.percussion) return;
+    if (!newWeight || newWeight < 1) return;
+    var newList = seatSectionsList.slice();
+    newList[idx] = Object.assign({}, sec, { weight: newWeight });
+    setSeatingSections(db, newList).catch(function(err){
+      alert('調整寬度權重失敗：' + err.code);
+    });
+  }
+
+  seatForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    var instrumentName = seatInstrumentSelect.value;
+    if (!instrumentName){
+      showSeatError('請先在上面新增至少一個樂器');
+      return;
+    }
+    showSeatError('');
+    var isPercussion = document.getElementById('seatPercussion').checked;
+    var newSection = {
+      zoneId: 'z' + Date.now(),
+      instrumentName: instrumentName,
+      label: document.getElementById('seatLabel').value.trim(),
+      percussion: isPercussion,
+      row: isPercussion ? null : Math.max(1, Number(document.getElementById('seatRow').value) || 1),
+      weight: isPercussion ? null : Math.max(1, Number(document.getElementById('seatWeight').value) || 1)
+    };
+    setSeatingSections(db, seatSectionsList.concat([newSection])).then(function(){
+      seatForm.reset();
+    }).catch(function(err){
+      showSeatError('新增失敗（' + err.code + '）');
+    });
+  });
+
+  seatList.addEventListener('click', function(e){
+    var upBtn = e.target.closest('[data-seat-up]');
+    var downBtn = e.target.closest('[data-seat-down]');
+    if (upBtn){ moveSeatSection(Number(upBtn.getAttribute('data-seat-up')), 'up'); return; }
+    if (downBtn){ moveSeatSection(Number(downBtn.getAttribute('data-seat-down')), 'down'); return; }
+
+    var btn = e.target.closest('[data-seat-remove]');
+    if (!btn) return;
+    var idx = Number(btn.getAttribute('data-seat-remove'));
+    var target = seatSectionsList[idx];
+    if (!target) return;
+    var ok = confirm('確定要刪除這個分區嗎？');
+    if (!ok) return;
+    var newList = seatSectionsList.slice();
+    newList.splice(idx, 1);
+    setSeatingSections(db, newList).catch(function(err){
+      alert('刪除失敗：' + err.code);
+    });
+  });
+
+  seatList.addEventListener('change', function(e){
+    var rowInput = e.target.closest('[data-seat-row-input]');
+    if (rowInput){ changeSeatSectionRow(Number(rowInput.getAttribute('data-seat-row-input')), Number(rowInput.value)); return; }
+    var weightInput = e.target.closest('[data-seat-weight-input]');
+    if (weightInput){ changeSeatSectionWeight(Number(weightInput.getAttribute('data-seat-weight-input')), Number(weightInput.value)); return; }
+  });
+
   requireAdmin().then(function(result){
     if (!result) return;
 
@@ -789,7 +1024,19 @@
       instrumentsLoaded = true;
       renderInstruments();
       renderMembers();
+      renderSeatInstrumentOptions();
     }, true, renderInstrumentsError);
+
+    // 座位圖分區設定只有 Owner 看得到/能用（8/19 使用者要求暫時不開放其他人編輯座位圖），
+    // 不是 Owner 就整個區塊連 DOM 都不顯示，也不去訂閱這份資料
+    if (!isOwner) return;
+    document.getElementById('seatSectionWrap').classList.remove('hidden');
+
+    subscribeSeatingSections(db, function(sections){
+      seatSectionsList = sections;
+      seatSectionsLoaded = true;
+      renderSeatSections();
+    }, true, renderSeatSectionsError);
   });
 </script>
 </body>

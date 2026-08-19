@@ -141,6 +141,7 @@
     padding:1.5px 6px; border-radius:5px; font-weight:600;
   }
   .event-meta{ margin-top:3px; font-size:11.5px; color:var(--ink-soft); }
+  .event-attendance{ margin-top:2px; font-size:11px; color:var(--ink-soft); }
   .stat-count{ flex:none; text-align:right; }
   .stat-count .num{ font-family:'Roboto Mono',monospace; font-weight:700; font-size:18px; color:var(--sage); }
   .stat-count .lbl{ font-size:9.5px; color:var(--ink-soft); margin-top:1px; }
@@ -191,6 +192,7 @@
     padding:8px 6px; text-align:center;
   }
   .sheet-summary-item .n{ font-family:'Roboto Mono',monospace; font-weight:700; font-size:15px; color:var(--sage); }
+  .sheet-summary-item .sub{ font-family:'Roboto Mono',monospace; font-size:9.5px; color:var(--ink-soft); margin-top:1px; }
   .sheet-summary-item .l{ font-size:9.5px; color:var(--ink-soft); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
   .sheet-group{ margin-top:16px; }
@@ -314,12 +316,38 @@
 
   // eventId -> [{ uid, name, account }]，跟頁面列表用同一次查詢的資料，點開分區明細不用再打一次 Firestore
   var checkinsByEvent = {};
+  // eventId -> { members: [uid...] }，出缺席調查的應到名單，沒建立過名單的活動不會有這個 key
+  var rostersByEvent = {};
+  // eventId -> [{ uid, name, account, status, reason }]，出缺席調查的團員回報
+  var reportsByEvent = {};
   // eventId -> 活動標題，開 sheet 時當標題用
   var eventTitleById = {};
   // uid -> { instruments }，approved 團員的樂器清單，第一次點開明細才抓、抓過快取
   var membersInstrumentsByUid = null;
   // settings/instruments 的清單（樂器名稱+分類），決定分區的順序，第一次點開明細才抓、抓過快取
   var instrumentsList = null;
+
+  // 沒有建立過應到名單的活動回傳 null（畫面顯示「未設定名單」，不硬算比例）；
+  // 有名單的話用 attendanceReports 算出席/請假，「未回報」＝名單裡但沒有對應回報的人
+  function computeAttendance(eventId){
+    var roster = rostersByEvent[eventId];
+    if (!roster) return null;
+    var reports = reportsByEvent[eventId] || [];
+    var reportedUids = {};
+    var attending = 0, leave = 0;
+    reports.forEach(function(r){
+      reportedUids[r.uid] = true;
+      if (r.status === 'attending') attending++;
+      else if (r.status === 'leave') leave++;
+    });
+    var notReported = roster.members.filter(function(uid){ return !reportedUids[uid]; }).length;
+    return { attending: attending, leave: leave, notReported: notReported };
+  }
+
+  function attendanceLabel(attendance){
+    if (!attendance) return '出缺席回報：未設定名單';
+    return '出缺席回報：出席 ' + attendance.attending + '・請假 ' + attendance.leave + '・未回報 ' + attendance.notReported;
+  }
 
   function renderRows(rows){
     if (rows.length === 0){
@@ -334,6 +362,7 @@
           '<div class="event-body">' +
             '<div class="event-title">' + evt.title + typeBadge(evt.type) + '</div>' +
             '<div class="event-meta">' + dateLabel + (evt.location ? ' · ' + evt.location : '') + '</div>' +
+            '<div class="event-attendance">' + attendanceLabel(evt.attendance) + '</div>' +
           '</div>' +
           '<div class="stat-count"><div class="num">' + evt.count + '</div><div class="lbl">人簽到</div></div>' +
         '</button>'
@@ -359,6 +388,11 @@
         ? collection(db, 'checkins')
         : query(collection(db, 'checkins'), where('checkedInAt', '>=', Timestamp.fromMillis(cutoffMs)));
       var checkinsSnap = await getDocs(checkinsQuery);
+      // eventRosters/attendanceReports 沒有跟活動日期直接對應的時間欄位可以做伺服器端範圍篩選
+      // （attendanceReports.respondedAt 是回報時間，不是活動時間），乾脆整份撈回來，
+      // 在下面用已經依日期篩過範圍的 rows 取 eventId 交集，作法跟 checkins「全部」情境一致
+      var rostersSnap = await getDocs(collection(db, 'eventRosters'));
+      var reportsSnap = await getDocs(collection(db, 'attendanceReports'));
 
       checkinsByEvent = {};
       checkinsSnap.forEach(function(docSnap){
@@ -366,6 +400,19 @@
         var eid = data.eventId;
         if (!checkinsByEvent[eid]) checkinsByEvent[eid] = [];
         checkinsByEvent[eid].push({ uid: data.uid, name: data.name, account: data.account });
+      });
+
+      rostersByEvent = {};
+      rostersSnap.forEach(function(docSnap){
+        rostersByEvent[docSnap.id] = { members: docSnap.data().members || [] };
+      });
+
+      reportsByEvent = {};
+      reportsSnap.forEach(function(docSnap){
+        var data = docSnap.data();
+        var eid = data.eventId;
+        if (!reportsByEvent[eid]) reportsByEvent[eid] = [];
+        reportsByEvent[eid].push({ uid: data.uid, name: data.name, account: data.account, status: data.status, reason: data.reason });
       });
 
       var now = Date.now();
@@ -384,7 +431,8 @@
           type: data.type,
           date: d,
           location: data.location,
-          count: (checkinsByEvent[docSnap.id] || []).length
+          count: (checkinsByEvent[docSnap.id] || []).length,
+          attendance: computeAttendance(docSnap.id)
         });
       });
 
@@ -443,6 +491,18 @@
     });
   }
 
+  // 依樂器分組出「回報出席人數」，格式跟 groupCheckinsByInstrument 共用同一套分組邏輯，
+  // 只是餵進去的名單換成 attendanceReports 篩過 status === 'attending' 的清單
+  function attendingCountsByInstrument(eventId){
+    var roster = rostersByEvent[eventId];
+    if (!roster) return null;
+    var reports = reportsByEvent[eventId] || [];
+    var attendingGroups = groupCheckinsByInstrument(reports.filter(function(r){ return r.status === 'attending'; }));
+    var byName = {};
+    attendingGroups.forEach(function(g){ byName[g.name] = g.people.length; });
+    return byName;
+  }
+
   function renderDetailSheet(eventId){
     var checkins = checkinsByEvent[eventId] || [];
     document.getElementById('detailSheetTitle').textContent = eventTitleById[eventId] || '活動明細';
@@ -450,9 +510,14 @@
     var groups = groupCheckinsByInstrument(checkins);
     var body = document.getElementById('detailSheetBody');
 
-    var summaryHtml = '<div class="sheet-caption">各分部簽到數量</div>' +
+    // 「各分部簽到數量」＋「各分部出缺席回報」原本是兩組格子，使用者反映太占版面、
+    // 兩份資料本質上是同一件事的兩種角度，合併成一組：簽到人數是這頁的核心指標放大字，
+    // 回報出席人數當小字副標放旁邊；沒有應到名單的活動沒有回報資料可比對，副標就不顯示
+    var attendingByName = attendingCountsByInstrument(eventId);
+    var summaryHtml = '<div class="sheet-caption">各分部簽到數量' + (attendingByName ? '（／回報出席）' : '') + '</div>' +
       '<div class="sheet-summary">' + groups.map(function(g){
-        return '<div class="sheet-summary-item"><div class="n">' + g.people.length + '</div><div class="l">' + g.name + '</div></div>';
+        var subHtml = attendingByName ? '<div class="sub">／' + (attendingByName[g.name] || 0) + ' 回報</div>' : '';
+        return '<div class="sheet-summary-item"><div class="n">' + g.people.length + '</div>' + subHtml + '<div class="l">' + g.name + '</div></div>';
       }).join('') + '</div>';
 
     var detailHtml = '<div class="sheet-caption">詳細名單</div>' + groups.map(function(g){

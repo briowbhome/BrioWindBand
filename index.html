@@ -749,8 +749,9 @@
     avatarBtn.textContent = profile.name ? profile.name.charAt(0) : '?';
     avatarBtn.classList.remove('skel');
     var isAdmin = profile.role === 'admin' || profile.role === 'owner';
+    var canSeeConductorPage = isAdmin || profile.role === 'conductor';
 
-    initAccountMenu(profile.name, isAdmin ? 'admin-index.html' : null);
+    initAccountMenu(profile.name, isAdmin ? 'admin-index.html' : null, canSeeConductorPage ? 'conductor-admin.html' : null);
 
     // 首頁資料：下一次團練 + 即將到來的活動，接 events collection 即時更新
     var WEEKDAY = ['日', '一', '二', '三', '四', '五', '六'];

@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>布利歐管樂團｜指揮後台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#F2EFE5">
+<link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+<script src="./pwa-register.js" defer></script>
+<style>
+  :root{
+    --ink:#20242F;
+    --ink-soft:#4A4F5C;
+    --paper:#F2EFE5;
+    --paper-raised:#FBFAF4;
+    --line:#DAD3BE;
+    --brass:#B8863A;
+    --brass-deep:#8F6A2C;
+    --burgundy:#7A2331;
+    --burgundy-deep:#5C1A26;
+    --sage:#5F6E58;
+    --sage-bg:#E7EBDF;
+    --radius-lg:20px;
+    --radius-md:14px;
+    --radius-sm:9px;
+    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% -10%, #EFE9D6 0%, transparent 45%),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Noto Sans TC','Noto Sans',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    min-height:100dvh;
+    display:flex;
+    justify-content:center;
+    padding: 0 0 calc(48px + env(safe-area-inset-bottom));
+  }
+
+  button, a, select, textarea{ -webkit-tap-highlight-color: transparent; font-family:inherit; }
+  :focus-visible{ outline:2.5px solid var(--brass-deep); outline-offset:2px; border-radius:6px; }
+
+  .app{
+    width:100%;
+    max-width:460px;
+    min-height:100vh;
+    min-height:100dvh;
+    background:var(--paper);
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .hidden{ display:none !important; }
+
+  @keyframes skel-pulse{ 0%,100%{ opacity:.55; } 50%{ opacity:1; } }
+  .skel{ background:var(--line); animation:skel-pulse 1.4s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce){ .skel{ animation:none; opacity:.75; } }
+
+  .appbar{ display:flex; align-items:center; gap:12px; padding:18px 20px 14px; }
+  .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
+  .brandtext{ display:flex; flex-direction:column; line-height:1.1; }
+  .brandtext .name{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:19px; letter-spacing:.02em; }
+  .brandtext .sub{ font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.14em; color:var(--ink-soft); margin-top:3px; text-transform:uppercase; }
+  .appbar .spacer{ flex:1; }
+  .back-btn{
+    width:30px; height:30px; flex:none;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--ink); text-decoration:none;
+  }
+  .brand-link{ display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; }
+  .avatar{
+    width:38px; height:38px; border-radius:50%;
+    background:var(--burgundy); color:#F2EFE5;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Noto Serif TC',serif; font-weight:700; font-size:14px;
+    border:2px solid var(--paper-raised); box-shadow:0 0 0 1.5px var(--line);
+    padding:0; cursor:pointer;
+  }
+
+  .staff{
+    height:16px; margin:0 20px 6px;
+    background-image: repeating-linear-gradient(var(--line), var(--line) 1px, transparent 1px, transparent 4px);
+    opacity:.9;
+  }
+
+  .section-label{ display:flex; align-items:baseline; gap:8px; margin:20px 20px 4px; }
+  .section-label .tw{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:15.5px; }
+  .section-label .en{ font-family:'Roboto Mono',monospace; font-size:10px; letter-spacing:.12em; color:var(--ink-soft); text-transform:uppercase; }
+  .lede{ margin:6px 20px 10px; font-size:12.5px; line-height:1.6; color:var(--ink-soft); }
+
+  .card{
+    margin:0 20px 20px;
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-card);
+    padding:16px;
+  }
+  .card-title{ font-weight:700; font-size:13.5px; margin-bottom:4px; }
+  .card-sub{ font-size:11.5px; color:var(--ink-soft); margin-bottom:12px; }
+  .empty-note{ font-size:12.5px; color:var(--ink-soft); padding:8px 0; }
+
+  .stat-summary{ display:flex; gap:8px; flex-wrap:wrap; }
+  .stat-chip{
+    flex:1; min-width:78px;
+    background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm);
+    padding:9px 8px; text-align:center;
+  }
+  .stat-chip .n{ font-family:'Roboto Mono',monospace; font-weight:700; font-size:17px; color:var(--sage); }
+  .stat-chip .l{ font-size:10px; color:var(--ink-soft); margin-top:2px; }
+
+  .instrument-toggle-btn{
+    display:block; width:100%; text-align:left; margin-top:14px;
+    background:none; border:none; padding:4px 0; cursor:pointer;
+    font-size:12px; font-weight:700; color:var(--brass-deep);
+  }
+  .instrument-bars{ margin-top:4px; }
+  .instrument-bar-row{
+    display:grid; grid-template-columns:64px 1fr 22px; align-items:center; gap:10px;
+    padding:6px 0; border-bottom:1px solid var(--line);
+  }
+  .instrument-bar-row:last-child{ border-bottom:none; }
+  .instrument-bar-row .l{ font-size:12px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .instrument-bar-track{ height:6px; background:var(--paper); border-radius:3px; overflow:hidden; }
+  .instrument-bar-fill{ height:100%; background:var(--sage); }
+  .instrument-bar-row .n{ font-family:'Roboto Mono',monospace; font-weight:700; font-size:13px; color:var(--ink); text-align:right; }
+
+  .note-textarea{
+    width:100%; min-height:110px; resize:vertical;
+    border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--paper);
+    padding:10px; font-size:13px; color:var(--ink); line-height:1.6;
+  }
+  .note-save-row{ display:flex; align-items:center; justify-content:flex-end; gap:10px; margin-top:8px; }
+  .note-status{ font-size:11px; color:var(--ink-soft); }
+  .note-save-btn{
+    background:var(--brass); color:var(--ink); border:none; border-radius:var(--radius-sm);
+    padding:9px 18px; font-weight:700; font-size:12.5px; cursor:pointer;
+  }
+  .note-save-btn:disabled{ opacity:.5; cursor:default; }
+
+  .notes-list{ margin-top:14px; }
+  .note-item{ padding:10px 0; border-top:1px solid var(--line); }
+  .note-item-text{ font-size:12.5px; color:var(--ink); line-height:1.6; white-space:pre-wrap; }
+  .note-item-meta{ display:flex; align-items:center; justify-content:space-between; margin-top:6px; }
+  .note-item-date{ font-family:'Roboto Mono',monospace; font-size:10px; color:var(--ink-soft); }
+  .note-item-actions{ display:flex; gap:4px; }
+  .note-item-actions button{
+    background:none; border:none; color:var(--ink-soft); cursor:pointer;
+    font-size:13px; width:24px; height:24px; border-radius:50%;
+  }
+  .note-item-actions button:active{ background:var(--sage-bg); }
+  .note-item-edit-textarea{
+    width:100%; min-height:80px; resize:vertical;
+    border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--paper);
+    padding:8px; font-size:12.5px; color:var(--ink); line-height:1.6; margin-top:4px;
+  }
+  .note-item-edit-row{ display:flex; justify-content:flex-end; gap:8px; margin-top:6px; }
+  .note-item-edit-row button{
+    border:none; border-radius:var(--radius-sm); padding:6px 14px; font-size:12px; font-weight:700; cursor:pointer;
+  }
+  .note-item-save-btn{ background:var(--brass); color:var(--ink); }
+  .note-item-cancel-btn{ background:none; color:var(--ink-soft); }
+
+  /* ---------- 座位圖：真正的同心弧形扇區（SVG），取代舊版單排小方塊 ---------- */
+  .seat-wrap{ width:100%; margin-top:6px; }
+  .seat-wrap svg{ width:100%; height:auto; display:block; }
+  .seat-wedge{ cursor:pointer; }
+  .seat-wedge path, .seat-wedge rect{ stroke:var(--paper-raised); stroke-width:1.5; }
+  .seat-wedge:active path, .seat-wedge:active rect{ opacity:.75; }
+  .seat-wedge-label{ font-size:9.5px; font-family:'Noto Sans TC','Noto Sans',sans-serif; }
+  .seat-wedge-count{ font-size:10px; font-family:'Roboto Mono',monospace; font-weight:700; }
+  .seat-conductor-dot{ fill:var(--burgundy); }
+  .seat-conductor-label{ font-size:10px; fill:var(--ink-soft); }
+
+  /* ---------- Detail bottom sheet ---------- */
+  .sheet-overlay{
+    position:fixed; inset:0; background:rgba(32,36,47,.45);
+    display:none; align-items:flex-end; justify-content:center; z-index:50;
+  }
+  .sheet-overlay.active{ display:flex; }
+  .sheet{
+    width:100%; max-width:460px; max-height:70vh;
+    background:var(--paper-raised); border-radius:20px 20px 0 0;
+    display:flex; flex-direction:column; box-shadow:0 -10px 30px rgba(32,36,47,.3);
+  }
+  .sheet-handle{ width:36px; height:4px; background:var(--line); border-radius:999px; margin:10px auto 2px; }
+  .sheet-header{ padding:6px 20px 10px; }
+  .sheet-header .tw{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:15.5px; }
+  .sheet-header .hint{ margin-top:3px; font-size:11.5px; color:var(--ink-soft); }
+  .sheet-body{ overflow-y:auto; padding:0 20px 8px; border-top:1px solid var(--line); }
+  .sheet-name-row{
+    padding:8px 0; font-size:12.5px; color:var(--ink);
+    display:flex; justify-content:space-between; gap:8px; border-bottom:1px solid var(--line);
+  }
+  .sheet-name-row:last-child{ border-bottom:none; }
+  .sheet-name-row .st{ font-family:'Roboto Mono',monospace; font-size:10px; color:var(--ink-soft); }
+  .sheet-empty{ padding:10px 0; font-size:12px; color:var(--ink-soft); }
+  .sheet-footer{ padding:14px 20px calc(14px + env(safe-area-inset-bottom)); border-top:1px solid var(--line); }
+  .sheet-close-btn{
+    width:100%; background:var(--brass); color:var(--ink); border:none;
+    border-radius:var(--radius-md); padding:12px; font-weight:700; font-size:13.5px; cursor:pointer;
+  }
+</style>
+</head>
+<body>
+<div class="app" id="appRoot">
+
+  <div class="appbar">
+    <a class="back-btn" href="index.html" aria-label="回團員首頁">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 11 12 4l8 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10v9h12v-9" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+    </a>
+    <a class="brand-link" href="index.html">
+      <img class="mark" src="assets/BrioLogo.jpg" alt="布利歐管樂團 Logo">
+      <div class="brandtext">
+        <div class="name">布利歐管樂團</div>
+        <div class="sub">Brio Wind Band</div>
+      </div>
+    </a>
+    <div class="spacer"></div>
+    <button class="avatar skel" id="avatarBtn" type="button" aria-label="帳號選單"></button>
+  </div>
+
+  <div class="staff"></div>
+
+  <div class="section-label">
+    <span class="tw">指揮專用</span>
+    <span class="en">Conductor</span>
+  </div>
+  <p class="lede" id="nextEventLede">正在載入下一場團練資料…</p>
+
+  <div id="emptyState" class="card hidden">
+    <div class="empty-note">目前沒有排定下一場團練。</div>
+  </div>
+
+  <div id="contentSections" class="hidden">
+    <div class="section-label"><span class="tw">出缺席回報</span></div>
+    <p class="lede">下一場團練的視覺化出缺席回報總覽，分部出席清單可以展開。</p>
+    <div class="card">
+      <div class="card-title" id="nextEventTitle">—</div>
+      <div class="card-sub" id="nextEventMeta">—</div>
+
+      <div id="seatChartWrap" class="seat-wrap"></div>
+      <div id="seatChartEmpty" class="empty-note hidden">還沒有應到名單，暫不顯示座位圖。</div>
+
+      <div class="stat-summary" id="attendanceSummary"></div>
+
+      <button type="button" class="instrument-toggle-btn" id="instrumentToggleBtn">▸ 分部出席清單</button>
+      <div id="instrumentBars" class="instrument-bars hidden"></div>
+      <div id="instrumentEmpty" class="empty-note hidden">這場活動還沒有應到名單，無法依樂器分類。</div>
+    </div>
+  </div>
+
+  <div class="section-label"><span class="tw">排練筆記</span></div>
+  <p class="lede">自己的筆記本，可以新增多則。</p>
+  <div class="card">
+    <textarea id="noteNewTextarea" class="note-textarea" placeholder="寫點什麼，按下面按鈕新增一則。"></textarea>
+    <div class="note-save-row">
+      <span class="note-status" id="noteStatus"></span>
+      <button type="button" class="note-save-btn" id="noteAddBtn">新增筆記</button>
+    </div>
+    <div id="notesList" class="notes-list"></div>
+    <div id="notesEmpty" class="empty-note hidden">還沒有任何筆記。</div>
+  </div>
+
+</div>
+
+<div class="sheet-overlay" id="zoneSheetOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="tw" id="zoneSheetTitle">分區名單</div>
+      <div class="hint" id="zoneSheetHint">—</div>
+    </div>
+    <div class="sheet-body" id="zoneSheetBody"></div>
+    <div class="sheet-footer">
+      <button type="button" class="sheet-close-btn" id="zoneSheetClose">關閉</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { requireAdminOrConductor, peekCachedProfile } from './auth-guard.js';
+  import { db } from './firebase-init.js';
+  import { initAccountMenu } from './account-menu.js';
+  import { subscribeEventTypes, COLOR_THEMES } from './event-types.js';
+  import { DEFAULT_INSTRUMENTS } from './instruments.js';
+  import { getSeatingSectionsOnce, DEFAULT_SECTIONS } from './seating-chart.js';
+  import {
+    collection, getDocs, getDoc, doc, setDoc, deleteDoc, serverTimestamp,
+    query, where, orderBy, limit, Timestamp
+  } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+
+  var cachedProfile = peekCachedProfile();
+  if (cachedProfile && cachedProfile.name){
+    var avatarBtnEl = document.getElementById('avatarBtn');
+    avatarBtnEl.textContent = cachedProfile.name.charAt(0);
+    avatarBtnEl.classList.remove('skel');
+  }
+
+  var currentUid = null;
+  var nextEvent = null; // { id, title, type, date, location }
+  var rosterMembers = null; // array<uid> | null（null = 沒有名單）
+  var reports = []; // [{uid,name,account,status}]
+  var instrumentsList = DEFAULT_INSTRUMENTS;
+  var seatingSectionsList = DEFAULT_SECTIONS;
+  var membersInstrumentsByUid = {}; // uid -> instruments[]，approved 團員，roster 名單內才需要
+  var membersNameByUid = {}; // uid -> {name, account}
+
+  // ---------- 找下一場團練（跟首頁「下一次◯◯」同一套判斷：homeHighlight 類型裡最近的一場） ----------
+  var eventTypesById = {};
+  var typesLoaded = false;
+
+  async function findNextEvent(){
+    var snap = await getDocs(query(
+      collection(db, 'events'),
+      where('date', '>=', Timestamp.now()),
+      orderBy('date', 'asc'),
+      limit(20)
+    ));
+    var found = null;
+    snap.forEach(function(docSnap){
+      if (found) return;
+      var data = docSnap.data();
+      var t = eventTypesById[data.type];
+      if (!t || !t.homeHighlight) return;
+      found = {
+        id: docSnap.id,
+        title: data.title,
+        type: data.type,
+        date: data.date && data.date.toDate ? data.date.toDate() : null,
+        location: data.location
+      };
+    });
+    return found;
+  }
+
+  // ---------- 應到/回報/簽到資料 ----------
+  async function loadEventData(eventId){
+    var rosterSnap = await getDoc(doc(db, 'eventRosters', eventId));
+    rosterMembers = rosterSnap.exists() ? (rosterSnap.data().members || []) : null;
+
+    var reportsSnap = await getDocs(query(collection(db, 'attendanceReports'), where('eventId', '==', eventId)));
+    reports = [];
+    reportsSnap.forEach(function(docSnap){
+      var data = docSnap.data();
+      reports.push({ uid: data.uid, name: data.name, account: data.account, status: data.status });
+    });
+
+    if (rosterMembers && rosterMembers.length > 0){
+      var usersSnap = await getDocs(query(collection(db, 'users'), where('status', '==', 'approved')));
+      membersInstrumentsByUid = {};
+      membersNameByUid = {};
+      usersSnap.forEach(function(docSnap){
+        var data = docSnap.data();
+        membersInstrumentsByUid[docSnap.id] = data.instruments || [];
+        membersNameByUid[docSnap.id] = { name: data.name, account: data.account };
+      });
+    }
+  }
+
+  function computeSummary(){
+    var reportedUids = {};
+    var attending = 0, leave = 0;
+    reports.forEach(function(r){
+      reportedUids[r.uid] = true;
+      if (r.status === 'attending') attending++;
+      else if (r.status === 'leave') leave++;
+    });
+    var notReported = rosterMembers ? rosterMembers.filter(function(uid){ return !reportedUids[uid]; }).length : 0;
+    return { attending: attending, leave: leave, notReported: notReported, total: rosterMembers ? rosterMembers.length : 0 };
+  }
+
+  // 依樂器清單順序分組，回傳 [{name, uids}]；一人可能同時列在多個樂器分區（跟
+  // checkin-stats-admin.html 的 groupCheckinsByInstrument 同一套簡化取捨，見該頁說明
+  function groupUidsByInstrument(uids){
+    var byName = {};
+    instrumentsList.forEach(function(inst){ byName[inst.name] = []; });
+    uids.forEach(function(uid){
+      var insts = membersInstrumentsByUid[uid] || [];
+      if (insts.length === 0){
+        if (!byName['未設定樂器']) byName['未設定樂器'] = [];
+        byName['未設定樂器'].push(uid);
+        return;
+      }
+      insts.forEach(function(name){
+        if (!byName[name]) byName[name] = [];
+        byName[name].push(uid);
+      });
+    });
+    var orderedNames = instrumentsList.map(function(inst){ return inst.name; });
+    if (byName['未設定樂器']) orderedNames.push('未設定樂器');
+    return orderedNames.map(function(name){ return { name: name, uids: byName[name] }; });
+  }
+
+  function renderSummary(){
+    var s = computeSummary();
+    var html;
+    if (!rosterMembers){
+      html = '<div class="stat-chip"><div class="n">—</div><div class="l">未設定名單</div></div>';
+    } else {
+      html =
+        '<div class="stat-chip"><div class="n">' + s.attending + '</div><div class="l">出席</div></div>' +
+        '<div class="stat-chip"><div class="n">' + s.leave + '</div><div class="l">請假</div></div>' +
+        '<div class="stat-chip"><div class="n">' + s.notReported + '</div><div class="l">未回報</div></div>' +
+        '<div class="stat-chip"><div class="n">' + s.total + '</div><div class="l">應到</div></div>';
+    }
+    document.getElementById('attendanceSummary').innerHTML = html;
+  }
+
+  function renderInstrumentGrid(){
+    var wrap = document.getElementById('instrumentBars');
+    var emptyNote = document.getElementById('instrumentEmpty');
+    if (!rosterMembers){
+      wrap.innerHTML = '';
+      emptyNote.classList.remove('hidden');
+      return;
+    }
+    emptyNote.classList.add('hidden');
+    var attendingUids = reports.filter(function(r){ return r.status === 'attending'; }).map(function(r){ return r.uid; });
+    var groups = groupUidsByInstrument(attendingUids);
+    var maxCount = groups.reduce(function(max, g){ return Math.max(max, g.uids.length); }, 0) || 1;
+    wrap.innerHTML = groups.map(function(g){
+      var pct = Math.round((g.uids.length / maxCount) * 100);
+      return (
+        '<div class="instrument-bar-row">' +
+          '<div class="l">' + g.name + '</div>' +
+          '<div class="instrument-bar-track"><div class="instrument-bar-fill" style="width:' + pct + '%;"></div></div>' +
+          '<div class="n">' + g.uids.length + '</div>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  // ---------- 座位圖：分區清單來自 settings/seatingSections（後台可調整，見 roles-admin.html
+  // 「座位圖分區設定」），畫成真正的同心弧形扇區（一排一圈，row 1 離指揮最近），
+  // 幾何位置仍是即時算出——分區的「排」跟「排內順序」決定位置，不是座標本身存資料 ----------
+  // 排除 burgundy——COLOR_THEMES 裡唯一深底淺字的主題（拿去當活動類型徽章的強調色用），
+  // 混進來色塊之間深淺會跳來跳去，跟其餘九色的淺底柔和感不一致
+  var SEAT_COLOR_KEYS = Object.keys(COLOR_THEMES).filter(function(k){ return k !== 'burgundy'; });
+  var SEAT_R0 = 26; // 最內圈（離指揮最近那排）的內半徑，留給指揮點/標籤一點空間
+  var SEAT_BAND = 48; // 每排的徑向厚度
+
+  function seatEscape(text){
+    return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function seatPolar(cx, cy, r, angleDeg){
+    var rad = angleDeg * Math.PI / 180;
+    return { x: cx + r * Math.cos(rad), y: cy - r * Math.sin(rad) };
+  }
+
+  function seatWedgePath(cx, cy, innerR, outerR, angleA, angleB){
+    var oa = seatPolar(cx, cy, outerR, angleA);
+    var ob = seatPolar(cx, cy, outerR, angleB);
+    var ib = seatPolar(cx, cy, innerR, angleB);
+    var ia = seatPolar(cx, cy, innerR, angleA);
+    return 'M ' + oa.x.toFixed(1) + ' ' + oa.y.toFixed(1) +
+      ' A ' + outerR + ' ' + outerR + ' 0 0 1 ' + ob.x.toFixed(1) + ' ' + ob.y.toFixed(1) +
+      ' L ' + ib.x.toFixed(1) + ' ' + ib.y.toFixed(1) +
+      ' A ' + innerR + ' ' + innerR + ' 0 0 0 ' + ia.x.toFixed(1) + ' ' + ia.y.toFixed(1) +
+      ' Z';
+  }
+
+  // 算出整張圖的版面（寬高、指揮點位置）跟每個分區的幾何資料，畫布高度依實際排數/是否有
+  // 打擊樂動態算出來，不是寫死的固定高度
+  function buildSeatChartLayout(){
+    var nonPercussion = seatingSectionsList.filter(function(sec){ return !sec.percussion; });
+    var percussion = seatingSectionsList.filter(function(sec){ return sec.percussion; });
+
+    var byRow = {};
+    nonPercussion.forEach(function(sec){
+      var r = sec.row || 1;
+      if (!byRow[r]) byRow[r] = [];
+      byRow[r].push(sec);
+    });
+    var rowNumbers = Object.keys(byRow).map(Number).sort(function(a, b){ return a - b; });
+
+    var cx = 200;
+    var topMargin = 10;
+    var percussionH = percussion.length ? 32 : 0;
+    var gapAboveRings = percussion.length ? 14 : 6;
+    var maxOuterR = SEAT_R0 + rowNumbers.length * SEAT_BAND;
+    var bottomMargin = 26;
+    var topOfRingsY = topMargin + percussionH + gapAboveRings;
+    var cy = topOfRingsY + maxOuterR;
+    var height = cy + bottomMargin;
+
+    // 顏色依「樂器名稱」指定，不是依分區出現順序——同一個樂器拆成多個分區（例如分兩排坐）
+    // 要用同一個顏色才看得出是同一組人，不能因為兩個分區在陣列裡的位置不同就配到不同色
+    var colorByInstrument = {};
+    var colorIdx = 0;
+    function colorKeyFor(instrumentName){
+      if (!colorByInstrument[instrumentName]){
+        colorByInstrument[instrumentName] = SEAT_COLOR_KEYS[colorIdx++ % SEAT_COLOR_KEYS.length];
+      }
+      return colorByInstrument[instrumentName];
+    }
+
+    var wedges = [];
+    rowNumbers.forEach(function(rowNum, ri){
+      var items = byRow[rowNum];
+      var innerR = SEAT_R0 + ri * SEAT_BAND;
+      var outerR = SEAT_R0 + (ri + 1) * SEAT_BAND;
+      // 依 weight 權重切角度（預設都是 1，等於平均切），不是單純依數量平均切
+      var totalWeight = items.reduce(function(sum, s){ return sum + (s.weight || 1); }, 0) || items.length;
+      var cumulative = 0;
+      items.forEach(function(sec, i){
+        var w = sec.weight || 1;
+        var startFrac = cumulative / totalWeight;
+        cumulative += w;
+        var endFrac = cumulative / totalWeight;
+        var angleA = 180 - startFrac * 180;
+        var angleB = 180 - endFrac * 180;
+        var midAngle = (angleA + angleB) / 2;
+        var midR = (innerR + outerR) / 2;
+        var labelPos = seatPolar(cx, cy, midR, midAngle);
+        wedges.push({
+          instrumentName: sec.instrumentName,
+          label: sec.label || sec.instrumentName,
+          path: seatWedgePath(cx, cy, innerR, outerR, angleA, angleB),
+          labelX: labelPos.x,
+          labelY: labelPos.y,
+          colorKey: colorKeyFor(sec.instrumentName)
+        });
+      });
+    });
+
+    var percussionRects = percussion.map(function(sec, i){
+      var rectW = 300 / percussion.length;
+      return {
+        instrumentName: sec.instrumentName,
+        label: sec.label || sec.instrumentName,
+        x: cx - 150 + i * rectW,
+        y: topMargin,
+        w: rectW,
+        h: percussionH,
+        labelX: cx - 150 + i * rectW + rectW / 2,
+        labelY: topMargin + percussionH / 2,
+        colorKey: colorKeyFor(sec.instrumentName)
+      };
+    });
+
+    return { cx: cx, cy: cy, width: 400, height: height, wedges: wedges, percussionRects: percussionRects };
+  }
+
+  function renderSeatChart(){
+    var wrap = document.getElementById('seatChartWrap');
+    var emptyNote = document.getElementById('seatChartEmpty');
+    if (!rosterMembers){
+      wrap.innerHTML = '';
+      emptyNote.classList.remove('hidden');
+      return;
+    }
+    emptyNote.classList.add('hidden');
+
+    var attendingUids = reports.filter(function(r){ return r.status === 'attending'; }).map(function(r){ return r.uid; });
+    var attendingGroups = groupUidsByInstrument(attendingUids);
+    var rosterGroups = groupUidsByInstrument(rosterMembers);
+    var attendingByName = {};
+    attendingGroups.forEach(function(g){ attendingByName[g.name] = g.uids.length; });
+    var rosterByName = {};
+    rosterGroups.forEach(function(g){ rosterByName[g.name] = g.uids.length; });
+
+    var layout = buildSeatChartLayout();
+
+    function zoneGroup(instrumentName, label, colorKey, shapeHtml, labelX, labelY){
+      var theme = COLOR_THEMES[colorKey] || COLOR_THEMES.slate;
+      var attended = attendingByName[instrumentName] || 0;
+      var total = rosterByName[instrumentName] || 0;
+      return (
+        '<g class="seat-wedge" data-zone-instrument="' + seatEscape(instrumentName) + '" data-zone-label="' + seatEscape(label) + '">' +
+          shapeHtml.replace('{FILL}', theme.bg) +
+          '<text class="seat-wedge-label" x="' + labelX + '" y="' + (labelY - 5) + '" text-anchor="middle" style="fill:' + theme.text + ';">' + seatEscape(label) + '</text>' +
+          '<text class="seat-wedge-count" x="' + labelX + '" y="' + (labelY + 9) + '" text-anchor="middle" style="fill:' + theme.text + ';">' + attended + ' / ' + total + '</text>' +
+        '</g>'
+      );
+    }
+
+    var svg = '<svg viewBox="0 0 ' + layout.width + ' ' + layout.height + '" xmlns="http://www.w3.org/2000/svg">';
+    svg += layout.wedges.map(function(z){
+      return zoneGroup(z.instrumentName, z.label, z.colorKey, '<path d="' + z.path + '" style="fill:{FILL};"></path>', z.labelX, z.labelY);
+    }).join('');
+    svg += layout.percussionRects.map(function(z){
+      var rectHtml = '<rect x="' + z.x + '" y="' + z.y + '" width="' + z.w + '" height="' + z.h + '" rx="8" style="fill:{FILL};"></rect>';
+      return zoneGroup(z.instrumentName, z.label, z.colorKey, rectHtml, z.labelX, z.labelY);
+    }).join('');
+    svg += '<circle class="seat-conductor-dot" cx="' + layout.cx + '" cy="' + layout.cy + '" r="7"></circle>';
+    svg += '<text class="seat-conductor-label" x="' + layout.cx + '" y="' + (layout.cy + 20) + '" text-anchor="middle">指揮</text>';
+    svg += '</svg>';
+
+    wrap.innerHTML = svg;
+  }
+
+  // ---------- 分區明細 sheet ----------
+  var zoneSheetOverlay = document.getElementById('zoneSheetOverlay');
+
+  function openZoneSheet(instrumentName, label){
+    var attendingUids = reports.filter(function(r){ return r.status === 'attending'; }).map(function(r){ return r.uid; });
+    var rosterGroups = groupUidsByInstrument(rosterMembers || []);
+    var group = rosterGroups.filter(function(g){ return g.name === instrumentName; })[0];
+    var uids = group ? group.uids : [];
+
+    document.getElementById('zoneSheetTitle').textContent = label || instrumentName;
+    document.getElementById('zoneSheetHint').textContent = '該分部的應到名單';
+
+    var body = document.getElementById('zoneSheetBody');
+    if (uids.length === 0){
+      body.innerHTML = '<div class="sheet-empty">這個分區目前沒有人在應到名單內</div>';
+    } else {
+      body.innerHTML = uids.map(function(uid){
+        var m = membersNameByUid[uid] || {};
+        var isAttending = attendingUids.indexOf(uid) !== -1;
+        var statusText = isAttending ? '出席' : (reports.some(function(r){ return r.uid === uid && r.status === 'leave'; }) ? '請假' : '尚未回報');
+        return '<div class="sheet-name-row"><span>' + (m.name || uid) + '</span><span class="st">' + statusText + '</span></div>';
+      }).join('');
+    }
+    zoneSheetOverlay.classList.add('active');
+  }
+
+  document.getElementById('seatChartWrap').addEventListener('click', function(e){
+    var zoneEl = e.target.closest('[data-zone-instrument]');
+    if (!zoneEl) return;
+    openZoneSheet(zoneEl.getAttribute('data-zone-instrument'), zoneEl.getAttribute('data-zone-label'));
+  });
+  document.getElementById('zoneSheetClose').addEventListener('click', function(){
+    zoneSheetOverlay.classList.remove('active');
+  });
+  zoneSheetOverlay.addEventListener('click', function(e){
+    if (e.target === zoneSheetOverlay) zoneSheetOverlay.classList.remove('active');
+  });
+
+  // ---------- 排練筆記：不綁活動的個人筆記本，可以新增多則、永久保留 ----------
+  var noteNewTextarea = document.getElementById('noteNewTextarea');
+  var noteAddBtn = document.getElementById('noteAddBtn');
+  var noteStatus = document.getElementById('noteStatus');
+  var notesListEl = document.getElementById('notesList');
+  var notesEmptyEl = document.getElementById('notesEmpty');
+  var myNotes = []; // [{id, note, createdAt}]，新的在前面
+  var editingNoteId = null;
+  var editingNoteDraft = '';
+
+  function escapeNoteHtml(text){
+    var div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function formatNoteDate(ts){
+    if (!ts || !ts.toDate) return '';
+    var d = ts.toDate();
+    return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + d.toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit', hour12:false });
+  }
+
+  // 只用 where('uid','==',currentUid) 不加 orderBy，避免 Firestore 要求額外的複合索引，
+  // 排序（新的在前）交給前端做就好，筆記本身數量不多，這樣做不會有效能問題
+  async function loadNotes(){
+    try {
+      var snap = await getDocs(query(collection(db, 'conductorNotes'), where('uid', '==', currentUid)));
+      myNotes = [];
+      snap.forEach(function(docSnap){
+        var data = docSnap.data();
+        myNotes.push({ id: docSnap.id, note: data.note || '', createdAt: data.createdAt });
+      });
+      myNotes.sort(function(a, b){
+        var at = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+        var bt = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+        return bt - at;
+      });
+    } catch (e) {
+      myNotes = [];
+    }
+    renderNotes();
+  }
+
+  function renderNotes(){
+    if (myNotes.length === 0){
+      notesListEl.innerHTML = '';
+      notesEmptyEl.classList.remove('hidden');
+      return;
+    }
+    notesEmptyEl.classList.add('hidden');
+    notesListEl.innerHTML = myNotes.map(function(n){
+      if (editingNoteId === n.id){
+        return (
+          '<div class="note-item">' +
+            '<textarea class="note-item-edit-textarea" data-note-edit-input="' + n.id + '">' + escapeNoteHtml(editingNoteDraft) + '</textarea>' +
+            '<div class="note-item-edit-row">' +
+              '<button type="button" class="note-item-cancel-btn" data-note-cancel="' + n.id + '">取消</button>' +
+              '<button type="button" class="note-item-save-btn" data-note-save="' + n.id + '">儲存</button>' +
+            '</div>' +
+          '</div>'
+        );
+      }
+      return (
+        '<div class="note-item">' +
+          '<div class="note-item-text">' + escapeNoteHtml(n.note) + '</div>' +
+          '<div class="note-item-meta">' +
+            '<span class="note-item-date">' + formatNoteDate(n.createdAt) + '</span>' +
+            '<div class="note-item-actions">' +
+              '<button type="button" data-note-edit-btn="' + n.id + '" aria-label="編輯">✎</button>' +
+              '<button type="button" data-note-delete="' + n.id + '" aria-label="刪除">×</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  noteAddBtn.addEventListener('click', function(){
+    var text = noteNewTextarea.value.trim();
+    if (!text) return;
+    noteAddBtn.disabled = true;
+    noteStatus.textContent = '新增中…';
+    var newRef = doc(collection(db, 'conductorNotes'));
+    setDoc(newRef, {
+      uid: currentUid,
+      note: text,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }).then(function(){
+      noteNewTextarea.value = '';
+      noteStatus.textContent = '已新增';
+      setTimeout(function(){ noteStatus.textContent = ''; }, 2000);
+      return loadNotes();
+    }).catch(function(err){
+      noteStatus.textContent = '新增失敗：' + err.code;
+    }).finally(function(){
+      noteAddBtn.disabled = false;
+    });
+  });
+
+  notesListEl.addEventListener('click', function(e){
+    var editBtn = e.target.closest('[data-note-edit-btn]');
+    if (editBtn){
+      var id = editBtn.getAttribute('data-note-edit-btn');
+      var n = myNotes.filter(function(x){ return x.id === id; })[0];
+      editingNoteId = id;
+      editingNoteDraft = n ? n.note : '';
+      renderNotes();
+      return;
+    }
+    var cancelBtn = e.target.closest('[data-note-cancel]');
+    if (cancelBtn){
+      editingNoteId = null;
+      renderNotes();
+      return;
+    }
+    var saveBtn = e.target.closest('[data-note-save]');
+    if (saveBtn){
+      var saveId = saveBtn.getAttribute('data-note-save');
+      var input = notesListEl.querySelector('[data-note-edit-input="' + saveId + '"]');
+      var newText = input ? input.value.trim() : '';
+      if (!newText) return;
+      setDoc(doc(db, 'conductorNotes', saveId), {
+        note: newText,
+        updatedAt: serverTimestamp()
+      }, { merge: true }).then(function(){
+        editingNoteId = null;
+        return loadNotes();
+      }).catch(function(err){
+        alert('儲存失敗：' + err.code);
+      });
+      return;
+    }
+    var deleteBtn = e.target.closest('[data-note-delete]');
+    if (deleteBtn){
+      var delId = deleteBtn.getAttribute('data-note-delete');
+      var ok = confirm('確定要刪除這則筆記嗎？');
+      if (!ok) return;
+      deleteDoc(doc(db, 'conductorNotes', delId)).then(function(){
+        return loadNotes();
+      }).catch(function(err){
+        alert('刪除失敗：' + err.code);
+      });
+    }
+  });
+
+  // ---------- 依樂器分類明細：預設收合，點了才展開 ----------
+  var instrumentToggleBtn = document.getElementById('instrumentToggleBtn');
+  var instrumentBarsExpanded = false;
+  instrumentToggleBtn.addEventListener('click', function(){
+    instrumentBarsExpanded = !instrumentBarsExpanded;
+    document.getElementById('instrumentBars').classList.toggle('hidden', !instrumentBarsExpanded);
+    instrumentToggleBtn.textContent = (instrumentBarsExpanded ? '▾' : '▸') + ' 分部出席清單';
+  });
+
+  // ---------- 主流程 ----------
+  // settings/instruments 是後台可管理的清單（roles-admin.html），這頁只讀取、不修改，
+  // 讀不到才退回內建預設清單，不能整頁卡住
+  async function loadInstrumentsList(){
+    try {
+      var snap = await getDoc(doc(db, 'settings', 'instruments'));
+      instrumentsList = snap.exists() ? (snap.data().list || DEFAULT_INSTRUMENTS) : DEFAULT_INSTRUMENTS;
+    } catch (e) {
+      instrumentsList = DEFAULT_INSTRUMENTS;
+    }
+  }
+
+  // settings/seatingSections 同樣是後台可管理清單（roles-admin.html「座位圖分區設定」），
+  // 讀不到（還沒設定過或網路失敗）就退回 DEFAULT_SECTIONS，跟樂器清單一樣不能讓整頁卡住
+  async function loadSeatingSections(){
+    try {
+      seatingSectionsList = await getSeatingSectionsOnce(db);
+    } catch (e) {
+      seatingSectionsList = DEFAULT_SECTIONS;
+    }
+  }
+
+  async function boot(){
+    document.getElementById('nextEventLede').textContent = '正在載入下一場團練資料…';
+    loadNotes(); // 筆記本不綁活動，不用等下一場團練查完才載入，跟下面的流程各自獨立
+    await loadInstrumentsList();
+    await loadSeatingSections();
+    try {
+      nextEvent = await findNextEvent();
+    } catch (e) {
+      document.getElementById('nextEventLede').textContent = '讀取失敗，請重新整理再試一次';
+      return;
+    }
+
+    if (!nextEvent){
+      document.getElementById('nextEventLede').textContent = '';
+      document.getElementById('emptyState').classList.remove('hidden');
+      return;
+    }
+
+    document.getElementById('nextEventLede').textContent = '以下資料針對下一場團練顯示。';
+    document.getElementById('contentSections').classList.remove('hidden');
+    document.getElementById('nextEventTitle').textContent = nextEvent.title;
+    document.getElementById('nextEventMeta').textContent =
+      (nextEvent.date ? (nextEvent.date.getMonth() + 1) + '/' + nextEvent.date.getDate() + '（' + nextEvent.date.toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit', hour12:false }) + '）' : '時間未定') +
+      (nextEvent.location ? ' · ' + nextEvent.location : '');
+
+    try {
+      await loadEventData(nextEvent.id);
+    } catch (e) {
+      document.getElementById('nextEventMeta').textContent = '讀取失敗，請重新整理再試一次';
+      return;
+    }
+
+    renderSummary();
+    renderInstrumentGrid();
+    renderSeatChart();
+  }
+
+  requireAdminOrConductor().then(function(result){
+    if (!result) return;
+    currentUid = result.uid;
+
+    var avatarBtn = document.getElementById('avatarBtn');
+    avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
+    avatarBtn.classList.remove('skel');
+    var isAdmin = result.profile.role === 'admin' || result.profile.role === 'owner';
+    initAccountMenu(result.profile.name, isAdmin ? 'admin-index.html' : null, null);
+
+    subscribeEventTypes(db, function(types){
+      eventTypesById = {};
+      types.forEach(function(t){ eventTypesById[t.id] = t; });
+      typesLoaded = true;
+      boot();
+    }, null, function(){
+      document.getElementById('nextEventLede').textContent = '讀取失敗，請重新整理再試一次';
+    });
+  });
+</script>
+</body>
+</html>

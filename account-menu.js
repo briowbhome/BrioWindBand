@@ -27,8 +27,10 @@ function ensureStyle() {
 
 // 掛在 appbar 右上角大頭貼按鈕上的帳號選單。
 // adminHref：只有需要顯示「後台管理」連結時才傳（例如 index.html 對幹部/擁有者），其他頁面不用傳。
+// conductorHref：只有需要顯示「指揮專用」連結時才傳（index.html 對指揮/幹部/擁有者），其他頁面不用傳；
+// admin/owner 也看得到這個連結，不是只有 conductor 才有，方便幹部直接進去看
 // 之後「帳號資料」頁做出來可以在這裡再加一個入口
-export function initAccountMenu(name, adminHref) {
+export function initAccountMenu(name, adminHref, conductorHref) {
   var avatarBtn = document.getElementById('avatarBtn');
   if (!avatarBtn) return;
 
@@ -42,6 +44,7 @@ export function initAccountMenu(name, adminHref) {
   menu.innerHTML =
     '<div class="acct-name"></div>' +
     (adminHref ? '<a href="' + adminHref + '">後台管理</a>' : '') +
+    (conductorHref ? '<a href="' + conductorHref + '">指揮專用</a>' : '') +
     '<button type="button" data-action="logout">登出</button>' +
     '<div class="acct-version">v' + APP_VERSION + '</div>';
   menu.querySelector('.acct-name').textContent = name || '';
