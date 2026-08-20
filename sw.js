@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'brio-v9';
+const CACHE_VERSION = 'brio-v11';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -8,7 +8,7 @@ const CORE_ASSETS = [
   './admin-index.html',
   './members-admin.html',
   './event-admin.html',
-  './checkin-admin.html',
+  './roster-admin.html',
   './announce-admin.html',
   './roles-admin.html',
   './stats-admin.html',

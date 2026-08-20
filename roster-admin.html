@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>布利歐管樂團｜名單管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#F2EFE5">
+<link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+<script src="./pwa-register.js" defer></script>
+<style>
+  :root{
+    --ink:#20242F;
+    --ink-soft:#4A4F5C;
+    --paper:#F2EFE5;
+    --paper-raised:#FBFAF4;
+    --line:#DAD3BE;
+    --brass:#B8863A;
+    --brass-deep:#8F6A2C;
+    --burgundy:#7A2331;
+    --burgundy-deep:#5C1A26;
+    --sage:#5F6E58;
+    --sage-bg:#E7EBDF;
+    --radius-lg:20px;
+    --radius-md:14px;
+    --radius-sm:9px;
+    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% -10%, #EFE9D6 0%, transparent 45%),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Noto Sans TC','Noto Sans',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    min-height:100dvh;
+    display:flex;
+    justify-content:center;
+    padding: 0 0 calc(48px + env(safe-area-inset-bottom));
+  }
+
+  button, a, input{ -webkit-tap-highlight-color: transparent; font-family:inherit; }
+  :focus-visible{ outline:2.5px solid var(--brass-deep); outline-offset:2px; border-radius:6px; }
+
+  .app{
+    width:100%;
+    max-width:460px;
+    min-height:100vh;
+    min-height:100dvh;
+    background:var(--paper);
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .hidden{ display:none !important; }
+
+  /* ---------- Skeleton placeholders ---------- */
+  @keyframes skel-pulse{ 0%,100%{ opacity:.55; } 50%{ opacity:1; } }
+  .skel{ background:var(--line); animation:skel-pulse 1.4s ease-in-out infinite; }
+  .avatar.skel{ animation:skel-pulse 1.4s ease-in-out infinite; }
+  .skel-bar{ display:inline-block; border-radius:5px; }
+  @media (prefers-reduced-motion: reduce){
+    .skel, .avatar.skel{ animation:none; opacity:.75; }
+  }
+  .rt-skel-lines{ flex:1; display:flex; flex-direction:column; gap:7px; padding-top:2px; }
+
+  .appbar{ display:flex; align-items:center; gap:12px; padding:18px 20px 14px; }
+  .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
+  .brandtext{ display:flex; flex-direction:column; line-height:1.1; }
+  .brandtext .name{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:19px; letter-spacing:.02em; }
+  .brandtext .sub{ font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.14em; color:var(--ink-soft); margin-top:3px; text-transform:uppercase; }
+  .appbar .spacer{ flex:1; }
+  .avatar{
+    width:38px; height:38px; border-radius:50%;
+    background:var(--burgundy); color:#F2EFE5;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Noto Serif TC',serif; font-weight:700; font-size:14px;
+    border:2px solid var(--paper-raised); box-shadow:0 0 0 1.5px var(--line);
+    padding:0; cursor:pointer;
+  }
+  .back-btn{
+    width:30px; height:30px; flex:none;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--ink); text-decoration:none;
+  }
+  .brand-link{ display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; }
+
+  .staff{
+    height:16px; margin:0 20px 6px;
+    background-image: repeating-linear-gradient(var(--line), var(--line) 1px, transparent 1px, transparent 4px);
+    opacity:.9;
+  }
+
+  .section-label{ display:flex; align-items:baseline; gap:8px; margin:20px 20px 4px; }
+  .section-label .tw{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:15.5px; }
+  .section-label .en{ font-family:'Roboto Mono',monospace; font-size:10px; letter-spacing:.12em; color:var(--ink-soft); text-transform:uppercase; }
+  .lede{ margin:6px 20px 10px; font-size:12.5px; line-height:1.6; color:var(--ink-soft); }
+  .add-btn{
+    margin-left:auto; align-self:center;
+    border:1px solid var(--line); background:var(--paper); color:var(--brass-deep);
+    border-radius:999px; padding:6px 14px; font-size:11.5px; font-weight:700; cursor:pointer;
+  }
+  .add-btn:active{ background:var(--sage-bg); }
+
+  /* ---------- Template list ---------- */
+  .list{
+    margin:0 20px 24px;
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-card);
+    overflow:hidden;
+  }
+  .rt-item{ padding:10px 10px 10px 16px; display:flex; align-items:center; gap:4px; }
+  .rt-item + .rt-item{ border-top:1px solid var(--line); }
+  .rt-open{ flex:1; min-width:0; background:none; border:none; padding:8px 0; text-align:left; cursor:pointer; }
+  .rt-open:active{ opacity:.7; }
+  .rt-name{ font-weight:700; font-size:13.5px; color:var(--ink); }
+  .rt-meta{ margin-top:3px; font-size:11.5px; color:var(--ink-soft); }
+  .empty{ padding:36px 20px; text-align:center; font-size:13px; color:var(--ink-soft); }
+
+  /* ---------- Sheet ---------- */
+  .sheet-overlay{
+    position:fixed; inset:0; z-index:80;
+    background:rgba(32,36,47,.45);
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  .sheet-overlay.active{ display:flex; }
+  .sheet{
+    width:100%; max-width:460px; max-height:85vh;
+    background:var(--paper-raised);
+    border-radius:20px 20px 0 0;
+    display:flex; flex-direction:column;
+    box-shadow:0 -10px 30px rgba(32,36,47,.3);
+  }
+  .sheet-handle{ width:36px; height:4px; background:var(--line); border-radius:999px; margin:10px auto 2px; }
+  .sheet-header{ position:relative; padding:6px 44px 12px 20px; border-bottom:1px solid var(--line); }
+  .sheet-header .name{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:16px; }
+  .sheet-close{
+    position:absolute; top:4px; right:10px;
+    width:30px; height:30px; border-radius:50%; border:none; background:none;
+    color:var(--ink-soft); font-size:19px; line-height:1; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .sheet-close:active{ background:var(--paper); }
+  .sheet-body{ overflow-y:auto; padding:14px 20px 8px; }
+
+  .field{ margin-top:12px; display:flex; flex-direction:column; gap:6px; }
+  .field:first-child{ margin-top:0; }
+  .field label{
+    font-family:'Roboto Mono',monospace; font-size:10.5px; font-weight:600;
+    letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft);
+  }
+  .field input{
+    border:1px solid var(--line); background:var(--paper);
+    border-radius:var(--radius-sm); padding:11px 13px;
+    font-size:14px; color:var(--ink); width:100%;
+  }
+
+  /* ---------- 唯讀檢視 + 編輯觸發（比照 event-admin.html 活動資訊/名單調整分頁的既有模式） ---------- */
+  .info-row{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:9px 0; font-size:13px; border-bottom:1px solid var(--line); }
+  .info-row .k{ flex:none; color:var(--ink-soft); font-family:'Roboto Mono',monospace; font-size:10px; letter-spacing:.05em; }
+  .info-row .v{ font-weight:500; color:var(--ink); text-align:right; }
+  .survey-namelist{ margin-top:4px; font-size:12px; color:var(--ink); line-height:1.7; }
+  .info-edit-btn{
+    border:1px solid var(--line); background:var(--paper); color:var(--brass-deep);
+    border-radius:999px; padding:8px 18px; font-size:12.5px; font-weight:700; cursor:pointer;
+  }
+  .info-edit-btn:active{ background:var(--sage-bg); }
+  .info-edit-row{ display:flex; gap:8px; margin-top:14px; }
+  #templateDeleteBtn{ color:var(--burgundy-deep); border-color:#EFD4D8; }
+
+  .survey-section-label{
+    font-family:'Roboto Mono',monospace; font-size:10.5px; font-weight:700;
+    letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft);
+    margin:16px 0 8px;
+  }
+  .survey-bulk-row{ display:flex; gap:8px; margin-bottom:8px; }
+  .survey-bulk-row button{
+    border:1px solid var(--line); background:var(--paper); color:var(--ink-soft);
+    border-radius:999px; padding:5px 12px; font-size:11px; font-weight:700; cursor:pointer;
+  }
+  .survey-bulk-row button:active{ background:var(--sage-bg); color:var(--sage); }
+
+  .check-list{ display:flex; flex-direction:column; gap:2px; max-height:320px; overflow-y:auto; background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm); padding:4px 10px; }
+  .check-row{ display:flex; align-items:center; gap:10px; padding:7px 2px; }
+  .check-row + .check-row{ border-top:1px solid var(--line); }
+  .checkbox{
+    width:18px; height:18px; border-radius:5px; border:1.5px solid var(--line);
+    flex:none; display:flex; align-items:center; justify-content:center;
+    font-size:11px; color:#fff; cursor:pointer; background:none; padding:0;
+  }
+  .checkbox.on{ background:var(--brass); border-color:var(--brass); }
+  .check-text{ flex:1; font-size:12.5px; color:var(--ink); cursor:pointer; background:none; border:none; text-align:left; padding:0; }
+
+  .form-error{
+    margin-top:12px; font-size:12.5px; color:var(--burgundy);
+    background:#FBF3F3; border:1px solid #EFD4D8; border-radius:var(--radius-sm);
+    padding:10px 12px; display:none;
+  }
+  .form-error.show{ display:block; }
+
+  .sheet-footer{
+    display:flex; gap:10px;
+    padding:14px 20px calc(14px + env(safe-area-inset-bottom));
+    border-top:1px solid var(--line);
+  }
+  .cta-btn{
+    flex:1;
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    background:var(--brass); color:var(--ink); border:none;
+    border-radius:var(--radius-md); padding:14px 16px;
+    font-weight:700; font-size:14.5px; cursor:pointer;
+    transition:transform .12s ease, background .12s ease;
+  }
+  .cta-btn:active{ transform:scale(.98); background:var(--brass-deep); }
+  .cta-btn:disabled{ opacity:.55; cursor:default; transform:none; }
+  .cta-btn-secondary{ background:var(--paper); color:var(--ink-soft); border:1px solid var(--line); }
+  .cta-btn-secondary:active{ transform:scale(.98); background:var(--paper); }
+</style>
+</head>
+<body>
+<div class="app" id="appRoot">
+
+  <div class="appbar">
+    <a class="back-btn" href="admin-index.html" aria-label="回控制台首頁">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="m15 5-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <a class="brand-link" href="index.html">
+      <img class="mark" src="assets/BrioLogo.jpg" alt="布利歐管樂團 Logo">
+      <div class="brandtext">
+        <div class="name">布利歐管樂團</div>
+        <div class="sub">Brio Wind Band</div>
+      </div>
+    </a>
+    <div class="spacer"></div>
+    <button class="avatar skel" id="avatarBtn" type="button" aria-label="帳號選單"></button>
+  </div>
+
+  <div class="staff"></div>
+
+  <div class="section-label">
+    <span class="tw">名單管理</span>
+    <span class="en">Roster Templates</span>
+    <button type="button" class="add-btn" id="createTemplateBtn">＋ 新增名單</button>
+  </div>
+  <p class="lede">建立可重複套用的參與名單範本，建立/編輯活動時可以直接套用。</p>
+
+  <div class="list" id="templateList"></div>
+
+</div>
+
+<div class="sheet-overlay" id="templateSheetOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button type="button" class="sheet-close" id="templateSheetClose" aria-label="關閉">×</button>
+      <div class="name" id="templateSheetTitle">新增名單</div>
+    </div>
+    <div class="sheet-body">
+      <div id="templateViewMode" class="hidden">
+        <div class="info-row"><span class="k">成員</span><span class="v" id="templateViewCount">—</span></div>
+        <div class="survey-namelist" id="templateViewNames"></div>
+        <div class="info-edit-row">
+          <button type="button" class="info-edit-btn" id="templateEditBtn">✎ 編輯</button>
+          <button type="button" class="info-edit-btn" id="templateDeleteBtn">刪除</button>
+        </div>
+      </div>
+      <div id="templateEditForm">
+        <div class="field">
+          <label>名單名稱</label>
+          <input type="text" id="templateName" placeholder="例如：校友團六屆" required>
+        </div>
+
+        <div class="survey-section-label">成員</div>
+        <div class="survey-bulk-row">
+          <button type="button" id="templateSelectAllBtn">全選</button>
+          <button type="button" id="templateClearAllBtn">全部取消</button>
+        </div>
+        <div class="check-list" id="templateChecklist"></div>
+
+        <p class="form-error" id="templateFormError"></p>
+      </div>
+    </div>
+    <div class="sheet-footer" id="templateFormFooter">
+      <button type="button" class="cta-btn cta-btn-secondary hidden" id="templateCancelBtn">取消</button>
+      <button type="button" class="cta-btn" id="templateSaveBtn">建立名單</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { requireAdmin, peekCachedProfile } from './auth-guard.js';
+  import { db } from './firebase-init.js';
+  import { initAccountMenu } from './account-menu.js';
+  import {
+    collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot,
+    serverTimestamp, getDocs, query, where
+  } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+
+  function escapeHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+
+  var SKELETON_ROWS_HTML = [1, 2, 3].map(function(){
+    return (
+      '<div class="rt-item"><div class="rt-skel-lines">' +
+        '<span class="skel skel-bar" style="width:45%;height:13px;"></span>' +
+        '<span class="skel skel-bar" style="width:25%;height:10px;"></span>' +
+      '</div></div>'
+    );
+  }).join('');
+
+  var cachedProfile = peekCachedProfile();
+  if (cachedProfile && cachedProfile.name){
+    var avatarBtnEl = document.getElementById('avatarBtn');
+    avatarBtnEl.textContent = cachedProfile.name.charAt(0);
+    avatarBtnEl.classList.remove('skel');
+  }
+
+  var currentAdminUid = null;
+  var templatesById = {};
+  var templatesList = [];
+  var templatesLoaded = false;
+  var approvedMembers = null;
+  var editingTemplateId = null; // null = 新增模式
+  var draftSet = {}; // {uid: true}
+
+  var templateList = document.getElementById('templateList');
+  templateList.innerHTML = SKELETON_ROWS_HTML;
+
+  function renderTemplateAdminError(){
+    templateList.innerHTML = '<div class="empty">讀取失敗，請重新整理再試一次</div>';
+  }
+
+  function renderTemplateList(){
+    if (!templatesLoaded) return;
+    if (templatesList.length === 0){
+      templateList.innerHTML = '<div class="empty">目前還沒有任何名單</div>';
+      return;
+    }
+    templateList.innerHTML = templatesList.map(function(t){
+      return (
+        '<div class="rt-item">' +
+          '<button type="button" class="rt-open" data-open-template="' + t.id + '">' +
+            '<div class="rt-name">' + escapeHtml(t.name) + '</div>' +
+            '<div class="rt-meta">' + (t.members || []).length + ' 人</div>' +
+          '</button>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  async function ensureApprovedMembers(){
+    if (approvedMembers) return approvedMembers;
+    var snap = await getDocs(query(collection(db, 'users'), where('status', '==', 'approved')));
+    approvedMembers = snap.docs.map(function(docSnap){
+      var data = docSnap.data();
+      return { uid: docSnap.id, name: data.name, account: data.account };
+    });
+    return approvedMembers;
+  }
+
+  function renderChecklist(){
+    var checklist = document.getElementById('templateChecklist');
+    checklist.innerHTML = (approvedMembers || []).map(function(m){
+      var on = !!draftSet[m.uid];
+      return (
+        '<div class="check-row">' +
+          '<button type="button" class="checkbox' + (on ? ' on' : '') + '" data-uid="' + m.uid + '">' + (on ? '✓' : '') + '</button>' +
+          '<button type="button" class="check-text" data-uid="' + m.uid + '">' + escapeHtml(m.name) + '（' + escapeHtml(m.account) + '）</button>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function showFormError(message){
+    var el = document.getElementById('templateFormError');
+    el.textContent = message;
+    el.classList.toggle('show', !!message);
+  }
+
+  var templateSheetOverlay = document.getElementById('templateSheetOverlay');
+  var templateNameInput = document.getElementById('templateName');
+  var templateSaveBtn = document.getElementById('templateSaveBtn');
+  var templateDeleteBtn = document.getElementById('templateDeleteBtn');
+  var templateCancelBtn = document.getElementById('templateCancelBtn');
+  var templateViewMode = document.getElementById('templateViewMode');
+  var templateEditForm = document.getElementById('templateEditForm');
+  var templateFormFooter = document.getElementById('templateFormFooter');
+  var templateViewCount = document.getElementById('templateViewCount');
+  var templateViewNames = document.getElementById('templateViewNames');
+
+  // 唯讀摘要（只有編輯既有名單才會用到，新增名單沒有「唯讀」狀態可看，直接進表單）；
+  // 名單名稱顯示在 sheet 標題（見 openEditSheet），摘要內容不用重複顯示一次
+  function showTemplateView(t){
+    templateViewMode.classList.remove('hidden');
+    templateEditForm.classList.add('hidden');
+    templateFormFooter.classList.add('hidden');
+    document.getElementById('templateSheetTitle').textContent = t.name || '—';
+    var members = t.members || [];
+    templateViewCount.textContent = members.length + ' 人';
+    var namesByUid = {};
+    (approvedMembers || []).forEach(function(m){ namesByUid[m.uid] = m; });
+    templateViewNames.textContent = members.length === 0 ? '（無）' : members.map(function(uid){
+      var m = namesByUid[uid];
+      return m ? m.name : uid;
+    }).join('、');
+  }
+
+  function showTemplateEditForm(){
+    templateViewMode.classList.add('hidden');
+    templateEditForm.classList.remove('hidden');
+    templateFormFooter.classList.remove('hidden');
+  }
+
+  async function openCreateSheet(){
+    editingTemplateId = null;
+    draftSet = {};
+    templateNameInput.value = '';
+    document.getElementById('templateSheetTitle').textContent = '新增名單';
+    templateSaveBtn.textContent = '建立名單';
+    templateCancelBtn.classList.add('hidden'); // 新增沒有「唯讀」畫面可以取消回去，只有關閉整個 sheet
+    showFormError('');
+    await ensureApprovedMembers();
+    renderChecklist();
+    showTemplateEditForm();
+    templateSheetOverlay.classList.add('active');
+  }
+
+  // 點清單裡的名單，先看唯讀摘要，點「✎ 編輯」才進勾選畫面，不會一點開就是可編輯狀態
+  async function openEditSheet(templateId){
+    var t = templatesById[templateId];
+    if (!t) return;
+    editingTemplateId = templateId;
+    templateSaveBtn.textContent = '儲存變更';
+    templateCancelBtn.classList.remove('hidden');
+    showFormError('');
+    await ensureApprovedMembers();
+    showTemplateView(t);
+    templateSheetOverlay.classList.add('active');
+  }
+
+  document.getElementById('templateEditBtn').addEventListener('click', function(){
+    if (!editingTemplateId) return;
+    var t = templatesById[editingTemplateId];
+    if (!t) return;
+    draftSet = {};
+    (t.members || []).forEach(function(uid){ draftSet[uid] = true; });
+    templateNameInput.value = t.name || '';
+    renderChecklist();
+    showTemplateEditForm();
+  });
+
+  templateCancelBtn.addEventListener('click', function(){
+    if (!editingTemplateId) return;
+    var t = templatesById[editingTemplateId];
+    if (t) showTemplateView(t); // 放棄未存檔的草稿，回到唯讀摘要
+  });
+
+  function closeTemplateSheet(){
+    templateSheetOverlay.classList.remove('active');
+  }
+
+  document.getElementById('createTemplateBtn').addEventListener('click', openCreateSheet);
+  document.getElementById('templateSheetClose').addEventListener('click', closeTemplateSheet);
+  templateSheetOverlay.addEventListener('click', function(e){
+    if (e.target === templateSheetOverlay) closeTemplateSheet();
+  });
+
+  templateList.addEventListener('click', function(e){
+    var openBtn = e.target.closest('[data-open-template]');
+    if (openBtn) openEditSheet(openBtn.getAttribute('data-open-template'));
+  });
+
+  document.getElementById('templateChecklist').addEventListener('click', function(e){
+    var btn = e.target.closest('[data-uid]');
+    if (!btn) return;
+    var uid = btn.getAttribute('data-uid');
+    if (draftSet[uid]) delete draftSet[uid]; else draftSet[uid] = true;
+    var row = btn.closest('.check-row');
+    var checkboxEl = row.querySelector('.checkbox');
+    var on = !!draftSet[uid];
+    checkboxEl.classList.toggle('on', on);
+    checkboxEl.textContent = on ? '✓' : '';
+  });
+
+  document.getElementById('templateSelectAllBtn').addEventListener('click', function(){
+    (approvedMembers || []).forEach(function(m){ draftSet[m.uid] = true; });
+    renderChecklist();
+  });
+  document.getElementById('templateClearAllBtn').addEventListener('click', function(){
+    draftSet = {};
+    renderChecklist();
+  });
+
+  templateSaveBtn.addEventListener('click', function(){
+    var name = templateNameInput.value.trim();
+    if (!name){
+      showFormError('請輸入名單名稱');
+      return;
+    }
+    var duplicate = templatesList.some(function(t){
+      return t.name === name && t.id !== editingTemplateId;
+    });
+    if (duplicate){
+      showFormError('已經有一個叫「' + name + '」的名單了，請改用別的名稱，或直接編輯既有名單');
+      return;
+    }
+    showFormError('');
+    var members = Object.keys(draftSet);
+    templateSaveBtn.disabled = true;
+
+    var task = editingTemplateId
+      ? updateDoc(doc(db, 'rosterTemplates', editingTemplateId), {
+          name: name, members: members, updatedAt: serverTimestamp()
+        })
+      : addDoc(collection(db, 'rosterTemplates'), {
+          name: name, members: members,
+          createdBy: currentAdminUid, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+        });
+
+    task.then(function(){
+      templateSaveBtn.disabled = false;
+      closeTemplateSheet();
+    }).catch(function(err){
+      templateSaveBtn.disabled = false;
+      showFormError('操作失敗（' + err.code + '）');
+    });
+  });
+
+  templateDeleteBtn.addEventListener('click', function(){
+    if (!editingTemplateId) return;
+    var t = templatesById[editingTemplateId];
+    var ok = confirm(
+      '確定要刪除「' + (t ? t.name : '這份名單') + '」嗎？\n' +
+      '已經套用過這份名單的活動不受影響（活動名單是套用當下的複製快照），只是往後那些活動會顯示「來源名單已刪除」。\n' +
+      '此動作無法復原。'
+    );
+    if (!ok) return;
+    templateDeleteBtn.disabled = true;
+    deleteDoc(doc(db, 'rosterTemplates', editingTemplateId)).then(function(){
+      templateDeleteBtn.disabled = false;
+      closeTemplateSheet();
+    }).catch(function(err){
+      templateDeleteBtn.disabled = false;
+      alert('刪除失敗：' + err.code);
+    });
+  });
+
+  requireAdmin().then(function(result){
+    if (!result) return;
+    currentAdminUid = result.uid;
+
+    var avatarBtn = document.getElementById('avatarBtn');
+    avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
+    avatarBtn.classList.remove('skel');
+    initAccountMenu(result.profile.name);
+
+    onSnapshot(collection(db, 'rosterTemplates'), function(snap){
+      templatesById = {};
+      templatesList = [];
+      snap.forEach(function(docSnap){
+        var data = Object.assign({ id: docSnap.id }, docSnap.data());
+        templatesById[docSnap.id] = data;
+        templatesList.push(data);
+      });
+      templatesList.sort(function(a, b){ return (a.name || '').localeCompare(b.name || '', 'zh-Hant'); });
+      templatesLoaded = true;
+      renderTemplateList();
+    }, renderTemplateAdminError);
+  });
+</script>
+</body>
+</html>
