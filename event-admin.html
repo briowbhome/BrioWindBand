@@ -328,6 +328,8 @@
     padding:9px 12px; background:var(--sage-bg); color:var(--sage);
     font-size:11.5px; font-weight:700; border-radius:var(--radius-sm);
   }
+  .survey-toggle-group{ display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
+  .survey-toggle-hint{ font-size:10.5px; color:var(--ink-soft); }
   .survey-list{ margin-top:8px; background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm); overflow:hidden; }
   .survey-row{ padding:9px 12px; font-size:12px; }
   .survey-row + .survey-row{ border-top:1px solid var(--line); }
@@ -634,7 +636,13 @@
         </div>
       </div>
       <div id="sheetAttendanceTab" class="hidden">
-        <div class="survey-section-label">回報狀況</div>
+        <div class="survey-section-row">
+          <div class="survey-section-label">回報狀況</div>
+          <div class="survey-toggle-group">
+            <div id="surveyToggleSlot"></div>
+            <div id="surveyToggleHint" class="survey-toggle-hint hidden"></div>
+          </div>
+        </div>
         <div id="rosterReportsSlot"><div class="survey-empty">載入中…</div></div>
       </div>
       <div id="sheetCheckinTab" class="hidden">
@@ -1083,6 +1091,7 @@
     if (!openRosterEventId) return;
     showRosterView(); // 保險：確保離開「名單調整」時放棄任何未存檔的草稿
     setSheetTab('attendance');
+    renderSurveyToggle();
   });
 
   document.getElementById('infoEditBtn').addEventListener('click', function(){
@@ -1191,8 +1200,13 @@
     };
     if (isNew) payload.createdBy = currentAdminUid;
     await setDoc(doc(db, 'eventRosters', eventId), payload, { merge: true });
-    // 保險：搶在 eventRosters 的 onSnapshot 回來前，先用剛套用的結果更新本地資料
-    rostersById[eventId] = { members: template.members, sourceTemplateId: templateId };
+    // 保險：搶在 eventRosters 的 onSnapshot 回來前，先用剛套用的結果更新本地資料。
+    // surveyOpenedAt 沿用原本快取值（套用範本不寫這個欄位，merge 不會清掉它，本地快取也不該清掉）
+    rostersById[eventId] = {
+      members: template.members,
+      sourceTemplateId: templateId,
+      surveyOpenedAt: (rostersById[eventId] && rostersById[eventId].surveyOpenedAt) || null
+    };
   }
 
   // 重繪「建立活動」跟「名單調整」分頁的兩個範本下拉選單，保留使用者目前選取的值
@@ -1286,6 +1300,7 @@
     rosterViewNames.textContent = '';
     rosterReportsSlot.innerHTML = '<div class="survey-empty">載入中…</div>';
     rosterSheetOverlay.classList.add('active');
+    renderSurveyToggle(); // 名單資料是即時監聽、本來就有，不用等 loadReports 才能畫這塊
 
     await ensureApprovedMembers();
     showRosterView();
@@ -1338,9 +1353,14 @@
     rosterSaveBtn.disabled = true;
     setDoc(doc(db, 'eventRosters', eventId), payload, { merge: true }).then(function(){
       // 保險：搶在 eventRosters 的 onSnapshot 回來前，先用剛存的結果更新本地資料，
-      // 讓緊接著呼叫的 showRosterView() 不會顯示存檔前的舊人數；手動編輯不寫入 sourceTemplateId
-      // 這個欄位（merge 寫入不會動到它），本地快取也保留原值，不讓「來源範本」資訊列閃爍消失
-      rostersById[eventId] = { members: members, sourceTemplateId: (rostersById[eventId] && rostersById[eventId].sourceTemplateId) || null };
+      // 讓緊接著呼叫的 showRosterView() 不會顯示存檔前的舊人數；手動編輯不寫入 sourceTemplateId／
+      // surveyOpenedAt 這兩個欄位（merge 寫入不會動到它們），本地快取也保留原值，不讓「來源範本」
+      // 資訊列或「調查進行中」狀態因為手動存名單而閃爍消失
+      rostersById[eventId] = {
+        members: members,
+        sourceTemplateId: (rostersById[eventId] && rostersById[eventId].sourceTemplateId) || null,
+        surveyOpenedAt: (rostersById[eventId] && rostersById[eventId].surveyOpenedAt) || null
+      };
       showRosterView(); // 存檔後回到唯讀摘要，不關閉整個活動明細 sheet，方便接著切去其他分頁
     }).catch(function(err){
       alert('儲存失敗：' + err.code);
@@ -1724,9 +1744,47 @@
     try {
       var snap = await getDocs(query(collection(db, 'attendanceReports'), where('eventId', '==', eventId)));
       reportsByEvent[eventId] = snap.docs.map(function(d){ return d.data(); });
-      if (openRosterEventId === eventId) renderReportsSlot();
+      if (openRosterEventId === eventId){ renderReportsSlot(); renderSurveyToggle(); }
     } catch (err) {
       if (openRosterEventId === eventId) rosterReportsSlot.innerHTML = '<div class="survey-empty">載入失敗（' + err.code + '）</div>';
+    }
+  }
+
+  // 幹部手動發起/關閉出缺席調查：名單存在不等於調查已發起，兩者刻意拆成獨立狀態，
+  // 首頁的橫幅/通知中心只看 surveyOpenedAt，不看名單本身存不存在。
+  // 按鈕位置比照「簽到」分頁「簽到名單」標題旁的「＋ 手動新增簽到」，跟標題同一列靠右
+  // （沿用既有的 .survey-section-row/.add-btn，不用自己兜版型，也不會再有對不齊的問題）
+  function renderSurveyToggle(){
+    var eventId = openRosterEventId;
+    if (!eventId) return;
+    var slot = document.getElementById('surveyToggleSlot');
+    var hint = document.getElementById('surveyToggleHint');
+    var roster = rostersById[eventId];
+
+    if (roster && roster.surveyOpenedAt){
+      var d = roster.surveyOpenedAt;
+      var timeText = (d.getMonth() + 1) + '/' + d.getDate() + ' ' +
+        d.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false });
+      slot.innerHTML = '<button type="button" class="add-btn" id="surveyCloseBtn">關閉調查</button>';
+      hint.textContent = '已於 ' + timeText + ' 發起';
+      hint.classList.remove('hidden');
+      document.getElementById('surveyCloseBtn').addEventListener('click', function(){
+        // 單純的開關，隨時可以再重新發起，不是不可逆動作，不需要 confirm 擋一次
+        setDoc(doc(db, 'eventRosters', eventId), { surveyOpenedAt: null }, { merge: true })
+          .catch(function(err){ alert('關閉失敗（' + err.code + '），請再試一次'); });
+      });
+    } else {
+      slot.innerHTML = '<button type="button" class="add-btn" id="surveyStartBtn">發起調查</button>';
+      hint.classList.add('hidden');
+      hint.textContent = '';
+      document.getElementById('surveyStartBtn').addEventListener('click', function(){
+        if (!roster || !roster.members || roster.members.length === 0){
+          alert('請先到「參與名單」分頁建立名單後再發起調查');
+          return;
+        }
+        setDoc(doc(db, 'eventRosters', eventId), { surveyOpenedAt: serverTimestamp() }, { merge: true })
+          .catch(function(err){ alert('發起失敗（' + err.code + '），請再試一次'); });
+      });
     }
   }
 
@@ -2074,10 +2132,15 @@
       rostersById = {};
       snap.forEach(function(docSnap){
         var data = docSnap.data();
-        rostersById[docSnap.id] = { members: data.members || [], sourceTemplateId: data.sourceTemplateId || null };
+        rostersById[docSnap.id] = {
+          members: data.members || [],
+          sourceTemplateId: data.sourceTemplateId || null,
+          surveyOpenedAt: data.surveyOpenedAt && data.surveyOpenedAt.toDate ? data.surveyOpenedAt.toDate() : null
+        };
       });
       rostersLoaded = true;
       maybeRender();
+      if (openRosterEventId && activeSheetTab === 'attendance') renderSurveyToggle();
     }, function(err){ console.error('eventRosters 監聽失敗', err); });
 
     // 名單範本（roster-admin.html 管理）：只影響「建立活動」跟「名單調整」分頁的兩個下拉選單，

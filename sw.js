@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'brio-v11';
+const CACHE_VERSION = 'brio-v13';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -14,6 +14,7 @@ const CORE_ASSETS = [
   './stats-admin.html',
   './checkin-stats-admin.html',
   './conductor-admin.html',
+  './profile.html',
   './auth-guard.js',
   './auth-service.js',
   './firebase-init.js',
@@ -23,6 +24,7 @@ const CORE_ASSETS = [
   './instruments.js',
   './seating-chart.js',
   './ios-install.js',
+  './push-config.js',
   './manifest.json',
   './assets/BrioLogo.jpg',
   './assets/icons/icon-192.png',
@@ -59,5 +61,33 @@ self.addEventListener('fetch', (event) => {
         return response;
       })
       .catch(() => caches.match(event.request))
+  );
+});
+
+// 收「推播」的一半管線：這輪還沒有 Cloud Function 會真的送推播，先把接收端搭好，
+// 之後接上發送端就能直接用，不用回頭補這段
+self.addEventListener('push', (event) => {
+  var payload = {};
+  try { payload = event.data ? event.data.json() : {}; } catch (e) {}
+  var title = payload.title || '布利歐管樂團';
+  var options = {
+    body: payload.body || '',
+    icon: './assets/icons/icon-192.png',
+    badge: './assets/icons/icon-192.png',
+    data: { url: payload.url || './index.html' }
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  var url = (event.notification.data && event.notification.data.url) || './index.html';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (var i = 0; i < clientList.length; i++) {
+        if (clientList[i].url.indexOf(url) !== -1 && 'focus' in clientList[i]) return clientList[i].focus();
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(url);
+    })
   );
 });

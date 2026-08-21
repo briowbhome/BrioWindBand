@@ -587,7 +587,11 @@
       );
     }
 
-    var svg = '<svg viewBox="0 0 ' + layout.width + ' ' + layout.height + '" xmlns="http://www.w3.org/2000/svg">';
+    // width/height 屬性刻意跟 viewBox 一起給，不是只靠 CSS 的 width:100%;height:auto 算比例——
+    // 部分 iOS Safari 版本對「只有 viewBox、沒有明確 width/height」的 SVG 用 innerHTML 動態插入時，
+    // intrinsic ratio 算不出來會直接把高度收成 0（畫面上等於什麼都沒畫，但 DOM 節點其實都在），
+    // 這是已知的 WebKit 邊角案例，跟資料量/效能無關，補上明確尺寸就能繞過
+    var svg = '<svg viewBox="0 0 ' + layout.width + ' ' + layout.height + '" width="' + layout.width + '" height="' + layout.height + '" xmlns="http://www.w3.org/2000/svg">';
     svg += layout.wedges.map(function(z){
       return zoneGroup(z.instrumentName, z.label, z.colorKey, '<path d="' + z.path + '" style="fill:{FILL};"></path>', z.labelX, z.labelY);
     }).join('');

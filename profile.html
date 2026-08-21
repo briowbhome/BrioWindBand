@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>布利歐管樂團｜個人中心</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#F2EFE5">
+<link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+<script src="./pwa-register.js" defer></script>
+<script src="./ios-install.js" defer></script>
+<style>
+  :root{
+    --ink:#20242F;
+    --ink-soft:#4A4F5C;
+    --paper:#F2EFE5;
+    --paper-raised:#FBFAF4;
+    --line:#DAD3BE;
+    --brass:#B8863A;
+    --brass-deep:#8F6A2C;
+    --burgundy:#7A2331;
+    --burgundy-deep:#5C1A26;
+    --sage:#5F6E58;
+    --sage-bg:#E7EBDF;
+    --radius-lg:20px;
+    --radius-md:14px;
+    --radius-sm:9px;
+    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% -10%, #EFE9D6 0%, transparent 45%),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Noto Sans TC','Noto Sans',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    min-height:100dvh;
+    display:flex;
+    justify-content:center;
+  }
+
+  button, a{ -webkit-tap-highlight-color: transparent; font-family:inherit; }
+  :focus-visible{ outline:2.5px solid var(--brass-deep); outline-offset:2px; border-radius:6px; }
+
+  .app{
+    width:100%;
+    max-width:460px;
+    min-height:100vh;
+    min-height:100dvh;
+    background:var(--paper);
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .hidden{ display:none !important; }
+
+  /* ---------- Skeleton placeholders ---------- */
+  @keyframes skel-pulse{ 0%,100%{ opacity:.55; } 50%{ opacity:1; } }
+  .skel{ background:var(--line); animation:skel-pulse 1.4s ease-in-out infinite; }
+  .skel-bar{ display:inline-block; border-radius:5px; }
+  @media (prefers-reduced-motion: reduce){
+    .skel{ animation:none; opacity:.75; }
+  }
+
+  .appbar{ display:flex; align-items:center; gap:12px; padding:18px 20px 14px; }
+  .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
+  .brandtext{ display:flex; flex-direction:column; line-height:1.1; }
+  .brandtext .name{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:19px; letter-spacing:.02em; }
+  .brandtext .sub{ font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.14em; color:var(--ink-soft); margin-top:3px; text-transform:uppercase; }
+  .appbar .spacer{ flex:1; }
+
+  .avatar{
+    width:38px; height:38px; border-radius:50%;
+    background:var(--burgundy); color:#F2EFE5;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Noto Serif TC',serif; font-weight:700; font-size:14px;
+    border:2px solid var(--paper-raised); box-shadow:0 0 0 1.5px var(--line);
+    padding:0; flex:none;
+  }
+  .tab-avatar{ width:20px; height:20px; font-size:9.5px; border:none; box-shadow:none; }
+
+  .staff{
+    height:16px; margin:0 20px 6px;
+    background-image: repeating-linear-gradient(var(--line), var(--line) 1px, transparent 1px, transparent 4px);
+    opacity:.9;
+  }
+
+  /* ---------- 個人資訊卡 ---------- */
+  .profile-card{
+    margin:16px 20px; padding:18px 16px;
+    background:var(--paper-raised); border:1px solid var(--line);
+    border-radius:var(--radius-lg); box-shadow:var(--shadow-card);
+  }
+  .profile-header{ display:flex; align-items:center; gap:14px; }
+  .profile-header .avatar{ width:52px; height:52px; font-size:19px; }
+  .profile-header .who{ min-width:0; }
+  .profile-header .who .pname-row{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+  .profile-header .who .pname{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:17px; color:var(--ink); }
+  .role-badge{
+    font-size:10px; font-weight:700; color:var(--brass-deep);
+    background:#F3E7D4; border-radius:999px; padding:2px 8px;
+  }
+  .profile-header .who .pmeta{ margin-top:4px; font-size:12px; color:var(--ink-soft); }
+
+  .profile-detail{ margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
+  .profile-detail .info-row{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:5px 0; font-size:12.5px; }
+  .profile-detail .info-row .k{ color:var(--ink-soft); }
+  .profile-detail .info-row .v{ color:var(--ink); font-weight:500; text-align:right; }
+  .profile-edit-btn-row{ margin-top:14px; text-align:right; }
+  .profile-edit-btn{
+    border:1px solid var(--line); background:var(--paper); color:var(--brass-deep);
+    border-radius:999px; padding:8px 18px; font-size:12.5px; font-weight:700; cursor:pointer;
+  }
+  .profile-edit-btn:active{ background:var(--sage-bg); }
+
+  .profile-edit-title{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:15px; color:var(--ink); margin-bottom:14px; }
+  .profile-edit-form .field{ margin-bottom:12px; }
+  .profile-edit-form .field label{
+    display:block; font-family:'Roboto Mono',monospace; font-size:10px; font-weight:600;
+    letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:5px;
+  }
+  .profile-edit-form .field input[type=text], .profile-edit-form .field input[type=tel]{
+    width:100%; border:1px solid var(--line); background:var(--paper);
+    border-radius:var(--radius-sm); padding:10px 12px; font-size:13px; color:var(--ink);
+  }
+  .profile-form-error{ font-size:12px; color:var(--burgundy-deep); margin-bottom:10px; }
+  .profile-edit-actions{ display:flex; gap:8px; margin-top:4px; }
+  .profile-edit-actions button{ flex:1; text-align:center; padding:11px 4px; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer; }
+  .profile-edit-cancel{ border:1px solid var(--line); background:none; color:var(--ink-soft); }
+  .profile-edit-save{ border:none; background:var(--brass); color:var(--ink); }
+  .profile-edit-save:disabled{ opacity:.55; cursor:default; }
+
+  /* ---------- 通知中心（跟 index.html 同一套，appbar 也要看得到） ---------- */
+  .bell-btn{
+    position:relative; width:34px; height:34px; flex:none;
+    background:none; border:none; padding:0; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .notif-dot{
+    position:absolute; top:3px; right:5px;
+    width:8px; height:8px; border-radius:50%;
+    background:var(--burgundy); border:1.5px solid var(--paper);
+  }
+  .sheet-overlay{
+    position:fixed; inset:0; z-index:80;
+    background:rgba(32,36,47,.45);
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  .sheet-overlay.active{ display:flex; }
+  .sheet{
+    width:100%; max-width:460px; max-height:85vh;
+    background:var(--paper-raised);
+    border-radius:20px 20px 0 0;
+    display:flex; flex-direction:column;
+    box-shadow:0 -10px 30px rgba(32,36,47,.3);
+  }
+  .sheet-handle{ width:36px; height:4px; background:var(--line); border-radius:999px; margin:10px auto 2px; }
+  .sheet-header{ position:relative; padding:6px 44px 12px 20px; border-bottom:1px solid var(--line); }
+  .sheet-header .name{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:16px; }
+  .sheet-header .tw{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:15.5px; }
+  .sheet-header .hint{ margin-top:3px; font-size:11.5px; color:var(--ink-soft); }
+  .sheet-close{
+    position:absolute; top:4px; right:10px;
+    width:30px; height:30px; border-radius:50%; border:none; background:none;
+    color:var(--ink-soft); font-size:19px; line-height:1; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .sheet-close:active{ background:var(--paper); }
+  .sheet-body{ overflow-y:auto; padding:16px 20px 8px; }
+  .sheet-footer{ padding:14px 20px calc(14px + env(safe-area-inset-bottom)); border-top:1px solid var(--line); }
+  .cta-btn{
+    width:100%; display:flex; align-items:center; justify-content:center; gap:10px;
+    background:var(--brass); color:var(--ink); border:none;
+    border-radius:var(--radius-md); padding:13px 16px;
+    font-weight:700; font-size:14px; cursor:pointer;
+  }
+  .cta-btn:active{ transform:scale(.98); background:var(--brass-deep); }
+
+  /* ---------- Birthday wheel picker（跟 login.html 同一套，複製一份） ---------- */
+  .picker-trigger{
+    width:100%; border:1px solid var(--line); background:var(--paper);
+    border-radius:var(--radius-sm); padding:11px 14px;
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    cursor:pointer; text-align:left; font-size:13px; color:var(--ink);
+  }
+  .picker-trigger .placeholder{ color:#B4AD97; font-size:13px; }
+  .picker-trigger .chev{ flex:none; width:16px; height:16px; opacity:.55; }
+  .wheel-picker{ display:flex; position:relative; height:200px; padding:4px 0; }
+  .wheel-highlight{
+    position:absolute; left:0; right:0; top:84px; height:40px;
+    border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+    background:rgba(184,134,58,.08); pointer-events:none; border-radius:8px;
+  }
+  .wheel-col{
+    flex:1; height:200px; overflow-y:auto; scroll-snap-type:y mandatory;
+    -webkit-overflow-scrolling:touch; scrollbar-width:none;
+  }
+  .wheel-col::-webkit-scrollbar{ display:none; }
+  .wheel-col .wheel-pad{ height:80px; }
+  .wheel-item{
+    height:40px; display:flex; align-items:center; justify-content:center;
+    scroll-snap-align:center; font-family:'Roboto Mono',monospace;
+    font-size:15px; color:#B4AD97;
+  }
+  .wheel-item.active{ color:var(--ink); font-weight:700; font-size:16px; }
+  .notif-section-label{
+    font-family:'Roboto Mono',monospace; font-size:10px; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--brass-deep); margin:0 0 8px;
+  }
+  .notif-section{ margin-bottom:20px; }
+  .notif-row{
+    display:flex; align-items:center; gap:10px;
+    padding:12px 13px; background:var(--paper); border:1px solid var(--line);
+    border-radius:12px; margin-bottom:8px; cursor:pointer; text-align:left; width:100%;
+  }
+  .notif-row .dot{ flex:none; width:7px; height:7px; border-radius:50%; background:var(--burgundy); }
+  .notif-row .body{ flex:1; min-width:0; }
+  .notif-row .title{ font-size:12.5px; color:var(--ink); font-weight:700; }
+  .notif-row .meta{ font-size:11px; color:var(--ink-soft); margin-top:2px; }
+  .notif-empty{ font-size:12px; color:var(--ink-soft); padding:6px 2px 14px; }
+  .notif-viewall{
+    display:block; width:100%; background:none; border:none;
+    text-align:center; font-size:12px; font-weight:700; color:var(--brass-deep);
+    padding:6px; cursor:pointer;
+  }
+
+  /* ---------- 通知開關 ---------- */
+  .pref-card{
+    margin:0 20px 14px; padding:16px;
+    background:var(--paper-raised); border:1px solid var(--line);
+    border-radius:var(--radius-lg); box-shadow:var(--shadow-card);
+  }
+  .pref-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .pref-row .label{ font-size:13.5px; font-weight:700; color:var(--ink); }
+  .pref-hint{ margin-top:8px; font-size:11.5px; color:var(--ink-soft); line-height:1.55; }
+  .pref-hint.warn{ color:var(--burgundy-deep); }
+
+  .toggle-switch{
+    position:relative; flex:none; width:44px; height:26px; border-radius:999px;
+    border:none; padding:0; cursor:pointer; background:var(--line);
+    transition:background .15s ease;
+  }
+  .toggle-switch .knob{
+    position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%;
+    background:#fff; box-shadow:0 1px 2px rgba(32,36,47,.25);
+    transition:transform .15s ease;
+  }
+  .toggle-switch.on{ background:var(--sage); }
+  .toggle-switch.on .knob{ transform:translateX(18px); }
+  .toggle-switch:disabled{ opacity:.5; cursor:default; }
+
+  /* ---------- 連結列 ---------- */
+  .link-list{ margin:0 20px 14px; display:flex; flex-direction:column; gap:8px; }
+  .link-row{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:12px 15px; background:var(--paper-raised); border:1px solid var(--line);
+    border-radius:12px; font-size:13px; color:var(--ink); text-decoration:none; font-weight:500;
+  }
+  .link-row .chev{ color:var(--brass-deep); }
+
+  .logout-btn{
+    display:block; width:calc(100% - 40px); margin:6px 20px 14px;
+    text-align:center; padding:12px; border:1px solid var(--burgundy); border-radius:12px;
+    color:var(--burgundy); background:none; font-size:13.5px; font-weight:700; cursor:pointer;
+  }
+  .logout-btn:active{ background:var(--sage-bg); }
+
+  .version-footer{
+    text-align:center; font-family:'Roboto Mono',monospace; font-size:10.5px;
+    color:var(--ink-soft); letter-spacing:.06em; margin-bottom:16px;
+  }
+
+  /* ---------- Bottom tab bar ---------- */
+  .tabbar{
+    position:sticky; bottom:0; margin-top:auto;
+    background:var(--paper-raised); border-top:1px solid var(--line);
+    padding: 8px 10px calc(10px + env(safe-area-inset-bottom));
+    display:flex; justify-content:space-around;
+  }
+  .tab{
+    display:flex; flex-direction:column; align-items:center; gap:3px;
+    background:none; border:none; cursor:pointer;
+    color:var(--ink-soft); text-decoration:none;
+    font-family:'Noto Sans TC',sans-serif; font-size:10.5px;
+    padding:4px 10px;
+  }
+  .tab.active{ color:var(--burgundy); }
+  .tab .ico{ width:20px; height:20px; }
+  .tab.tab-soon{ opacity:.42; }
+
+  .soon-toast{
+    position:fixed; left:50%; bottom:calc(72px + env(safe-area-inset-bottom));
+    transform:translate(-50%,8px);
+    background:var(--ink); color:var(--paper);
+    font-family:'Noto Sans TC',sans-serif; font-size:12px; font-weight:600;
+    padding:8px 16px; border-radius:999px;
+    opacity:0; pointer-events:none; z-index:60;
+    transition:opacity .2s ease, transform .2s ease;
+  }
+  .soon-toast.show{ opacity:1; transform:translate(-50%,0); }
+</style>
+</head>
+<body>
+<div class="app" id="appRoot">
+
+  <div class="appbar">
+    <img class="mark" src="assets/BrioLogo.jpg" alt="布利歐管樂團 Logo">
+    <div class="brandtext">
+      <div class="name">布利歐管樂團</div>
+      <div class="sub">Brio Wind Band</div>
+    </div>
+    <div class="spacer"></div>
+    <button class="bell-btn" id="notifBtn" type="button" aria-label="通知">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none"><path d="M6 9a6 6 0 0 1 12 0v4l1.8 3.2a.6.6 0 0 1-.5.9H4.7a.6.6 0 0 1-.5-.9L6 13V9Z" stroke="#20242F" stroke-width="1.6" stroke-linejoin="round"/><path d="M9.5 19.5a2.5 2.5 0 0 0 5 0" stroke="#20242F" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span class="notif-dot hidden" id="notifDot"></span>
+    </button>
+  </div>
+
+  <div class="staff"></div>
+
+  <div class="profile-card">
+    <div id="profileViewMode">
+      <div class="profile-header">
+        <div class="avatar skel" id="profileAvatar"></div>
+        <div class="who">
+          <div class="pname-row">
+            <span class="pname skel skel-bar" id="profileName" style="width:80px;height:17px;">&nbsp;</span>
+            <span class="role-badge hidden" id="profileRoleBadge"></span>
+          </div>
+          <div class="pmeta skel skel-bar" id="profileMeta" style="width:120px;height:12px;margin-top:6px;">&nbsp;</div>
+        </div>
+      </div>
+      <div class="profile-detail hidden" id="profileDetail">
+        <div class="info-row"><span class="k">生日</span><span class="v" id="profileBirthdayView">—</span></div>
+        <div class="info-row"><span class="k">電話</span><span class="v" id="profilePhoneView">—</span></div>
+        <div class="info-row"><span class="k">車牌</span><span class="v" id="profilePlateView">—</span></div>
+      </div>
+      <div class="profile-edit-btn-row hidden" id="profileEditBtnRow">
+        <button type="button" class="profile-edit-btn" id="profileEditBtn">✎ 編輯個人資料</button>
+      </div>
+    </div>
+    <div id="profileEditMode" class="hidden">
+      <div class="profile-edit-title">編輯個人資料</div>
+      <p class="profile-form-error hidden" id="profileFormError"></p>
+      <div class="profile-edit-form">
+        <div class="field">
+          <label>姓名</label>
+          <input type="text" id="profileNameInput" placeholder="請輸入真實姓名">
+        </div>
+        <div class="field">
+          <label>生日</label>
+          <button type="button" class="picker-trigger" id="profileBirthdayTrigger">
+            <span id="profileBirthdayTriggerText" class="placeholder">點擊選擇生日</span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="#4A4F5C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+        <div class="field">
+          <label>電話</label>
+          <input type="tel" id="profilePhoneInput" placeholder="0912345678" autocomplete="tel" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label>車牌（選填）</label>
+          <input type="text" id="profilePlateInput" placeholder="例如 ABC-1234">
+        </div>
+      </div>
+      <div class="profile-edit-actions">
+        <button type="button" class="profile-edit-cancel" id="profileEditCancelBtn">取消</button>
+        <button type="button" class="profile-edit-save" id="profileEditSaveBtn">儲存變更</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 生日 年月日滾輪 Bottom Sheet（跟 login.html 同一套，複製一份） -->
+  <div class="sheet-overlay" id="birthdaySheetOverlay">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div class="tw">選擇生日</div>
+        <div class="hint">上下滑動選擇年、月、日</div>
+      </div>
+      <div class="sheet-body">
+        <div class="wheel-picker">
+          <div class="wheel-highlight"></div>
+          <div class="wheel-col" id="wheelYear"></div>
+          <div class="wheel-col" id="wheelMonth"></div>
+          <div class="wheel-col" id="wheelDay"></div>
+        </div>
+      </div>
+      <div class="sheet-footer">
+        <button type="button" class="cta-btn" id="birthdaySheetDoneBtn">完成</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="pref-card">
+    <div class="pref-row">
+      <div class="label">推播通知</div>
+      <button type="button" class="toggle-switch" id="notifToggle" aria-label="開啟推播通知"><span class="knob"></span></button>
+    </div>
+    <div class="pref-hint hidden" id="notifHint"></div>
+  </div>
+
+  <div class="link-list" id="adminLinks"></div>
+
+  <button type="button" class="logout-btn" id="logoutBtn">登出</button>
+  <div class="version-footer" id="versionFooter"></div>
+
+  <!-- Bottom tab bar -->
+  <div class="tabbar">
+    <a class="tab" href="index.html">
+      <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M4 11 12 4l8 7" stroke="#4A4F5C" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10v9h12v-9" stroke="#4A4F5C" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      首頁
+    </a>
+    <button class="tab tab-soon">
+      <svg class="ico" viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="16" rx="2" stroke="#4A4F5C" stroke-width="1.6"/><path d="M4 10h16M9 3v4M15 3v4" stroke="#4A4F5C" stroke-width="1.6" stroke-linecap="round"/></svg>
+      行事曆
+    </button>
+    <button class="tab tab-soon">
+      <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M6 4h9l3 3v13H6z" stroke="#4A4F5C" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 11h6M9 14h6M9 17h4" stroke="#4A4F5C" stroke-width="1.6" stroke-linecap="round"/></svg>
+      譜夾
+    </button>
+    <span class="tab active">
+      <span class="avatar tab-avatar" id="tabAvatarIcon" style="background:var(--burgundy);"></span>
+      我的
+    </span>
+  </div>
+
+  <div class="soon-toast" id="soonToast">即將推出</div>
+
+</div>
+
+<!-- 通知中心 Bottom Sheet（跟 index.html 同一套，todo/公告點擊都導去首頁處理，這裡不重做整個回報流程） -->
+<div class="sheet-overlay" id="notifSheetOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button type="button" class="sheet-close" id="notifSheetClose" aria-label="關閉">×</button>
+      <div class="name">通知</div>
+    </div>
+    <div class="sheet-body">
+      <div class="notif-section">
+        <div class="notif-section-label">待辦事項</div>
+        <div id="notifTodoList"></div>
+      </div>
+      <div class="notif-section">
+        <div class="notif-section-label">公告</div>
+        <div id="notifAnnounceList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { requireApprovedMember, peekCachedProfile, logout } from './auth-guard.js';
+  import { db } from './firebase-init.js';
+  import {
+    collection, query, where, orderBy, limit, onSnapshot,
+    doc, getDoc, setDoc, serverTimestamp
+  } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+  import { APP_VERSION } from './version.js';
+  import { VAPID_PUBLIC_KEY } from './push-config.js';
+
+  // 還沒做的分頁（行事曆/譜夾）：反灰 + 點擊顯示「即將推出」提示
+  var soonToast = document.getElementById('soonToast');
+  var soonTimer = null;
+  document.querySelectorAll('.tab-soon').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      if (soonTimer) clearTimeout(soonTimer);
+      soonToast.classList.add('show');
+      soonTimer = setTimeout(function(){ soonToast.classList.remove('show'); }, 1500);
+    });
+  });
+
+  function isIOS(){
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  }
+  function isStandalone(){
+    return window.navigator.standalone === true ||
+      window.matchMedia('(display-mode: standalone)').matches;
+  }
+  function urlBase64ToUint8Array(base64String){
+    var padding = '='.repeat((4 - base64String.length % 4) % 4);
+    var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    var rawData = window.atob(base64);
+    var outputArray = new Uint8Array(rawData.length);
+    for (var i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+    return outputArray;
+  }
+
+  // 骨架畫面：頁面一開始就顯示（不等驗證），姓名縮寫不是敏感資訊，有快取先猜著填
+  var cachedProfile = peekCachedProfile();
+  if (cachedProfile && cachedProfile.name){
+    document.getElementById('profileAvatar').textContent = cachedProfile.name.charAt(0);
+    document.getElementById('profileAvatar').classList.remove('skel');
+    document.getElementById('tabAvatarIcon').textContent = cachedProfile.name.charAt(0);
+  }
+
+  requireApprovedMember().then(function(result){
+    if (!result) return;
+    var profile = result.profile;
+
+    document.getElementById('profileAvatar').textContent = profile.name ? profile.name.charAt(0) : '?';
+    document.getElementById('profileAvatar').classList.remove('skel');
+    document.getElementById('tabAvatarIcon').textContent = profile.name ? profile.name.charAt(0) : '?';
+
+    var nameEl = document.getElementById('profileName');
+    nameEl.textContent = profile.name || '—';
+    nameEl.classList.remove('skel', 'skel-bar');
+    nameEl.style.width = '';
+    nameEl.style.height = '';
+
+    var metaEl = document.getElementById('profileMeta');
+    metaEl.textContent = '帳號：' + (profile.account || '—') +
+      (profile.instruments && profile.instruments.length ? '・' + profile.instruments.join('、') : '');
+    metaEl.classList.remove('skel', 'skel-bar');
+    metaEl.style.width = '';
+    metaEl.style.height = '';
+
+    document.getElementById('versionFooter').textContent = 'v' + APP_VERSION;
+
+    // ---------- 角色標籤：非團員（指揮/管理員/Owner）才顯示，文字沿用 members-admin.html／
+    // roles-admin.html 同一套 ROLE_LABELS ----------
+    var ROLE_LABELS = { member: '團員', conductor: '指揮', admin: '管理員', owner: 'Owner' };
+    if (profile.role && profile.role !== 'member'){
+      var roleBadgeEl = document.getElementById('profileRoleBadge');
+      roleBadgeEl.textContent = ROLE_LABELS[profile.role] || profile.role;
+      roleBadgeEl.classList.remove('hidden');
+    }
+
+    // ---------- 個人資料唯讀摘要／編輯：先看後編，跟專案其他地方（活動資訊分頁等）同一套模式，
+    // 同一張卡片內原地切換，不另外開 sheet。可編輯欄位是姓名/生日/電話/車牌，不含樂器/聲部
+    // （樂器/聲部牽動座位圖/簽到分區/分部長指派等多處邏輯，維持由幹部在 roles-admin.html 調整）----------
+    function formatBirthdayDisplay(iso){
+      if (!iso) return '未填寫';
+      var parts = String(iso).split('-');
+      if (parts.length !== 3) return iso;
+      return Number(parts[0]) + '年' + Number(parts[1]) + '月' + Number(parts[2]) + '日';
+    }
+
+    document.getElementById('profileBirthdayView').textContent = formatBirthdayDisplay(profile.birthday);
+    document.getElementById('profilePhoneView').textContent = profile.phone || '未填寫';
+    document.getElementById('profilePlateView').textContent = profile.licensePlate || '未填寫';
+    document.getElementById('profileDetail').classList.remove('hidden');
+    document.getElementById('profileEditBtnRow').classList.remove('hidden');
+
+    var profileViewMode = document.getElementById('profileViewMode');
+    var profileEditMode = document.getElementById('profileEditMode');
+    var profileNameInput = document.getElementById('profileNameInput');
+    var profilePhoneInput = document.getElementById('profilePhoneInput');
+    var profilePlateInput = document.getElementById('profilePlateInput');
+    var profileBirthdayTriggerText = document.getElementById('profileBirthdayTriggerText');
+    var profileFormError = document.getElementById('profileFormError');
+
+    // 生日：年月日滾輪，跟 login.html 同一套寫法內聯複製一份（專案慣例：不共用邏輯檔）
+    var WHEEL_ITEM_H = 40;
+    var YEAR_NOW = new Date().getFullYear();
+    var YEAR_MIN = YEAR_NOW - 100;
+    var YEAR_MAX = YEAR_NOW - 5;
+    var YEAR_VALUES = [];
+    for (var y = YEAR_MAX; y >= YEAR_MIN; y--) YEAR_VALUES.push(y);
+    var MONTH_VALUES = [1,2,3,4,5,6,7,8,9,10,11,12];
+
+    var birthdayState = { year: YEAR_NOW - 25, month: 1, day: 1 };
+    var wheelYear = document.getElementById('wheelYear');
+    var wheelMonth = document.getElementById('wheelMonth');
+    var wheelDay = document.getElementById('wheelDay');
+    var birthdaySheetOverlay = document.getElementById('birthdaySheetOverlay');
+    var dayValues = [];
+
+    function daysInMonth(year, month){ return new Date(year, month, 0).getDate(); }
+
+    function buildWheelColumn(col, values, formatter){
+      col.innerHTML = '<div class="wheel-pad"></div>' +
+        values.map(function(v){ return '<div class="wheel-item" data-value="' + v + '">' + formatter(v) + '</div>'; }).join('') +
+        '<div class="wheel-pad"></div>';
+    }
+
+    function setWheelPosition(col, values, value){
+      var idx = values.indexOf(value);
+      if (idx === -1) idx = 0;
+      col.scrollTop = idx * WHEEL_ITEM_H;
+      highlightWheelIndex(col, idx);
+    }
+
+    function highlightWheelIndex(col, idx){
+      var items = col.querySelectorAll('.wheel-item');
+      items.forEach(function(el, i){ el.classList.toggle('active', i === idx); });
+    }
+
+    function clampedIndex(col, count){
+      var idx = Math.round(col.scrollTop / WHEEL_ITEM_H);
+      if (idx < 0) idx = 0;
+      if (idx > count - 1) idx = count - 1;
+      return idx;
+    }
+
+    function rebuildDayColumn(){
+      var maxDay = daysInMonth(birthdayState.year, birthdayState.month);
+      if (birthdayState.day > maxDay) birthdayState.day = maxDay;
+      var dayVals = [];
+      for (var d = 1; d <= maxDay; d++) dayVals.push(d);
+      buildWheelColumn(wheelDay, dayVals, function(v){ return v + '日'; });
+      setWheelPosition(wheelDay, dayVals, birthdayState.day);
+      return dayVals;
+    }
+
+    function attachWheelScroll(col, getValues, onSettle){
+      col.addEventListener('scroll', function(){
+        var idx = clampedIndex(col, getValues().length);
+        highlightWheelIndex(col, idx);
+        clearTimeout(col._settleTimer);
+        col._settleTimer = setTimeout(function(){
+          var settledIdx = clampedIndex(col, getValues().length);
+          onSettle(getValues()[settledIdx]);
+        }, 120);
+      });
+    }
+
+    buildWheelColumn(wheelYear, YEAR_VALUES, function(v){ return v + '年'; });
+    buildWheelColumn(wheelMonth, MONTH_VALUES, function(v){ return v + '月'; });
+
+    attachWheelScroll(wheelYear, function(){ return YEAR_VALUES; }, function(value){
+      birthdayState.year = value;
+      dayValues = rebuildDayColumn();
+    });
+    attachWheelScroll(wheelMonth, function(){ return MONTH_VALUES; }, function(value){
+      birthdayState.month = value;
+      dayValues = rebuildDayColumn();
+    });
+    attachWheelScroll(wheelDay, function(){ return dayValues; }, function(value){
+      birthdayState.day = value;
+    });
+
+    function openBirthdaySheet(){
+      birthdaySheetOverlay.classList.add('active');
+      setWheelPosition(wheelYear, YEAR_VALUES, birthdayState.year);
+      setWheelPosition(wheelMonth, MONTH_VALUES, birthdayState.month);
+      dayValues = rebuildDayColumn();
+    }
+
+    document.getElementById('profileBirthdayTrigger').addEventListener('click', openBirthdaySheet);
+    birthdaySheetOverlay.addEventListener('click', function(e){
+      if (e.target === birthdaySheetOverlay) birthdaySheetOverlay.classList.remove('active');
+    });
+    document.getElementById('birthdaySheetDoneBtn').addEventListener('click', function(){
+      profileBirthdayTriggerText.textContent = birthdayState.year + '年' + birthdayState.month + '月' + birthdayState.day + '日';
+      profileBirthdayTriggerText.classList.remove('placeholder');
+      birthdaySheetOverlay.classList.remove('active');
+    });
+
+    function parseBirthdayIso(iso){
+      if (!iso) return null;
+      var parts = String(iso).split('-');
+      if (parts.length !== 3) return null;
+      return { year: Number(parts[0]), month: Number(parts[1]), day: Number(parts[2]) };
+    }
+
+    function enterProfileEditMode(){
+      profileFormError.classList.add('hidden');
+      profileNameInput.value = profile.name || '';
+      profilePhoneInput.value = profile.phone || '';
+      profilePlateInput.value = profile.licensePlate || '';
+
+      var parsed = parseBirthdayIso(profile.birthday);
+      if (parsed){
+        birthdayState.year = parsed.year;
+        birthdayState.month = parsed.month;
+        birthdayState.day = parsed.day;
+        profileBirthdayTriggerText.textContent = parsed.year + '年' + parsed.month + '月' + parsed.day + '日';
+        profileBirthdayTriggerText.classList.remove('placeholder');
+      } else {
+        birthdayState.year = YEAR_NOW - 25;
+        birthdayState.month = 1;
+        birthdayState.day = 1;
+        profileBirthdayTriggerText.textContent = '點擊選擇生日';
+        profileBirthdayTriggerText.classList.add('placeholder');
+      }
+
+      profileViewMode.classList.add('hidden');
+      profileEditMode.classList.remove('hidden');
+    }
+
+    function exitProfileEditMode(){
+      profileEditMode.classList.add('hidden');
+      profileViewMode.classList.remove('hidden');
+    }
+
+    document.getElementById('profileEditBtn').addEventListener('click', enterProfileEditMode);
+    document.getElementById('profileEditCancelBtn').addEventListener('click', exitProfileEditMode);
+
+    document.getElementById('profileEditSaveBtn').addEventListener('click', function(){
+      var name = profileNameInput.value.trim();
+      var phone = profilePhoneInput.value.trim();
+      var plate = profilePlateInput.value.trim();
+      var hasBirthday = !profileBirthdayTriggerText.classList.contains('placeholder');
+
+      if (!name){
+        profileFormError.textContent = '請輸入姓名';
+        profileFormError.classList.remove('hidden');
+        return;
+      }
+      if (!hasBirthday){
+        profileFormError.textContent = '請選擇生日';
+        profileFormError.classList.remove('hidden');
+        return;
+      }
+      if (!/^09\d{8}$/.test(phone)){
+        profileFormError.textContent = '請輸入正確的台灣手機號碼格式（09 開頭，共 10 碼）';
+        profileFormError.classList.remove('hidden');
+        return;
+      }
+
+      profileFormError.classList.add('hidden');
+      var saveBtn = document.getElementById('profileEditSaveBtn');
+      saveBtn.disabled = true;
+
+      var birthdayIso = birthdayState.year + '-' +
+        String(birthdayState.month).padStart(2, '0') + '-' +
+        String(birthdayState.day).padStart(2, '0');
+
+      setDoc(doc(db, 'users', result.uid), {
+        name: name,
+        birthday: birthdayIso,
+        phone: phone,
+        licensePlate: plate ? plate : null
+      }, { merge: true }).then(function(){
+        profile.name = name;
+        profile.birthday = birthdayIso;
+        profile.phone = phone;
+        profile.licensePlate = plate ? plate : null;
+
+        document.getElementById('profileAvatar').textContent = name.charAt(0);
+        document.getElementById('tabAvatarIcon').textContent = name.charAt(0);
+        nameEl.textContent = name;
+        document.getElementById('profileBirthdayView').textContent = formatBirthdayDisplay(birthdayIso);
+        document.getElementById('profilePhoneView').textContent = phone;
+        document.getElementById('profilePlateView').textContent = plate || '未填寫';
+
+        saveBtn.disabled = false;
+        exitProfileEditMode();
+      }).catch(function(err){
+        saveBtn.disabled = false;
+        profileFormError.textContent = '儲存失敗（' + err.code + '），請再試一次';
+        profileFormError.classList.remove('hidden');
+      });
+    });
+
+    // ---------- 通知中心（跟 index.html 同一套計算邏輯，這頁沒有出缺席回報 sheet／
+    // 公告清單本體，待辦列跟「查看全部」點擊都導去首頁處理，不重做整個互動流程） ----------
+    function formatRelativeTime(date){
+      var diffMs = Date.now() - date.getTime();
+      var minutes = Math.floor(diffMs / 60000);
+      if (minutes < 1) return '剛剛';
+      if (minutes < 60) return minutes + ' 分鐘前';
+      var hours = Math.floor(minutes / 60);
+      if (hours < 24) return hours + ' 小時前';
+      var days = Math.floor(hours / 24);
+      if (days === 1) return '昨天';
+      if (days < 7) return days + ' 天前';
+      return date.toLocaleDateString('zh-TW', { month:'numeric', day:'numeric' });
+    }
+
+    var rsvpEventCache = {};
+    var rsvpReportsByEvent = {};
+    var rsvpRosterEventIds = [];
+    var latestAnnouncements = [];
+    var notificationsReadAt = null;
+    var NOTIF_ANNOUNCE_LIMIT = 3;
+
+    async function ensureRsvpEventInfo(eventId){
+      if (rsvpEventCache[eventId]) return rsvpEventCache[eventId];
+      var snap = await getDoc(doc(db, 'events', eventId));
+      if (!snap.exists()) return null;
+      var data = snap.data();
+      var info = {
+        title: data.title,
+        date: data.date && data.date.toDate ? data.date.toDate() : null,
+        location: data.location
+      };
+      rsvpEventCache[eventId] = info;
+      return info;
+    }
+
+    function computePendingRsvpIds(){
+      var pendingIds = rsvpRosterEventIds.filter(function(id){
+        return rsvpEventCache[id] && !rsvpReportsByEvent[id];
+      });
+      pendingIds.sort(function(a, b){
+        var ta = rsvpEventCache[a].date ? rsvpEventCache[a].date.getTime() : 0;
+        var tb = rsvpEventCache[b].date ? rsvpEventCache[b].date.getTime() : 0;
+        return ta - tb;
+      });
+      return pendingIds;
+    }
+
+    var notifDot = document.getElementById('notifDot');
+    var notifSheetOverlay = document.getElementById('notifSheetOverlay');
+
+    function renderNotifDot(){
+      var hasPendingTodo = computePendingRsvpIds().length > 0;
+      var hasUnreadAnnounce = latestAnnouncements.some(function(item){
+        return !notificationsReadAt || item.createdAt > notificationsReadAt;
+      });
+      notifDot.classList.toggle('hidden', !(hasPendingTodo || hasUnreadAnnounce));
+    }
+
+    function renderNotifSheet(){
+      var todoList = document.getElementById('notifTodoList');
+      var pendingIds = computePendingRsvpIds();
+      if (pendingIds.length === 0){
+        todoList.innerHTML = '<div class="notif-empty">目前沒有待辦事項</div>';
+      } else {
+        todoList.innerHTML = pendingIds.map(function(id){
+          var info = rsvpEventCache[id];
+          var dateText = info.date ? (info.date.getMonth() + 1) + '/' + info.date.getDate() : '';
+          return (
+            '<button type="button" class="notif-row" data-notif-rsvp="' + id + '">' +
+              '<span class="dot"></span>' +
+              '<span class="body">' +
+                '<div class="title">尚未回報出缺席</div>' +
+                '<div class="meta">' + (dateText ? dateText + '（' + info.title + '）' : info.title) + '</div>' +
+              '</span>' +
+              '<span class="chev">›</span>' +
+            '</button>'
+          );
+        }).join('');
+      }
+
+      var announceListEl = document.getElementById('notifAnnounceList');
+      if (latestAnnouncements.length === 0){
+        announceListEl.innerHTML = '<div class="notif-empty">目前沒有公告</div>';
+      } else {
+        var shown = latestAnnouncements.slice(0, NOTIF_ANNOUNCE_LIMIT);
+        var rowsHtml = shown.map(function(item){
+          return (
+            '<div class="notif-row" style="cursor:default;">' +
+              '<span class="dot"></span>' +
+              '<span class="body">' +
+                '<div class="title">' + item.content + '</div>' +
+                '<div class="meta">' + formatRelativeTime(item.createdAt) + '</div>' +
+              '</span>' +
+            '</div>'
+          );
+        }).join('');
+        var viewAllHtml = latestAnnouncements.length > NOTIF_ANNOUNCE_LIMIT
+          ? '<button type="button" class="notif-viewall" id="notifViewAllBtn">查看全部 ›</button>' : '';
+        announceListEl.innerHTML = rowsHtml + viewAllHtml;
+        var viewAllBtn = document.getElementById('notifViewAllBtn');
+        if (viewAllBtn){
+          viewAllBtn.addEventListener('click', function(){ location.href = 'index.html'; });
+        }
+      }
+    }
+
+    function markNotificationsRead(){
+      notificationsReadAt = new Date();
+      renderNotifDot();
+      setDoc(doc(db, 'users', result.uid), { notificationsReadAt: serverTimestamp() }, { merge: true })
+        .catch(function(err){ console.error('標記通知已讀失敗', err); });
+    }
+
+    function openNotifSheet(){
+      renderNotifSheet();
+      notifSheetOverlay.classList.add('active');
+      markNotificationsRead();
+    }
+
+    function closeNotifSheet(){
+      notifSheetOverlay.classList.remove('active');
+    }
+
+    document.getElementById('notifBtn').addEventListener('click', openNotifSheet);
+    document.getElementById('notifSheetClose').addEventListener('click', closeNotifSheet);
+    notifSheetOverlay.addEventListener('click', function(e){
+      if (e.target === notifSheetOverlay) closeNotifSheet();
+    });
+    // 待辦列點擊：這頁沒有出缺席回報 sheet，直接導去首頁處理
+    document.getElementById('notifTodoList').addEventListener('click', function(e){
+      var btn = e.target.closest('[data-notif-rsvp]');
+      if (!btn) return;
+      location.href = 'index.html';
+    });
+
+    onSnapshot(query(collection(db, 'announcements'), orderBy('createdAt', 'desc'), limit(5)), function(snap){
+      latestAnnouncements = snap.docs.map(function(docSnap){
+        var data = docSnap.data();
+        return {
+          content: data.content,
+          createdAt: data.createdAt && data.createdAt.toDate ? data.createdAt.toDate() : new Date()
+        };
+      });
+      renderNotifDot();
+      renderNotifSheet();
+    });
+
+    onSnapshot(query(collection(db, 'eventRosters'), where('members', 'array-contains', result.uid)), function(snap){
+      rsvpRosterEventIds = snap.docs.filter(function(d){ return d.data().surveyOpenedAt; }).map(function(d){ return d.id; });
+      rsvpRosterEventIds.forEach(function(id){
+        ensureRsvpEventInfo(id).then(function(){
+          renderNotifDot();
+          renderNotifSheet();
+        });
+      });
+      renderNotifDot();
+      renderNotifSheet();
+    }, function(err){ console.error('eventRosters 監聽失敗', err); });
+
+    onSnapshot(query(collection(db, 'attendanceReports'), where('uid', '==', result.uid)), function(snap){
+      rsvpReportsByEvent = {};
+      snap.forEach(function(d){
+        var data = d.data();
+        rsvpReportsByEvent[data.eventId] = { status: data.status, reason: data.reason };
+      });
+      renderNotifDot();
+      renderNotifSheet();
+    }, function(err){ console.error('attendanceReports 監聽失敗', err); });
+
+    onSnapshot(doc(db, 'users', result.uid), function(snap){
+      var data = snap.data() || {};
+      if (data.notificationsReadAt !== undefined && data.notificationsReadAt !== null){
+        notificationsReadAt = data.notificationsReadAt.toDate();
+        renderNotifDot();
+        renderNotifSheet();
+      }
+
+      // 個人資料欄位刻意也交給這個即時監聽更新，不是只靠 auth-guard.js 那份有 5 分鐘
+      // 同分頁快取的 profile——原因跟上面 notificationsReadAt 一樣：剛編輯完個人資料，
+      // 5 分鐘內重新整理會先看到快取裡編輯前的舊值，等這個監聽的第一次結果回來就會校正過來，
+      // 不會像 notificationsReadAt 那次 bug 一樣一直卡在舊值
+      profile.name = data.name;
+      profile.birthday = data.birthday;
+      profile.phone = data.phone;
+      profile.licensePlate = data.licensePlate;
+      if (profileEditMode.classList.contains('hidden')){
+        document.getElementById('profileAvatar').textContent = profile.name ? profile.name.charAt(0) : '?';
+        document.getElementById('tabAvatarIcon').textContent = profile.name ? profile.name.charAt(0) : '?';
+        nameEl.textContent = profile.name || '—';
+        document.getElementById('profileBirthdayView').textContent = formatBirthdayDisplay(profile.birthday);
+        document.getElementById('profilePhoneView').textContent = profile.phone || '未填寫';
+        document.getElementById('profilePlateView').textContent = profile.licensePlate || '未填寫';
+      }
+    }, function(err){ console.error('users 監聽失敗', err); });
+
+    // 後台管理／指揮專用連結：跟 index.html 同一套判斷式
+    var isAdmin = profile.role === 'admin' || profile.role === 'owner';
+    var canSeeConductorPage = isAdmin || profile.role === 'conductor';
+    var linksHtml = '';
+    if (isAdmin){
+      linksHtml += '<a class="link-row" href="admin-index.html">後台管理<span class="chev">›</span></a>';
+    }
+    if (canSeeConductorPage){
+      linksHtml += '<a class="link-row" href="conductor-admin.html">指揮專用<span class="chev">›</span></a>';
+    }
+    document.getElementById('adminLinks').innerHTML = linksHtml;
+
+    document.getElementById('logoutBtn').addEventListener('click', function(){
+      if (confirm('確定要登出嗎？')) logout();
+    });
+
+    // ---------- 通知開關 ----------
+    var notifToggle = document.getElementById('notifToggle');
+    var notifHint = document.getElementById('notifHint');
+
+    function setToggleState(on){
+      notifToggle.classList.toggle('on', on);
+    }
+    function showHint(text, warn){
+      notifHint.textContent = text;
+      notifHint.classList.toggle('warn', !!warn);
+      notifHint.classList.remove('hidden');
+    }
+    function hideHint(){
+      notifHint.classList.add('hidden');
+    }
+
+    setToggleState(!!profile.notificationsEnabled);
+
+    notifToggle.addEventListener('click', function(){
+      var turningOn = !notifToggle.classList.contains('on');
+      hideHint();
+
+      if (!turningOn){
+        setToggleState(false);
+        notifToggle.disabled = true;
+        navigator.serviceWorker.ready.then(function(reg){
+          return reg.pushManager.getSubscription();
+        }).then(function(sub){
+          return sub ? sub.unsubscribe() : null;
+        }).catch(function(err){ console.error('取消訂閱失敗', err); }).then(function(){
+          notifToggle.disabled = false;
+          return setDoc(doc(db, 'users', result.uid), {
+            notificationsEnabled: false,
+            pushSubscription: null,
+            notificationsUpdatedAt: serverTimestamp()
+          }, { merge: true });
+        }).catch(function(err){ console.error('更新通知設定失敗', err); });
+        return;
+      }
+
+      if (isIOS() && !isStandalone()){
+        showHint('請先將本站加入主畫面（分享 → 加入主畫面）才能開啟推播通知', true);
+        return;
+      }
+      if (Notification.permission === 'denied'){
+        showHint('瀏覽器通知權限已被封鎖，請至瀏覽器設定手動開啟', true);
+        return;
+      }
+
+      notifToggle.disabled = true;
+      Notification.requestPermission().then(function(perm){
+        if (perm !== 'granted'){
+          notifToggle.disabled = false;
+          return null;
+        }
+        return navigator.serviceWorker.ready.then(function(reg){
+          return reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+          });
+        }).then(function(sub){
+          return setDoc(doc(db, 'users', result.uid), {
+            notificationsEnabled: true,
+            pushSubscription: sub.toJSON(),
+            notificationsUpdatedAt: serverTimestamp()
+          }, { merge: true });
+        }).then(function(){
+          notifToggle.disabled = false;
+          setToggleState(true);
+        });
+      }).catch(function(err){
+        console.error('開啟通知失敗', err);
+        notifToggle.disabled = false;
+        setToggleState(false);
+        showHint('訂閱失敗，請稍後再試');
+      });
+    });
+  });
+</script>
+</body>
+</html>
