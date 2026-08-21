@@ -125,6 +125,25 @@
     resize:vertical; min-height:80px; line-height:1.6;
   }
 
+  .push-row{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    margin-top:14px; padding-top:14px; border-top:1px solid var(--line);
+  }
+  .push-row .push-label{ font-size:13.5px; font-weight:700; color:var(--ink); }
+  .push-row .push-hint{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; }
+  .toggle-switch{
+    position:relative; flex:none; width:44px; height:26px; border-radius:999px;
+    border:none; padding:0; cursor:pointer; background:var(--line);
+    transition:background .15s ease;
+  }
+  .toggle-switch .knob{
+    position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%;
+    background:#fff; box-shadow:0 1px 2px rgba(32,36,47,.25);
+    transition:transform .15s ease;
+  }
+  .toggle-switch.on{ background:var(--sage); }
+  .toggle-switch.on .knob{ transform:translateX(18px); }
+
   .form-buttons{ display:flex; gap:10px; margin-top:14px; }
   .cta-btn{
     flex:1;
@@ -205,6 +224,13 @@
       <label>公告內容</label>
       <textarea id="annContent" placeholder="例如：團練提前至 13:30 開始" required></textarea>
     </div>
+    <div class="push-row" id="pushRow">
+      <div>
+        <div class="push-label">發送推播通知</div>
+        <div class="push-hint">開啟後，發布時會通知所有已訂閱推播的團員</div>
+      </div>
+      <button type="button" class="toggle-switch" id="pushToggle" aria-label="發送推播通知"><span class="knob"></span></button>
+    </div>
     <p class="form-error" id="annFormError"></p>
     <div class="form-buttons">
       <button type="submit" class="cta-btn" id="annSubmitBtn">發布公告</button>
@@ -277,6 +303,12 @@
   var annList = document.getElementById('annList');
   annList.innerHTML = SKELETON_ITEMS_HTML;
 
+  var pushRow = document.getElementById('pushRow');
+  var pushToggle = document.getElementById('pushToggle');
+  pushToggle.addEventListener('click', function(){
+    pushToggle.classList.toggle('on');
+  });
+
   function showFormError(message){
     annFormError.textContent = message;
     annFormError.classList.toggle('show', !!message);
@@ -289,6 +321,8 @@
     annSubmitBtn.disabled = false;
     annSubmitBtn.textContent = '發布公告';
     annCancelBtn.classList.add('hidden');
+    pushRow.classList.remove('hidden');
+    pushToggle.classList.remove('on');
     showFormError('');
   }
 
@@ -301,6 +335,7 @@
     annSubmitBtn.disabled = false;
     annSubmitBtn.textContent = '儲存變更';
     annCancelBtn.classList.remove('hidden');
+    pushRow.classList.add('hidden');
     showFormError('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -324,6 +359,7 @@
       ? updateDoc(doc(db, 'announcements', editingId), { content: content })
       : addDoc(collection(db, 'announcements'), {
           content: content,
+          sendPush: pushToggle.classList.contains('on'),
           createdBy: currentAdminUid,
           createdAt: serverTimestamp()
         });
