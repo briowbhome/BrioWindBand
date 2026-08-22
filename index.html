@@ -176,13 +176,6 @@
     font-weight:700;
     font-size:15.5px;
   }
-  .section-label .en{
-    font-family:'Roboto Mono',monospace;
-    font-size:10px;
-    letter-spacing:.12em;
-    color:var(--ink-soft);
-    text-transform:uppercase;
-  }
 
   /* ---------- 個人焦點／團務總覽 分頁 ---------- */
   .seg-tabs{
@@ -444,6 +437,12 @@
   .event-chip .d{ font-family:'Roboto Mono',monospace; font-size:10px; color:var(--brass-deep); }
   .event-chip .t{ font-size:12px; font-weight:700; margin-top:3px; line-height:1.35; color:var(--ink); }
   .event-chip .l{ font-size:10.5px; color:var(--ink-soft); margin-top:3px; }
+  /* 最近一場用尺寸放大做出差異，不換色，其餘幾場微縮小退居次要 */
+  .event-chip:first-child{ flex-basis:158px; padding:13px; }
+  .event-chip:first-child .d{ font-size:11px; }
+  .event-chip:first-child .t{ font-size:15px; margin-top:5px; }
+  .event-chip:first-child .l{ font-size:11px; margin-top:5px; }
+  .event-chip:not(:first-child){ opacity:.88; transform:scale(.96); transform-origin:left center; }
   .chip-rsvp{
     position:absolute; top:6px; right:6px; width:16px; height:16px; border-radius:50%;
     font-size:9px; font-weight:700; line-height:16px; text-align:center; color:#F2EFE5;
@@ -711,12 +710,8 @@
     <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </button>
 
-  <!-- 練習資訊 Hero -->
-  <div class="section-label">
-    <span class="tw">下一次團練</span>
-    <span class="en">Next Rehearsal</span>
-  </div>
-
+  <!-- 練習資訊 Hero：卡片本身（深色票券樣式＋大字日期）已經足夠說明這是下一次團練，
+       不再另外加一條「下一次團練」標籤，避免每個區塊上面都疊一條小標籤 -->
   <div class="hero">
     <div class="staff-bg"></div>
     <div class="hero-inner">
@@ -781,7 +776,6 @@
   <!-- 即將到來的活動 -->
   <div class="section-label">
     <span class="tw">即將到來的活動</span>
-    <span class="en">Upcoming</span>
   </div>
 
   <div class="event-strip" id="programSkeleton">
