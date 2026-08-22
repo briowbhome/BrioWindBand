@@ -104,9 +104,11 @@
     display:flex; align-items:center; justify-content:center;
   }
   .notif-dot{
-    position:absolute; top:3px; right:5px;
-    width:8px; height:8px; border-radius:50%;
+    position:absolute; top:1px; right:1px;
+    min-width:15px; height:15px; padding:0 3px; border-radius:50%;
     background:var(--burgundy); border:1.5px solid var(--paper);
+    color:#F2EFE5; font-family:'Roboto Mono',monospace; font-size:9px; font-weight:700;
+    line-height:15px; text-align:center;
   }
 
   /* ---------- Staff-line divider (signature motif) ---------- */
@@ -181,6 +183,40 @@
     color:var(--ink-soft);
     text-transform:uppercase;
   }
+
+  /* ---------- 個人焦點／團務總覽 分頁 ---------- */
+  .seg-tabs{
+    display:flex; gap:6px; margin:2px 20px 14px;
+    background:var(--sage-bg); padding:4px; border-radius:999px;
+  }
+  .seg-tab{
+    flex:1; text-align:center; padding:8px 4px; border-radius:999px;
+    font-family:'Noto Sans TC',sans-serif; font-size:13px; font-weight:500;
+    color:var(--sage); background:none; border:none; cursor:pointer;
+  }
+  .seg-tab.active{ background:var(--ink); color:var(--paper); }
+  .seg-panel.hidden{ display:none; }
+  .overview-empty{
+    margin:0 20px; padding:24px 16px; text-align:center;
+    color:var(--ink-soft); font-size:13px;
+    border:1px dashed var(--line); border-radius:var(--radius-md);
+  }
+
+  /* ---------- 回報狀態小標籤（貼著日期，跟現有 status-chip-btn 同一套配色：出席=sage／請假=burgundy） ---------- */
+  .rsvp-status-chip{
+    margin-left:auto; align-self:center;
+    display:inline-flex; align-items:center; gap:4px;
+    padding:4px 10px; border-radius:999px;
+    font-family:'Noto Sans TC',sans-serif; font-size:11px; font-weight:500;
+  }
+  .rsvp-status-chip.attending{ background:var(--sage-bg); color:var(--sage); }
+  .rsvp-status-chip.leave{ background:rgba(122,35,49,.16); color:#E8A9B4; }
+
+  /* ---------- 簽到狀態（四態：尚未開放／開放中／已過期／已簽到） ---------- */
+  .checkin-msg{ text-align:center; font-size:13.5px; font-weight:700; padding:12px 0; }
+  .checkin-msg.muted{ color:#C9C2A8; }
+  .checkin-msg.warn{ color:#E8A9B4; }
+  .checkin-msg.done{ color:var(--brass); }
 
   /* ---------- Hero: next rehearsal card ---------- */
   .hero{
@@ -391,6 +427,28 @@
     color:var(--ink-soft);
     line-height:1.5;
   }
+
+  /* ---------- 即將到來：橫向捲動卡條（取代原本直向列表） ---------- */
+  .event-strip{
+    display:flex; gap:10px; overflow-x:auto;
+    margin:0 0 24px; padding:0 20px 4px;
+    scrollbar-width:none; -ms-overflow-style:none;
+  }
+  .event-strip::-webkit-scrollbar{ display:none; }
+  .event-chip{
+    position:relative; flex:0 0 132px;
+    background:var(--paper-raised); border:1px solid var(--line);
+    border-radius:var(--radius-md); padding:10px; box-shadow:var(--shadow-card);
+  }
+  .event-chip .d{ font-family:'Roboto Mono',monospace; font-size:10px; color:var(--brass-deep); }
+  .event-chip .t{ font-size:12px; font-weight:700; margin-top:3px; line-height:1.35; color:var(--ink); }
+  .event-chip .l{ font-size:10.5px; color:var(--ink-soft); margin-top:3px; }
+  .chip-rsvp{
+    position:absolute; top:6px; right:6px; width:16px; height:16px; border-radius:50%;
+    font-size:9px; font-weight:700; line-height:16px; text-align:center; color:#F2EFE5;
+  }
+  .chip-rsvp.attending{ background:var(--sage); }
+  .chip-rsvp.leave{ background:var(--burgundy); }
 
   /* ---------- 出缺席回報橫幅 ---------- */
   /* 深色語彙跟 .ticker 呼應，避免夾在公告 ticker 跟團練 hero 卡片中間時深淺跳動的割裂感；
@@ -623,6 +681,15 @@
     <div class="announce-list hidden" id="announceList"></div>
   </div>
 
+  <!-- 個人焦點／團務總覽 分頁：待辦、團練資訊、活動這些「跟我有關」的放個人焦點，
+       非急迫的參考資訊放團務總覽；公告因為可能包含場地異動等時效性資訊，刻意留在分頁外常駐顯示 -->
+  <div class="seg-tabs" role="tablist">
+    <button type="button" class="seg-tab active" id="segTabPersonal" role="tab" aria-selected="true">個人焦點</button>
+    <button type="button" class="seg-tab" id="segTabOverview" role="tab" aria-selected="false">團務總覽</button>
+  </div>
+
+  <div class="seg-panel" id="segPanelPersonal">
+
   <!-- 出缺席回報橫幅：只有自己在某場活動的參與名單內、且尚未回報時才顯示 -->
   <button type="button" class="rsvp-banner hidden" id="rsvpBanner">
     <span class="stripe"></span>
@@ -660,6 +727,7 @@
         <div class="hero-date">
           <span class="num" id="heroDateNum"></span>
           <span class="dow" id="heroDateDow"></span>
+          <span class="rsvp-status-chip hidden" id="heroRsvpChip"></span>
         </div>
 
         <div class="hero-rows">
@@ -673,16 +741,26 @@
             <span class="label">地點</span>
             <span class="val" id="heroLocationVal"></span>
           </div>
+          <div class="hero-row">
+            <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M9 18V5l12-2v13" stroke="#F2EFE5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" stroke="#F2EFE5" stroke-width="1.5"/><circle cx="18" cy="16" r="3" stroke="#F2EFE5" stroke-width="1.5"/></svg>
+            <span class="label">曲目</span>
+            <span class="val" id="heroRepertoireVal"></span>
+          </div>
         </div>
       </div>
       <div class="hero-empty hidden" id="heroEmpty">目前沒有排定的團練</div>
 
       <div class="checkin">
-        <button class="checkin-btn" id="checkinBtn">
-          <svg class="ico" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1" stroke="#20242F" stroke-width="1.6"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="#20242F" stroke-width="1.6"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="#20242F" stroke-width="1.6"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z" fill="#20242F"/></svg>
-          掃描 QR Code 簽到
-        </button>
-        <div class="checkin-sub" id="checkinSub">請掃描現場的簽到 QR Code</div>
+        <div class="checkin-msg muted hidden" id="checkinNotOpen">尚未開放簽到</div>
+        <div id="checkinOpenState">
+          <button class="checkin-btn" id="checkinBtn">
+            <svg class="ico" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1" stroke="#20242F" stroke-width="1.6"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="#20242F" stroke-width="1.6"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="#20242F" stroke-width="1.6"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z" fill="#20242F"/></svg>
+            掃描 QR Code 簽到
+          </button>
+          <div class="checkin-sub" id="checkinSub">請掃描現場的簽到 QR Code</div>
+        </div>
+        <div class="checkin-msg warn hidden" id="checkinExpired">此組 QR Code 已過期，請洽幹部確認</div>
+        <div class="checkin-msg done hidden" id="checkinDone">已簽到</div>
       </div>
     </div>
   </div>
@@ -693,31 +771,21 @@
     <span class="en">Upcoming</span>
   </div>
 
-  <div class="program" id="programSkeleton">
-    <div class="program-skel-item">
-      <span class="skel program-skel-date"></span>
-      <div class="program-skel-body">
-        <span class="skel skel-bar" style="width:60%;height:13px;"></span>
-        <span class="skel skel-bar" style="width:40%;height:11px;"></span>
-      </div>
-    </div>
-    <div class="program-skel-item">
-      <span class="skel program-skel-date"></span>
-      <div class="program-skel-body">
-        <span class="skel skel-bar" style="width:50%;height:13px;"></span>
-        <span class="skel skel-bar" style="width:35%;height:11px;"></span>
-      </div>
-    </div>
-    <div class="program-skel-item">
-      <span class="skel program-skel-date"></span>
-      <div class="program-skel-body">
-        <span class="skel skel-bar" style="width:55%;height:13px;"></span>
-        <span class="skel skel-bar" style="width:30%;height:11px;"></span>
-      </div>
-    </div>
+  <div class="event-strip" id="programSkeleton">
+    <div class="event-chip"><span class="skel skel-bar" style="width:100%;height:13px;"></span><span class="skel skel-bar" style="width:70%;height:11px;margin-top:6px;"></span></div>
+    <div class="event-chip"><span class="skel skel-bar" style="width:100%;height:13px;"></span><span class="skel skel-bar" style="width:70%;height:11px;margin-top:6px;"></span></div>
+    <div class="event-chip"><span class="skel skel-bar" style="width:100%;height:13px;"></span><span class="skel skel-bar" style="width:70%;height:11px;margin-top:6px;"></span></div>
   </div>
-  <div class="program hidden" id="programList"></div>
+  <div class="event-strip hidden" id="programList"></div>
   <div class="empty hidden" id="programEmpty">目前沒有即將到來的活動</div>
+
+  </div>
+
+  <!-- 團務總覽：非急迫的參考資訊，目前只有公告（已經常駐顯示在分頁外），
+       之後如果有團費繳交紀錄、行事曆檢視等功能會放在這裡 -->
+  <div class="seg-panel hidden" id="segPanelOverview">
+    <div class="overview-empty">目前沒有其他團務資訊</div>
+  </div>
 
   <!-- Bottom tab bar -->
   <div class="tabbar">
@@ -813,7 +881,7 @@
 
 <script type="module">
   import { requireApprovedMember, peekCachedProfile } from './auth-guard.js';
-  import { subscribeEventTypes, badgeStyle } from './event-types.js';
+  import { subscribeEventTypes } from './event-types.js';
   import { db } from './firebase-init.js';
   import { VAPID_PUBLIC_KEY } from './push-config.js';
   import {
@@ -832,6 +900,25 @@
       soonTimer = setTimeout(function(){ soonToast.classList.remove('show'); }, 1500);
     });
   });
+
+  // 個人焦點／團務總覽 分頁切換：純畫面狀態，不依賴登入驗證結果
+  var segTabPersonal = document.getElementById('segTabPersonal');
+  var segTabOverview = document.getElementById('segTabOverview');
+  var segPanelPersonal = document.getElementById('segPanelPersonal');
+  var segPanelOverview = document.getElementById('segPanelOverview');
+
+  function selectSegTab(tab){
+    var isPersonal = tab === 'personal';
+    segTabPersonal.classList.toggle('active', isPersonal);
+    segTabOverview.classList.toggle('active', !isPersonal);
+    segTabPersonal.setAttribute('aria-selected', String(isPersonal));
+    segTabOverview.setAttribute('aria-selected', String(!isPersonal));
+    segPanelPersonal.classList.toggle('hidden', !isPersonal);
+    segPanelOverview.classList.toggle('hidden', isPersonal);
+  }
+
+  segTabPersonal.addEventListener('click', function(){ selectSegTab('personal'); });
+  segTabOverview.addEventListener('click', function(){ selectSegTab('overview'); });
 
   // 骨架畫面：頁面一開始就顯示（不等驗證），大頭貼縮寫不是敏感資訊，
   // 有快取先猜著填，猜錯也不影響安全性，真正驗證完成後下面還是會覆寫成正確結果
@@ -946,6 +1033,20 @@
       return days + ' 天後';
     }
 
+    function renderRsvpChip(el, eventId){
+      var report = rsvpReportsByEvent[eventId];
+      if (!report){
+        el.classList.add('hidden');
+        return;
+      }
+      el.classList.remove('hidden');
+      el.classList.toggle('attending', report.status === 'attending');
+      el.classList.toggle('leave', report.status === 'leave');
+      el.textContent = report.status === 'leave' ? '已回報：請假' : '已回報：出席';
+    }
+
+    var lastCheckinFetchedEventId = null;
+
     function renderHero(nextRehearsal){
       var content = document.getElementById('heroContent');
       var empty = document.getElementById('heroEmpty');
@@ -964,12 +1065,46 @@
       document.getElementById('heroDateDow').textContent = '星期' + WEEKDAY[nextRehearsal.date.getDay()];
       document.getElementById('heroTimeVal').textContent = formatEventTime(nextRehearsal);
       document.getElementById('heroLocationVal').textContent = nextRehearsal.location || '地點未定';
+      document.getElementById('heroRepertoireVal').textContent =
+        nextRehearsal.repertoire.length > 0 ? nextRehearsal.repertoire.join('、') : '曲目未定';
+      renderRsvpChip(document.getElementById('heroRsvpChip'), nextRehearsal.id);
+
+      if (lastCheckinFetchedEventId !== nextRehearsal.id){
+        lastCheckinFetchedEventId = nextRehearsal.id;
+        refreshCheckinState(nextRehearsal.id);
+      }
     }
 
-    function typeBadge(typeId){
-      var t = eventTypesById[typeId];
-      var label = t ? t.label : typeId;
-      return '<span class="kind" style="' + badgeStyle(t ? t.colorKey : null) + '">' + label + '</span>';
+    // 簽到狀態四態：已簽到（checkins 有紀錄）優先於其他三態；
+    // 其餘看 checkinSessions/{eventId} 存不存在、windowEnd 有沒有過期
+    function renderCheckinState(state){
+      document.getElementById('checkinNotOpen').classList.toggle('hidden', state !== 'notopen');
+      document.getElementById('checkinOpenState').classList.toggle('hidden', state !== 'open');
+      document.getElementById('checkinExpired').classList.toggle('hidden', state !== 'expired');
+      document.getElementById('checkinDone').classList.toggle('hidden', state !== 'done');
+    }
+
+    async function refreshCheckinState(eventId){
+      try {
+        var checkinSnap = await getDoc(doc(db, 'checkins', eventId + '_' + result.uid));
+        if (lastCheckinFetchedEventId !== eventId) return; // 這段等待期間團練資訊又換了，捨棄這次結果
+        if (checkinSnap.exists()){
+          renderCheckinState('done');
+          return;
+        }
+        var sessionSnap = await getDoc(doc(db, 'checkinSessions', eventId));
+        if (lastCheckinFetchedEventId !== eventId) return;
+        if (!sessionSnap.exists()){
+          renderCheckinState('notopen');
+          return;
+        }
+        var windowEnd = sessionSnap.data().windowEnd;
+        var stillOpen = windowEnd && windowEnd.toMillis() > Date.now();
+        renderCheckinState(stillOpen ? 'open' : 'expired');
+      } catch (err){
+        console.error('讀取簽到狀態失敗', err);
+        renderCheckinState('open'); // 讀取失敗時退回原本一律顯示按鈕的行為，不擋住簽到
+      }
     }
 
     function renderProgram(events){
@@ -983,15 +1118,17 @@
         return;
       }
       empty.classList.add('hidden');
-      list.innerHTML = events.map(function(evt, i){
+      list.innerHTML = events.map(function(evt){
+        var report = rsvpReportsByEvent[evt.id];
+        var dotHtml = report
+          ? '<span class="chip-rsvp ' + (report.status === 'leave' ? 'leave' : 'attending') + '">' + (report.status === 'leave' ? '假' : '✓') + '</span>'
+          : '';
         return (
-          '<div class="program-item">' +
-            '<span class="measure">' + String(i + 1).padStart(2, '0') + '</span>' +
-            '<div class="program-date"><div class="d">' + evt.date.getDate() + '</div><div class="m">' + (evt.date.getMonth() + 1) + '月</div></div>' +
-            '<div class="program-body">' +
-              '<div class="program-title">' + evt.title + typeBadge(evt.type) + '</div>' +
-              '<div class="program-meta">' + formatEventTime(evt) + (evt.location ? ' · ' + evt.location : '') + '</div>' +
-            '</div>' +
+          '<div class="event-chip">' +
+            dotHtml +
+            '<div class="d">' + (evt.date.getMonth() + 1) + '/' + evt.date.getDate() + '（' + WEEKDAY[evt.date.getDay()] + '）</div>' +
+            '<div class="t">' + evt.title + '</div>' +
+            '<div class="l">' + (evt.location || '地點未定') + '</div>' +
           '</div>'
         );
       }).join('');
@@ -1045,12 +1182,14 @@
       latestEvents = snap.docs.map(function(docSnap){
         var data = docSnap.data();
         return {
+          id: docSnap.id,
           title: data.title,
           type: data.type,
           date: data.date.toDate(),
           allDay: !!data.allDay,
           endTime: data.endTime && data.endTime.toDate ? data.endTime.toDate() : null,
-          location: data.location
+          location: data.location,
+          repertoire: Array.isArray(data.repertoire) ? data.repertoire : []
         };
       });
 
@@ -1191,11 +1330,15 @@
     var notifSheetOverlay = document.getElementById('notifSheetOverlay');
 
     function renderNotifDot(){
-      var hasPendingTodo = computePendingRsvpIds().length > 0;
-      var hasUnreadAnnounce = latestAnnouncements.some(function(item){
+      var pendingCount = computePendingRsvpIds().length;
+      var unreadAnnounceCount = latestAnnouncements.filter(function(item){
         return !notificationsReadAt || item.createdAt > notificationsReadAt;
-      });
-      notifDot.classList.toggle('hidden', !(hasPendingTodo || hasUnreadAnnounce));
+      }).length;
+      var total = pendingCount + unreadAnnounceCount;
+      notifDot.textContent = total > 9 ? '9+' : String(total);
+      notifDot.classList.toggle('hidden', total === 0);
+      document.getElementById('notifBtn').setAttribute('aria-label',
+        total === 0 ? '通知中心，沒有未讀' : '通知中心，' + total + ' 則未讀');
     }
 
     function renderNotifSheet(){
@@ -1376,6 +1519,7 @@
       renderRsvpBanner();
       renderNotifDot();
       renderNotifSheet();
+      renderEventsSection(); // 團練卡片跟活動卡條上的「已回報」標籤也要跟著更新
     }, function(err){ console.error('attendanceReports 監聽失敗', err); });
 
     // notificationsReadAt 即時監聽（不透過 auth-guard.js 的快取 profile，見上方原因說明）。

@@ -61,7 +61,7 @@ exports.onSurveyOpened = onDocumentUpdated(
 
     await sendPushToUids(pendingUids, {
       title: '出缺席調查',
-      body: '「' + eventTitle + '」出缺席調查已開放，請盡速回報',
+      body: '「' + eventTitle + '」出缺席調查已開放，請儘速回報',
       url: './index.html'
     }, VAPID_PRIVATE_KEY.value());
   }
