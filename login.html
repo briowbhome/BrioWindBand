@@ -398,104 +398,6 @@
     font-size:16px;
   }
 
-  /* ---------- Pending review (ticket) ---------- */
-  .pending{
-    display:none;
-    margin:14px 20px 24px;
-    border-radius:var(--radius-lg);
-    background:var(--ink);
-    color:var(--paper);
-    position:relative;
-    overflow:hidden;
-    box-shadow:var(--shadow-card);
-  }
-  .pending.active{ display:block; }
-  .pending .staff-bg{
-    position:absolute; inset:0;
-    background-image: repeating-linear-gradient(
-      rgba(242,239,229,.09), rgba(242,239,229,.09) 1px, transparent 1px, transparent 9px
-    );
-    pointer-events:none;
-  }
-  .pending-inner{ position:relative; padding:22px 20px 18px; }
-
-  .pending-top{
-    display:flex; justify-content:space-between; align-items:flex-start;
-  }
-  .pending-eyebrow{
-    font-family:'Roboto Mono',monospace;
-    font-size:10.5px; letter-spacing:.16em; text-transform:uppercase;
-    color:var(--brass);
-  }
-  .status-chip{
-    background:var(--brass);
-    color:var(--ink);
-    font-family:'Roboto Mono',monospace;
-    font-weight:600;
-    font-size:11px;
-    padding:4px 10px;
-    border-radius:999px;
-  }
-
-  .pending-headline{
-    display:flex; align-items:center; gap:12px;
-    margin-top:14px;
-  }
-  .pending-headline .ico{ flex:none; width:34px; height:34px; }
-  .pending-headline .txt{
-    font-family:'Noto Serif TC',serif;
-    font-weight:900;
-    font-size:22px;
-    line-height:1.15;
-  }
-  .pending-sub{
-    margin-top:6px;
-    font-size:12.5px;
-    color:#C9C2A8;
-    line-height:1.6;
-  }
-
-  .pending-rows{
-    margin-top:18px;
-    display:flex; flex-direction:column; gap:9px;
-  }
-  .pending-row{ display:flex; align-items:flex-start; gap:10px; font-size:13px; }
-  .pending-row .label{ color:#C9C2A8; font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.06em; min-width:64px; margin-top:2px;}
-  .pending-row .val{ color:var(--paper); font-weight:500; }
-
-  .tear{
-    margin-top:18px;
-    border-top:1.5px dashed rgba(242,239,229,.35);
-    padding-top:14px;
-    position:relative;
-  }
-  .tear::before,.tear::after{
-    content:"";
-    position:absolute; top:-8px;
-    width:16px; height:16px; border-radius:50%;
-    background:var(--paper);
-  }
-  .tear::before{ left:-28px; }
-  .tear::after{ right:-28px; }
-  .tear-note{
-    font-size:11.5px;
-    color:#B7AF93;
-    line-height:1.6;
-    text-align:center;
-  }
-
-  .back-link{
-    display:block;
-    margin:0 20px 24px;
-    text-align:center;
-    background:none;
-    border:none;
-    color:var(--ink-soft);
-    font-size:12.5px;
-    text-decoration:underline;
-    text-underline-offset:2px;
-    cursor:pointer;
-  }
 </style>
 </head>
 <body>
@@ -623,34 +525,6 @@
       </form>
     </div>
   </div>
-
-  <!-- 審核中 -->
-  <div class="pending" id="pendingView">
-    <div class="staff-bg"></div>
-    <div class="pending-inner">
-      <div class="pending-top">
-        <span class="pending-eyebrow">帳號狀態 · Account Status</span>
-        <span class="status-chip">審核中</span>
-      </div>
-
-      <div class="pending-headline">
-        <svg class="ico" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#F2EFE5" stroke-width="1.5"/><path d="M12 7v5l3.5 2" stroke="#F2EFE5" stroke-width="1.5" stroke-linecap="round"/></svg>
-        <span class="txt">申請已送出</span>
-      </div>
-      <p class="pending-sub">你的帳號申請已送出，審核通過後即可使用完整功能。</p>
-
-      <div class="pending-rows">
-        <div class="pending-row"><span class="label">帳號</span><span class="val" id="sumAccount">—</span></div>
-        <div class="pending-row"><span class="label">姓名</span><span class="val" id="sumName">—</span></div>
-        <div class="pending-row"><span class="label">樂器/聲部</span><span class="val" id="sumInstruments">—</span></div>
-      </div>
-
-      <div class="tear">
-        <p class="tear-note">如需確認審核進度，可直接洽詢幹部。</p>
-      </div>
-    </div>
-  </div>
-  <button type="button" class="back-link" id="backToLogin" style="display:none;">← 返回登入</button>
 
   <!-- 生日 年月日滾輪 Bottom Sheet -->
   <div class="sheet-overlay" id="birthdaySheetOverlay">
@@ -1028,28 +902,16 @@
       licensePlate: plate,
       instruments: selectedInstruments
     }).then(function(result){
-      btn.disabled = false;
-      btn.textContent = '送出帳號申請';
-
-      document.getElementById('sumAccount').textContent = account;
-      document.getElementById('sumName').textContent = name;
-      document.getElementById('sumInstruments').textContent = selectedInstruments.join('、');
-
-      document.getElementById('authView').style.display = 'none';
-      document.getElementById('pendingView').classList.add('active');
-      document.getElementById('backToLogin').style.display = 'block';
+      // 註冊成功後直接登入進首頁——審核前只能看受限版的首頁，不用再回登入頁等審核，
+      // 見 index.html 的訪客/審核中身分處理
+      btn.textContent = '✓ 申請已送出，前往首頁';
+      btn.style.background = '#5F6E58';
+      setTimeout(function(){ location.href = 'index.html'; }, 500);
     }).catch(function(error){
       btn.disabled = false;
       btn.textContent = '送出帳號申請';
       showFormError('registerFormError', error.message);
     });
-  });
-
-  document.getElementById('backToLogin').addEventListener('click', function(){
-    document.getElementById('pendingView').classList.remove('active');
-    document.getElementById('authView').style.display = 'block';
-    document.getElementById('backToLogin').style.display = 'none';
-    showView('login');
   });
 </script>
 </body>

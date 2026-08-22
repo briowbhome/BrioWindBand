@@ -226,8 +226,46 @@ export async function requireAdminOrConductor() {
   return { uid: user.uid, profile: profile };
 }
 
-export async function logout() {
+// index.html／profile.html 用：訪客（未登入）、審核中（pending）、已核准都算「看得到」，
+// 只有真的被拒絕/停用/移除的帳號才會被踢出登入頁。刻意跟 requireApprovedMember() 分開——
+// 後者維持嚴格闔門給 checkin.html 用，這裡放寬只給這兩個頁面用，不影響其他頁面的守門邏輯
+export async function resolveMemberAccess() {
+  var user = await waitForAuthUser();
+  if (!user) {
+    return { state: "guest", uid: null, profile: null };
+  }
+
+  function isVisible(p) {
+    return !!p && (p.status === "approved" || p.status === "pending");
+  }
+
+  var profile;
+  try {
+    profile = await resolveProfile(user.uid, function (fresh) {
+      if (!isVisible(fresh)) {
+        clearProfileCache();
+        signOut(auth).then(goToLogin);
+      }
+    });
+  } catch (e) {
+    showConnectionError();
+    return null;
+  }
+
+  if (!isVisible(profile)) {
+    clearProfileCache();
+    await signOut(auth);
+    goToLogin();
+    return null;
+  }
+  return { state: profile.status, uid: user.uid, profile: profile };
+}
+
+// redirectTo 選填，預設是登入頁（給其他 8 個後台頁面用，登出後本來就該回登入頁）。
+// profile.html 傳 'profile.html'，讓訪客登出後留在原地看到訪客版個人中心，
+// 而不是被強制導去登入頁——這是這次開放訪客瀏覽後才需要的差異，其他呼叫端不受影響
+export async function logout(redirectTo) {
   clearProfileCache();
   await signOut(auth);
-  location.href = "login.html";
+  location.href = redirectTo || "login.html";
 }

@@ -56,7 +56,6 @@ export async function registerAccount({ account, password, name, birthday, phone
     throw new Error("帳號已建立，但寫入團員資料失敗，請洽幹部協助（" + error.code + "）");
   }
 
-  await signOut(auth);
   return { uid: uid };
 }
 
@@ -79,10 +78,8 @@ export async function loginAccount({ account, password }) {
 
   var profile = snap.data();
 
-  if (profile.status === "pending") {
-    await signOut(auth);
-    throw new Error("你的帳號申請仍在審核中，請耐心等候");
-  }
+  // pending 直接放行——審核中的帳號可以正常登入使用首頁的受限功能，
+  // 不再像以前那樣被登出+擋在登入頁外，只有真的被拒絕/停用才擋
   if (profile.status === "rejected") {
     await signOut(auth);
     throw new Error("此帳號申請未通過審核，請洽幹部");

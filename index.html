@@ -313,6 +313,7 @@
   }
   .checkin-btn:hover{ background:#C7963F; }
   .checkin-btn:active{ transform:scale(.98); background:var(--brass-deep); }
+  .checkin-btn.locked{ opacity:.5; }
   .checkin-btn .ico{ width:20px; height:20px; flex:none; }
   .checkin-sub{
     text-align:center;
@@ -465,6 +466,11 @@
   .rsvp-banner .ico{ flex:none; width:20px; height:20px; }
   .rsvp-banner .txt{ flex:1; font-size:13px; font-weight:500; line-height:1.5; }
   .rsvp-banner .chev{ flex:none; opacity:.7; }
+
+  /* ---------- 審核中狀態橫幅：跟出缺席回報橫幅同一套深色語彙，差別是不可點擊、
+     持續顯示到審核通過為止，刻意放在分頁外（跟公告 ticker 同層級），
+     不論切到「個人焦點」或「團務總覽」都看得到 ---------- */
+  .pending-banner{ cursor:default; margin:2px 20px 18px; }
 
   /* ---------- 通知中心 sheet ---------- */
   .notif-section-label{
@@ -681,6 +687,13 @@
     <div class="announce-list hidden" id="announceList"></div>
   </div>
 
+  <!-- 審核中狀態橫幅：帳號還在審核中時常駐顯示，刻意放在分頁外，切哪個分頁都看得到 -->
+  <div class="rsvp-banner pending-banner hidden" id="pendingBanner">
+    <span class="stripe"></span>
+    <svg class="ico" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    <span class="txt">帳號審核中，通過後即可使用完整功能</span>
+  </div>
+
   <!-- 個人焦點／團務總覽 分頁：待辦、團練資訊、活動這些「跟我有關」的放個人焦點，
        非急迫的參考資訊放團務總覽；公告因為可能包含場地異動等時效性資訊，刻意留在分頁外常駐顯示 -->
   <div class="seg-tabs" role="tablist">
@@ -801,7 +814,7 @@
       <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M6 4h9l3 3v13H6z" stroke="#4A4F5C" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 11h6M9 14h6M9 17h4" stroke="#4A4F5C" stroke-width="1.6" stroke-linecap="round"/></svg>
       譜夾
     </button>
-    <a class="tab" href="profile.html">
+    <a class="tab" href="profile.html" id="tabProfileLink">
       <span class="avatar tab-avatar skel" id="tabAvatarIcon"></span>
       我的
     </a>
@@ -880,7 +893,7 @@
 </div>
 
 <script type="module">
-  import { requireApprovedMember, peekCachedProfile } from './auth-guard.js';
+  import { resolveMemberAccess, peekCachedProfile } from './auth-guard.js';
   import { subscribeEventTypes } from './event-types.js';
   import { db } from './firebase-init.js';
   import { VAPID_PUBLIC_KEY } from './push-config.js';
@@ -889,23 +902,29 @@
     doc, getDoc, setDoc, serverTimestamp
   } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-  // 還沒做的分頁（行事曆/譜夾/我的）：反灰 + 點擊顯示「即將推出」提示，
-  // 不依賴登入驗證結果，跟下面的骨架畫面一樣頁面一開始就能動作
+  // 還沒做的分頁（行事曆/譜夾）：反灰 + 點擊顯示提示，不依賴登入驗證結果，
+  // 跟下面的骨架畫面一樣頁面一開始就能動作。同一顆 toast 也給下面的「鎖定」提示共用，
+  // 只是文案不同（訪客/審核中點到鎖住的功能）
   var soonToast = document.getElementById('soonToast');
   var soonTimer = null;
+  function showToast(text){
+    soonToast.textContent = text;
+    if (soonTimer) clearTimeout(soonTimer);
+    soonToast.classList.add('show');
+    soonTimer = setTimeout(function(){ soonToast.classList.remove('show'); }, 1500);
+  }
   document.querySelectorAll('.tab-soon').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      if (soonTimer) clearTimeout(soonTimer);
-      soonToast.classList.add('show');
-      soonTimer = setTimeout(function(){ soonToast.classList.remove('show'); }, 1500);
-    });
+    btn.addEventListener('click', function(){ showToast('即將推出'); });
   });
 
-  // 個人焦點／團務總覽 分頁切換：純畫面狀態，不依賴登入驗證結果
+  // 個人焦點／團務總覽 分頁切換：純畫面狀態。「團務總覽」只鎖訪客（未登入）——
+  // 審核中已經是真團員，讀取權限跟已核准一樣，只差在不能做簽到/回報這類寫入操作，
+  // 驗證完成前先預設鎖住，避免訪客在畫面剛載入、還不知道身分的瞬間點得進去
   var segTabPersonal = document.getElementById('segTabPersonal');
   var segTabOverview = document.getElementById('segTabOverview');
   var segPanelPersonal = document.getElementById('segPanelPersonal');
   var segPanelOverview = document.getElementById('segPanelOverview');
+  var overviewLocked = true;
 
   function selectSegTab(tab){
     var isPersonal = tab === 'personal';
@@ -918,7 +937,10 @@
   }
 
   segTabPersonal.addEventListener('click', function(){ selectSegTab('personal'); });
-  segTabOverview.addEventListener('click', function(){ selectSegTab('overview'); });
+  segTabOverview.addEventListener('click', function(){
+    if (overviewLocked){ showToast('請先登入後即可查看'); return; }
+    selectSegTab('overview');
+  });
 
   // 骨架畫面：頁面一開始就顯示（不等驗證），大頭貼縮寫不是敏感資訊，
   // 有快取先猜著填，猜錯也不影響安全性，真正驗證完成後下面還是會覆寫成正確結果
@@ -946,75 +968,21 @@
     return outputArray;
   }
 
-  requireApprovedMember().then(function(result){
-    if (!result) return; // 未通過驗證，requireApprovedMember 已經處理導轉
-    var profile = result.profile;
+  // ---------- 公開內容（首頁團練資訊/活動列表/公告）：訪客／審核中／已核准都看得到，
+  // 不等身分驗證完成就先掛上監聽，資料本身跟登入狀態無關 ----------
+  var WEEKDAY = ['日', '一', '二', '三', '四', '五', '六'];
+  var eventTypesById = {};
+  var latestEvents = [];
+  var rsvpReportsByEvent = {}; // 只有已核准/審核中會員登入後才會真的有資料，訪客維持空物件、畫面自然不顯示回報標籤
 
-    var tabAvatarIcon = document.getElementById('tabAvatarIcon');
-    tabAvatarIcon.textContent = profile.name ? profile.name.charAt(0) : '?';
-    tabAvatarIcon.classList.remove('skel');
+  var viewerState = null; // 'guest' | 'pending' | 'approved'，身分驗證完成後才有值
+  var viewerUid = null;
+  var viewerProfile = null;
+  // null＝可以正常掃碼，非 null＝鎖住時點擊要顯示的提示文字。預設鎖住（身分驗證還沒有結果前
+  // 一律當作鎖住），避免驗證完成前的瞬間被搶先點到，誤觸真的開相機
+  var checkinLockedMessage = '驗證身分中，請稍候';
 
-    // ---------- 通知開關推廣提示 ----------
-    // 顯示條件：還沒開通知、瀏覽器沒被封鎖過、這個裝置沒被使用者永久拒絕過、
-    // iOS 只有已加入主畫面才顯示（跟 ios-install.js 的加入主畫面提示天生互斥，
-    // 不需要額外排序邏輯）、同一天內最多顯示一次。
-    // 不像 ios-install.js 的「叉掉一次永久不再顯示」——這裡目的是希望大家最終都開啟，
-    // 「稍後再說」只是先跳過，隔天還會再問；只有瀏覽器原生詢問被使用者「封鎖」過，
-    // 才會永久停止（因為那個狀態下這個裝置沒辦法再重新跳出瀏覽器原生詢問，再問也沒用）
-    var NOTIF_PROMPT_DENIED_KEY = 'brio_notif_prompt_denied';
-    var NOTIF_PROMPT_LAST_SHOWN_KEY = 'brio_notif_prompt_last_shown';
-    var NOTIF_PROMPT_INTERVAL_MS = 24 * 60 * 60 * 1000;
-
-    function shouldShowNotifPrompt(){
-      if (profile.notificationsEnabled) return false;
-      if (!('Notification' in window) || !('serviceWorker' in navigator)) return false;
-      if (Notification.permission === 'denied') return false;
-      if (localStorage.getItem(NOTIF_PROMPT_DENIED_KEY) === 'true') return false;
-      if (isIOS() && !isStandalone()) return false;
-      var lastShown = Number(localStorage.getItem(NOTIF_PROMPT_LAST_SHOWN_KEY) || 0);
-      if (Date.now() - lastShown < NOTIF_PROMPT_INTERVAL_MS) return false;
-      return true;
-    }
-
-    var notifPromptOverlay = document.getElementById('notifPromptOverlay');
-    if (shouldShowNotifPrompt()){
-      localStorage.setItem(NOTIF_PROMPT_LAST_SHOWN_KEY, String(Date.now()));
-      notifPromptOverlay.classList.add('active');
-    }
-
-    document.getElementById('notifPromptLaterBtn').addEventListener('click', function(){
-      notifPromptOverlay.classList.remove('active');
-    });
-
-    document.getElementById('notifPromptEnableBtn').addEventListener('click', function(){
-      notifPromptOverlay.classList.remove('active');
-      Notification.requestPermission().then(function(perm){
-        if (perm === 'denied'){
-          localStorage.setItem(NOTIF_PROMPT_DENIED_KEY, 'true');
-          return;
-        }
-        if (perm !== 'granted') return;
-        return navigator.serviceWorker.ready.then(function(reg){
-          return reg.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-          });
-        }).then(function(sub){
-          return setDoc(doc(db, 'users', result.uid), {
-            notificationsEnabled: true,
-            pushSubscription: sub.toJSON(),
-            notificationsUpdatedAt: serverTimestamp()
-          }, { merge: true });
-        });
-      }).catch(function(err){ console.error('推播訂閱失敗', err); });
-    });
-
-    // 首頁資料：下一次團練 + 即將到來的活動，接 events collection 即時更新
-    var WEEKDAY = ['日', '一', '二', '三', '四', '五', '六'];
-    var eventTypesById = {};
-    var latestEvents = [];
-
-    function formatEventTime(evt){
+  function formatEventTime(evt){
       if (evt.allDay) return '全天';
       var start = evt.date.toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit', hour12:false });
       if (!evt.endTime) return start + ' 開始';
@@ -1071,12 +1039,13 @@
 
       if (lastCheckinFetchedEventId !== nextRehearsal.id){
         lastCheckinFetchedEventId = nextRehearsal.id;
-        refreshCheckinState(nextRehearsal.id);
+        syncCheckinLock();
       }
     }
 
     // 簽到狀態四態：已簽到（checkins 有紀錄）優先於其他三態；
-    // 其餘看 checkinSessions/{eventId} 存不存在、windowEnd 有沒有過期
+    // 其餘看 checkinSessions/{eventId} 存不存在、windowEnd 有沒有過期。
+    // 訪客／審核中不查真正的簽到狀態（反正按鈕本身就鎖住），一律借用「開放中」版位顯示鎖定按鈕
     function renderCheckinState(state){
       document.getElementById('checkinNotOpen').classList.toggle('hidden', state !== 'notopen');
       document.getElementById('checkinOpenState').classList.toggle('hidden', state !== 'open');
@@ -1084,9 +1053,17 @@
       document.getElementById('checkinDone').classList.toggle('hidden', state !== 'done');
     }
 
+    // 團練卡片換了場、或身分驗證結果剛出爐時都要重新同步一次——這兩個時機點誰先誰後不一定
+    // （events 監聽可能比驗證早跑完），只看目前這場團練該不該真的去查簽到狀態
+    function syncCheckinLock(){
+      if (!lastCheckinFetchedEventId) return;
+      if (viewerState === 'approved') refreshCheckinState(lastCheckinFetchedEventId);
+      else renderCheckinState('open');
+    }
+
     async function refreshCheckinState(eventId){
       try {
-        var checkinSnap = await getDoc(doc(db, 'checkins', eventId + '_' + result.uid));
+        var checkinSnap = await getDoc(doc(db, 'checkins', eventId + '_' + viewerUid));
         if (lastCheckinFetchedEventId !== eventId) return; // 這段等待期間團練資訊又換了，捨棄這次結果
         if (checkinSnap.exists()){
           renderCheckinState('done');
@@ -1268,9 +1245,10 @@
       }).join('');
     });
 
-    // 出缺席回報：查詢自己在哪些活動的參與名單內，橫幅提示尚未回報的活動，點擊直接開啟回報 sheet
+    // 出缺席回報：查詢自己在哪些活動的參與名單內，橫幅提示尚未回報的活動，點擊直接開啟回報 sheet。
+    // 訪客沒有 uid、審核中的人結構上不會出現在任何名單裡（見下方身分驗證區塊），
+    // 這幾份監聽只有 approved/pending 才會真的訂閱，rsvpReportsByEvent 宣告在檔案上方共用
     var rsvpEventCache = {}; // eventId -> { title, date, location }
-    var rsvpReportsByEvent = {}; // eventId -> { status, reason }
     var rsvpRosterEventIds = [];
 
     async function ensureRsvpEventInfo(eventId){
@@ -1300,9 +1278,14 @@
       return pendingIds;
     }
 
-    // 橫幅只提示「在名單內但還沒回報」的活動，跟「在名單內」（不論是否已回報）是不同的條件，要分開算
+    // 橫幅只提示「在名單內但還沒回報」的活動，跟「在名單內」（不論是否已回報）是不同的條件，要分開算。
+    // 訪客沒有個人資料可查，這塊整個隱藏——結構上訪客/審核中也不會有資料（見上方說明），這裡只是防呆
     function renderRsvpBanner(){
       var banner = document.getElementById('rsvpBanner');
+      if (viewerState !== 'approved' && viewerState !== 'pending'){
+        banner.classList.add('hidden');
+        return;
+      }
       var pendingIds = computePendingRsvpIds();
 
       if (pendingIds.length === 0){
@@ -1329,7 +1312,12 @@
     var notifDot = document.getElementById('notifDot');
     var notifSheetOverlay = document.getElementById('notifSheetOverlay');
 
+    // 訪客沒有個人資料可查，通知鈴鐺整個隱藏（appbar 也會把按鈕本身藏起來，見下方身分驗證區塊）
     function renderNotifDot(){
+      if (viewerState !== 'approved' && viewerState !== 'pending'){
+        notifDot.classList.add('hidden');
+        return;
+      }
       var pendingCount = computePendingRsvpIds().length;
       var unreadAnnounceCount = latestAnnouncements.filter(function(item){
         return !notificationsReadAt || item.createdAt > notificationsReadAt;
@@ -1398,7 +1386,8 @@
     function markNotificationsRead(){
       notificationsReadAt = new Date();
       renderNotifDot();
-      setDoc(doc(db, 'users', result.uid), { notificationsReadAt: serverTimestamp() }, { merge: true })
+      if (!viewerUid) return; // 訪客不會走到這裡（鈴鐺已隱藏），防呆用
+      setDoc(doc(db, 'users', viewerUid), { notificationsReadAt: serverTimestamp() }, { merge: true })
         .catch(function(err){ console.error('標記通知已讀失敗', err); });
     }
 
@@ -1470,18 +1459,18 @@
     });
 
     document.getElementById('rsvpSubmitBtn').addEventListener('click', function(){
-      if (!rsvpOpenEventId) return;
+      if (!rsvpOpenEventId || !viewerUid) return;
       var errorEl = document.getElementById('rsvpFormError');
       var reason = document.getElementById('rsvpReasonInput').value.trim();
       errorEl.classList.add('hidden');
       var submitBtn = document.getElementById('rsvpSubmitBtn');
       submitBtn.disabled = true;
       var eventId = rsvpOpenEventId;
-      setDoc(doc(db, 'attendanceReports', eventId + '_' + result.uid), {
+      setDoc(doc(db, 'attendanceReports', eventId + '_' + viewerUid), {
         eventId: eventId,
-        uid: result.uid,
-        account: profile.account,
-        name: profile.name,
+        uid: viewerUid,
+        account: viewerProfile.account,
+        name: viewerProfile.name,
         status: rsvpSelectedStatus,
         reason: rsvpSelectedStatus === 'leave' ? reason : '',
         respondedAt: serverTimestamp()
@@ -1495,47 +1484,8 @@
       });
     });
 
-    // 只有已經「發起調查」（surveyOpenedAt 有值）的活動才算待辦，名單存在不等於調查已發起
-    onSnapshot(query(collection(db, 'eventRosters'), where('members', 'array-contains', result.uid)), function(snap){
-      rsvpRosterEventIds = snap.docs.filter(function(d){ return d.data().surveyOpenedAt; }).map(function(d){ return d.id; });
-      rsvpRosterEventIds.forEach(function(id){
-        ensureRsvpEventInfo(id).then(function(){
-          renderRsvpBanner();
-          renderNotifDot();
-          renderNotifSheet();
-        });
-      });
-      renderRsvpBanner();
-      renderNotifDot();
-      renderNotifSheet();
-    }, function(err){ console.error('eventRosters 監聽失敗', err); });
-
-    onSnapshot(query(collection(db, 'attendanceReports'), where('uid', '==', result.uid)), function(snap){
-      rsvpReportsByEvent = {};
-      snap.forEach(function(d){
-        var data = d.data();
-        rsvpReportsByEvent[data.eventId] = { status: data.status, reason: data.reason };
-      });
-      renderRsvpBanner();
-      renderNotifDot();
-      renderNotifSheet();
-      renderEventsSection(); // 團練卡片跟活動卡條上的「已回報」標籤也要跟著更新
-    }, function(err){ console.error('attendanceReports 監聽失敗', err); });
-
-    // notificationsReadAt 即時監聽（不透過 auth-guard.js 的快取 profile，見上方原因說明）。
-    // setDoc 寫入 serverTimestamp() 後，本地端在伺服器確認前會先收到一次 null（Firestore 對
-    // 還沒解析的 serverTimestamp 的既有行為），這裡刻意跳過 null、保留當下畫面上的樂觀值，
-    // 避免紅點在剛點開通知中心後又閃一下重新出現
-    onSnapshot(doc(db, 'users', result.uid), function(snap){
-      var data = snap.data() || {};
-      if (data.notificationsReadAt !== undefined && data.notificationsReadAt !== null){
-        notificationsReadAt = data.notificationsReadAt.toDate();
-        renderNotifDot();
-        renderNotifSheet();
-      }
-    }, function(err){ console.error('users 監聽失敗', err); });
-
-    // 簽到：即時開相機畫面，持續解碼直到找到 QR Code
+    // 簽到：即時開相機畫面，持續解碼直到找到 QR Code。訪客／審核中時 checkinLockedMessage
+    // 會是非 null 的提示文字，點擊只顯示 toast、不會真的開相機（見下方身分驗證區塊設定）
     var checkinBtn = document.getElementById('checkinBtn');
     var scanOverlay = document.getElementById('scanOverlay');
     var scanVideo = document.getElementById('scanVideo');
@@ -1592,12 +1542,155 @@
       }
     }
 
-    checkinBtn?.addEventListener('click', startScan);
+    checkinBtn?.addEventListener('click', function(){
+      if (checkinLockedMessage){ showToast(checkinLockedMessage); return; }
+      startScan();
+    });
     scanCancelBtn.addEventListener('click', stopScan);
     scanOverlay.addEventListener('click', function(e){
       if (e.target === scanOverlay) stopScan();
     });
-  });
+
+    // ---------- 身分驗證：訪客（未登入）／審核中／已核准，決定要不要打開個人化功能 ----------
+    resolveMemberAccess().then(function(access){
+      if (!access) return; // 未通過驗證（被拒絕/停用等），resolveMemberAccess 已經處理導轉
+
+      viewerState = access.state;
+      viewerUid = access.uid;
+      viewerProfile = access.profile;
+      overviewLocked = (viewerState === 'guest');
+
+      // tabbar「我的」：不論身分一律連到 profile.html——訪客點進去要先看到「登入」按鈕，
+      // 不能在首頁這裡就直接跳登入頁，避免誤觸導覽列就被導走，訪客/審核中/已核准的畫面差異
+      // 交給 profile.html 自己的守門邏輯處理（HTML 預設值本來就是 profile.html，這裡不用再改）
+      // 通知鈴鐺：訪客沒有個人資料可查，整個隱藏；審核中/已核准維持顯示（自然是空狀態）
+      document.getElementById('notifBtn').classList.toggle('hidden', viewerState === 'guest');
+      // 審核中狀態橫幅
+      document.getElementById('pendingBanner').classList.toggle('hidden', viewerState !== 'pending');
+
+      var checkinSub = document.getElementById('checkinSub');
+      if (viewerState === 'guest'){
+        checkinLockedMessage = '請先登入後即可簽到';
+        checkinBtn.classList.add('locked');
+        checkinSub.textContent = '登入後即可掃描 QR Code 簽到';
+      } else if (viewerState === 'pending'){
+        checkinLockedMessage = '帳號審核中，通過後即可簽到';
+        checkinBtn.classList.add('locked');
+        checkinSub.textContent = '帳號審核中，通過後即可掃描簽到';
+      } else {
+        checkinLockedMessage = null;
+      }
+      syncCheckinLock(); // events 監聽可能比這裡先跑完，補算一次目前這場團練該不該查真正的簽到狀態
+
+      if (viewerState === 'guest'){
+        document.getElementById('tabAvatarIcon').classList.remove('skel');
+        renderRsvpBanner();
+        renderNotifDot();
+        return; // 訪客到此為止，不掛任何個人資料相關的監聽
+      }
+
+      var tabAvatarIcon = document.getElementById('tabAvatarIcon');
+      tabAvatarIcon.textContent = viewerProfile.name ? viewerProfile.name.charAt(0) : '?';
+      tabAvatarIcon.classList.remove('skel');
+
+      renderRsvpBanner();
+      renderNotifDot();
+      renderNotifSheet();
+
+      // ---------- 通知開關推廣提示：只給已核准會員看，審核中的人已經可以在個人中心自行開通知，
+      // 這個首頁主動彈窗留給已核准會員，避免審核中的人一進來就被兩層提示轟炸 ----------
+      if (viewerState === 'approved'){
+        var NOTIF_PROMPT_DENIED_KEY = 'brio_notif_prompt_denied';
+        var NOTIF_PROMPT_LAST_SHOWN_KEY = 'brio_notif_prompt_last_shown';
+        var NOTIF_PROMPT_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+        function shouldShowNotifPrompt(){
+          if (viewerProfile.notificationsEnabled) return false;
+          if (!('Notification' in window) || !('serviceWorker' in navigator)) return false;
+          if (Notification.permission === 'denied') return false;
+          if (localStorage.getItem(NOTIF_PROMPT_DENIED_KEY) === 'true') return false;
+          if (isIOS() && !isStandalone()) return false;
+          var lastShown = Number(localStorage.getItem(NOTIF_PROMPT_LAST_SHOWN_KEY) || 0);
+          if (Date.now() - lastShown < NOTIF_PROMPT_INTERVAL_MS) return false;
+          return true;
+        }
+
+        var notifPromptOverlay = document.getElementById('notifPromptOverlay');
+        if (shouldShowNotifPrompt()){
+          localStorage.setItem(NOTIF_PROMPT_LAST_SHOWN_KEY, String(Date.now()));
+          notifPromptOverlay.classList.add('active');
+        }
+
+        document.getElementById('notifPromptLaterBtn').addEventListener('click', function(){
+          notifPromptOverlay.classList.remove('active');
+        });
+
+        document.getElementById('notifPromptEnableBtn').addEventListener('click', function(){
+          notifPromptOverlay.classList.remove('active');
+          Notification.requestPermission().then(function(perm){
+            if (perm === 'denied'){
+              localStorage.setItem(NOTIF_PROMPT_DENIED_KEY, 'true');
+              return;
+            }
+            if (perm !== 'granted') return;
+            return navigator.serviceWorker.ready.then(function(reg){
+              return reg.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+              });
+            }).then(function(sub){
+              return setDoc(doc(db, 'users', viewerUid), {
+                notificationsEnabled: true,
+                pushSubscription: sub.toJSON(),
+                notificationsUpdatedAt: serverTimestamp()
+              }, { merge: true });
+            });
+          }).catch(function(err){ console.error('推播訂閱失敗', err); });
+        });
+      }
+
+      // 只有已經「發起調查」（surveyOpenedAt 有值）的活動才算待辦，名單存在不等於調查已發起。
+      // pending 結構上不會出現在任何名單裡（名單只能從已核准會員裡勾選），這裡維持同一套訂閱邏輯，
+      // 不用另外寫，監聽結果自然是空的
+      onSnapshot(query(collection(db, 'eventRosters'), where('members', 'array-contains', viewerUid)), function(snap){
+        rsvpRosterEventIds = snap.docs.filter(function(d){ return d.data().surveyOpenedAt; }).map(function(d){ return d.id; });
+        rsvpRosterEventIds.forEach(function(id){
+          ensureRsvpEventInfo(id).then(function(){
+            renderRsvpBanner();
+            renderNotifDot();
+            renderNotifSheet();
+          });
+        });
+        renderRsvpBanner();
+        renderNotifDot();
+        renderNotifSheet();
+      }, function(err){ console.error('eventRosters 監聽失敗', err); });
+
+      onSnapshot(query(collection(db, 'attendanceReports'), where('uid', '==', viewerUid)), function(snap){
+        rsvpReportsByEvent = {};
+        snap.forEach(function(d){
+          var data = d.data();
+          rsvpReportsByEvent[data.eventId] = { status: data.status, reason: data.reason };
+        });
+        renderRsvpBanner();
+        renderNotifDot();
+        renderNotifSheet();
+        renderEventsSection(); // 團練卡片跟活動卡條上的「已回報」標籤也要跟著更新
+      }, function(err){ console.error('attendanceReports 監聽失敗', err); });
+
+      // notificationsReadAt 即時監聽（不透過 auth-guard.js 的快取 profile，見上方原因說明）。
+      // setDoc 寫入 serverTimestamp() 後，本地端在伺服器確認前會先收到一次 null（Firestore 對
+      // 還沒解析的 serverTimestamp 的既有行為），這裡刻意跳過 null、保留當下畫面上的樂觀值，
+      // 避免紅點在剛點開通知中心後又閃一下重新出現
+      onSnapshot(doc(db, 'users', viewerUid), function(snap){
+        var data = snap.data() || {};
+        if (data.notificationsReadAt !== undefined && data.notificationsReadAt !== null){
+          notificationsReadAt = data.notificationsReadAt.toDate();
+          renderNotifDot();
+          renderNotifSheet();
+        }
+      }, function(err){ console.error('users 監聽失敗', err); });
+    });
 </script>
 </body>
 </html>

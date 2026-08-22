@@ -100,6 +100,10 @@
     background:var(--paper-raised); border:1px solid var(--line);
     border-radius:var(--radius-lg); box-shadow:var(--shadow-card);
   }
+  /* ---------- 訪客（未登入）狀態：只有訊息 + 登入按鈕，不顯示個人資料/通知開關/管理連結 ---------- */
+  .guest-card{ text-align:center; padding:28px 16px; }
+  .guest-card .tw{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:15px; color:var(--ink); margin-bottom:6px; }
+  .guest-card .sub{ font-size:12.5px; color:var(--ink-soft); line-height:1.6; margin-bottom:18px; }
   .profile-header{ display:flex; align-items:center; gap:14px; }
   .profile-header .avatar{ width:52px; height:52px; font-size:19px; }
   .profile-header .who{ min-width:0; }
@@ -327,7 +331,14 @@
 
   <div class="staff"></div>
 
-  <div class="profile-card">
+  <!-- 訪客（未登入）狀態：登入後即可使用完整功能，點按鈕才跳轉，不會誤觸底部導覽列就被導走 -->
+  <div class="profile-card guest-card hidden" id="guestCard">
+    <div class="tw">尚未登入</div>
+    <div class="sub">登入後即可使用完整功能</div>
+    <button type="button" class="cta-btn" id="guestLoginBtn">前往登入</button>
+  </div>
+
+  <div class="profile-card" id="profileCardWrap">
     <div id="profileViewMode">
       <div class="profile-header">
         <div class="avatar skel" id="profileAvatar"></div>
@@ -401,7 +412,7 @@
     </div>
   </div>
 
-  <div class="pref-card">
+  <div class="pref-card" id="notifPrefCard">
     <div class="pref-row">
       <div class="label">推播通知</div>
       <button type="button" class="toggle-switch" id="notifToggle" aria-label="開啟推播通知"><span class="knob"></span></button>
@@ -460,7 +471,7 @@
 </div>
 
 <script type="module">
-  import { requireApprovedMember, peekCachedProfile, logout } from './auth-guard.js';
+  import { resolveMemberAccess, peekCachedProfile, logout } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import {
     collection, query, where, orderBy, limit, onSnapshot,
@@ -504,9 +515,28 @@
     document.getElementById('tabAvatarIcon').textContent = cachedProfile.name.charAt(0);
   }
 
-  requireApprovedMember().then(function(result){
-    if (!result) return;
-    var profile = result.profile;
+  document.getElementById('guestLoginBtn').addEventListener('click', function(){
+    location.href = 'login.html';
+  });
+
+  resolveMemberAccess().then(function(access){
+    if (!access) return;
+
+    // 訪客（未登入）：只顯示登入提示卡，個人資料/通知開關/管理連結/登出整塊隱藏，
+    // 通知鈴鐺也隱藏（沒有個人資料可查），不掛任何個人化監聽
+    if (access.state === 'guest'){
+      document.getElementById('profileAvatar').classList.remove('skel');
+      document.getElementById('profileCardWrap').classList.add('hidden');
+      document.getElementById('guestCard').classList.remove('hidden');
+      document.getElementById('notifPrefCard').classList.add('hidden');
+      document.getElementById('logoutBtn').classList.add('hidden');
+      document.getElementById('notifBtn').classList.add('hidden');
+      document.getElementById('versionFooter').textContent = 'v' + APP_VERSION;
+      return;
+    }
+
+    var result = access;
+    var profile = access.profile;
 
     document.getElementById('profileAvatar').textContent = profile.name ? profile.name.charAt(0) : '?';
     document.getElementById('profileAvatar').classList.remove('skel');
@@ -963,7 +993,7 @@
     document.getElementById('adminLinks').innerHTML = linksHtml;
 
     document.getElementById('logoutBtn').addEventListener('click', function(){
-      if (confirm('確定要登出嗎？')) logout();
+      if (confirm('確定要登出嗎？')) logout('profile.html');
     });
 
     // ---------- 通知開關 ----------
