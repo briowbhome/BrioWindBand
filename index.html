@@ -1134,12 +1134,38 @@
     // 避免類型還沒載入時先顯示原始 ID 的畫面
     var typesLoaded = false;
 
-    function renderEventsSection(){
-      if (!typesLoaded) return;
-      renderHero(latestEvents.find(function(evt){
+    // 挑「下一次◯◯」要顯示哪一場：today 內如果有好幾場 homeHighlight 活動，不能只看
+    // 開始時間排序取最早那場——那場結束後（endTime，沒填就視同開始時間）要換到今天下一場；
+    // 今天的活動全部結束了、但還沒跨過午夜，維持顯示今天最後一場（撐到當天結束才換日）；
+    // 今天完全沒有活動才會落到最近的未來日期
+    function pickHighlightEvent(events){
+      var highlightList = events.filter(function(evt){
         var t = eventTypesById[evt.type];
         return t && t.homeHighlight;
-      }) || null);
+      });
+      if (highlightList.length === 0) return null;
+
+      var now = new Date();
+      var todayStart = new Date(now);
+      todayStart.setHours(0, 0, 0, 0);
+      var todayEnd = new Date(todayStart);
+      todayEnd.setDate(todayEnd.getDate() + 1);
+
+      var todayList = highlightList.filter(function(evt){
+        return evt.date >= todayStart && evt.date < todayEnd;
+      });
+      if (todayList.length === 0) return highlightList[0]; // 已按 date 升冪排序，第一個就是最近的未來活動
+
+      var stillOngoing = todayList.find(function(evt){
+        var effectiveEnd = evt.endTime || evt.date;
+        return effectiveEnd >= now;
+      });
+      return stillOngoing || todayList[todayList.length - 1];
+    }
+
+    function renderEventsSection(){
+      if (!typesLoaded) return;
+      renderHero(pickHighlightEvent(latestEvents));
       renderProgram(latestEvents.slice(0, 5));
     }
 

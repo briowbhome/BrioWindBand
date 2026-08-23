@@ -347,10 +347,16 @@
 
   // ---------- 應到/回報/簽到資料 ----------
   async function loadEventData(eventId){
-    var rosterSnap = await getDoc(doc(db, 'eventRosters', eventId));
+    // reports 查詢只需要 eventId，不需要等 roster 讀完才開始——這兩個彼此互不相依，
+    // 平行發出去；只有下面的 users 查詢真的需要先知道 roster 是否非空才能決定要不要查
+    var rosterAndReports = await Promise.all([
+      getDoc(doc(db, 'eventRosters', eventId)),
+      getDocs(query(collection(db, 'attendanceReports'), where('eventId', '==', eventId)))
+    ]);
+    var rosterSnap = rosterAndReports[0];
+    var reportsSnap = rosterAndReports[1];
     rosterMembers = rosterSnap.exists() ? (rosterSnap.data().members || []) : null;
 
-    var reportsSnap = await getDocs(query(collection(db, 'attendanceReports'), where('eventId', '==', eventId)));
     reports = [];
     reportsSnap.forEach(function(docSnap){
       var data = docSnap.data();
@@ -838,13 +844,19 @@
     }
   }
 
-  async function boot(){
+  // instrumentsPromise/seatingPromise 是呼叫端（見下方 requireAdminOrConductor 回呼）在
+  // eventTypes 監聽跑完之前就先發出去的請求——這兩份資料只讀 settings 底下的單一文件，
+  // 跟活動/活動類型完全無關，沒有理由等 eventTypes 才開始。boot() 這裡只需要等它們，
+  // 不需要重新發起，避免呼叫兩次
+  async function boot(instrumentsPromise, seatingPromise){
     document.getElementById('nextEventLede').textContent = '正在載入下一場團練資料…';
     loadNotes(); // 筆記本不綁活動，不用等下一場團練查完才載入，跟下面的流程各自獨立
-    await loadInstrumentsList();
-    await loadSeatingSections();
     try {
-      nextEvent = await withRetry(findNextEvent);
+      // 三者互不相依（instruments/seatingSections 不需要 eventTypesById，findNextEvent
+      // 只需要 eventTypesById 就緒，不需要等前兩個），平行發出去取代原本的依序 await，
+      // 縮短「必須嚴格排隊等待」的段數
+      var results = await Promise.all([instrumentsPromise, seatingPromise, withRetry(findNextEvent)]);
+      nextEvent = results[2];
     } catch (e) {
       document.getElementById('nextEventLede').textContent = '讀取失敗，請重新整理再試一次';
       return;
@@ -885,11 +897,16 @@
     var isAdmin = result.profile.role === 'admin' || result.profile.role === 'owner';
     initAccountMenu(result.profile.name, isAdmin ? 'admin-index.html' : null, null);
 
+    // 這兩個請求跟 eventTypes 監聽無關，身分驗證一通過就直接發出去，不用等 eventTypes
+    // 的第一次快照回來才開始——boot() 會接手 await 這兩個 promise，不會重複發起請求
+    var instrumentsPromise = loadInstrumentsList();
+    var seatingPromise = loadSeatingSections();
+
     subscribeEventTypes(db, function(types){
       eventTypesById = {};
       types.forEach(function(t){ eventTypesById[t.id] = t; });
       typesLoaded = true;
-      boot();
+      boot(instrumentsPromise, seatingPromise);
     }, null, function(){
       document.getElementById('nextEventLede').textContent = '讀取失敗，請重新整理再試一次';
     });
