@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'brio-v16';
+const CACHE_VERSION = 'brio-v17';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -27,6 +27,7 @@ const CORE_ASSETS = [
   './push-config.js',
   './manifest.json',
   './assets/BrioLogo.jpg',
+  './assets/icons/badge-96.png',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
   './assets/icons/icon-192-maskable.png',
@@ -73,6 +74,7 @@ self.addEventListener('push', (event) => {
   var options = {
     body: payload.body || '',
     icon: './assets/icons/icon-192.png',
+    badge: './assets/icons/badge-96.png',
     data: { url: payload.url || './index.html' }
   };
   event.waitUntil(self.registration.showNotification(title, options));
