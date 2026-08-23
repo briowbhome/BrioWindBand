@@ -800,6 +800,23 @@
   });
 
   // ---------- 主流程 ----------
+  function delay(ms){
+    return new Promise(function(resolve){ setTimeout(resolve, ms); });
+  }
+
+  // 跟 auth-guard.js 的 loadProfileWithRetry 同一套做法：失敗先重試一次給網路壅塞一個機會。
+  // 這頁的下一場團練資料是一串依序等待的一次性讀取（getDoc/getDocs），不像其他後台頁面
+  // 主要靠 onSnapshot 監聽（SDK 內建自動重連），單次網路瞬斷就會直接中斷整條鏈、顯示
+  // 讀取失敗——這是這頁比其他頁面更容易在網路不穩時出問題的結構性原因，補一次重試機會
+  async function withRetry(fn){
+    try {
+      return await fn();
+    } catch (e){
+      await delay(1200);
+      return await fn();
+    }
+  }
+
   // settings/instruments 是後台可管理的清單（roles-admin.html），這頁只讀取、不修改，
   // 讀不到才退回內建預設清單，不能整頁卡住
   async function loadInstrumentsList(){
@@ -827,7 +844,7 @@
     await loadInstrumentsList();
     await loadSeatingSections();
     try {
-      nextEvent = await findNextEvent();
+      nextEvent = await withRetry(findNextEvent);
     } catch (e) {
       document.getElementById('nextEventLede').textContent = '讀取失敗，請重新整理再試一次';
       return;
@@ -847,7 +864,7 @@
       (nextEvent.location ? ' · ' + nextEvent.location : '');
 
     try {
-      await loadEventData(nextEvent.id);
+      await withRetry(function(){ return loadEventData(nextEvent.id); });
     } catch (e) {
       document.getElementById('nextEventMeta').textContent = '讀取失敗，請重新整理再試一次';
       return;
