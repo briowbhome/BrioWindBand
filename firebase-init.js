@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import { initializeFirestore, persistentLocalCache } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { getFirestore } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCGT88l8VtEXBZGeRaKLiQXmDgWOdjr7rw",
@@ -13,9 +13,4 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-// 開本地端 IndexedDB 持久化快取：多頁應用每次切頁都會重新訂閱 onSnapshot，這個快取
-// 讓畫面先用上次看到的本地資料立即繪出，背景才跟伺服器對一次帳，改善「切頁像重新
-// 整個載入」的體感；不影響 Firestore 讀取計次（背後還是會跟伺服器確認資料沒過期）
-export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache()
-});
+export const db = getFirestore(app);

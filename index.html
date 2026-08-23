@@ -1060,6 +1060,10 @@
     // （events 監聽可能比驗證早跑完），只看目前這場團練該不該真的去查簽到狀態
     function syncCheckinLock(){
       if (!lastCheckinFetchedEventId) return;
+      // events 監聽（公開讀取）通常比 resolveMemberAccess() 先跑完，這個當下 viewerState
+      // 還是預設值 null，不是真的判斷出「訪客/審核中」——原本這裡把「還沒解出身分」誤當成
+      // 「非已核准」處理，會在身分驗證完成前就先把骨架屏換成看起來像可以按的簽到按鈕
+      if (viewerState === null) return;
       if (viewerState === 'approved') refreshCheckinState(lastCheckinFetchedEventId);
       else renderCheckinState('open');
     }
@@ -1114,9 +1118,14 @@
       }).join('');
     }
 
+    // 下界用「今天 00:00」而不是 Timestamp.now()——今天已經開始的活動（例如團練已經開始）
+    // 還是要繼續留在名單裡，「下一次◯◯」才不會在活動開始的當下就提早切到更後面那場，
+    // 而是照使用者定案的規則撐到當天結束（切到隔天 00:00）才換下一場
+    var todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
     var upcomingQuery = query(
       collection(db, 'events'),
-      where('date', '>=', Timestamp.now()),
+      where('date', '>=', Timestamp.fromDate(todayStart)),
       orderBy('date', 'asc'),
       limit(20)
     );
