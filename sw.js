@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'brio-v17';
+const CACHE_VERSION = 'brio-v18';
 const CORE_ASSETS = [
   './',
   './index.html',
