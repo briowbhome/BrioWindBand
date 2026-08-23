@@ -758,9 +758,13 @@
       </div>
       <div class="hero-empty hidden" id="heroEmpty">目前沒有排定的團練</div>
 
-      <div class="checkin">
+      <div class="checkin" id="checkinBlock">
+        <div class="checkin-msg" id="checkinSkeleton">
+          <span class="skel-dark skel-bar" style="width:200px;height:44px;border-radius:12px;margin:0 auto;"></span>
+          <span class="skel-dark skel-bar" style="width:140px;height:11px;margin:10px auto 0;"></span>
+        </div>
         <div class="checkin-msg muted hidden" id="checkinNotOpen">尚未開放簽到</div>
-        <div id="checkinOpenState">
+        <div id="checkinOpenState" class="hidden">
           <button class="checkin-btn" id="checkinBtn">
             <svg class="ico" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1" stroke="#20242F" stroke-width="1.6"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="#20242F" stroke-width="1.6"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="#20242F" stroke-width="1.6"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z" fill="#20242F"/></svg>
             掃描 QR Code 簽到
@@ -1016,10 +1020,14 @@
       if (!nextRehearsal){
         content.classList.add('hidden');
         empty.classList.remove('hidden');
+        // 沒有下一場團練就沒有簽到的對象，整塊連同骨架一起藏起來，避免卡在骨架屏
+        document.getElementById('checkinBlock').classList.add('hidden');
+        lastCheckinFetchedEventId = null;
         return;
       }
       empty.classList.add('hidden');
       content.classList.remove('hidden');
+      document.getElementById('checkinBlock').classList.remove('hidden');
       document.getElementById('heroEyebrow').textContent = nextRehearsal.title;
       document.getElementById('heroCountdown').textContent = formatCountdown(nextRehearsal.date);
       document.getElementById('heroDateNum').textContent =
@@ -1041,6 +1049,7 @@
     // 其餘看 checkinSessions/{eventId} 存不存在、windowEnd 有沒有過期。
     // 訪客／審核中不查真正的簽到狀態（反正按鈕本身就鎖住），一律借用「開放中」版位顯示鎖定按鈕
     function renderCheckinState(state){
+      document.getElementById('checkinSkeleton').classList.add('hidden');
       document.getElementById('checkinNotOpen').classList.toggle('hidden', state !== 'notopen');
       document.getElementById('checkinOpenState').classList.toggle('hidden', state !== 'open');
       document.getElementById('checkinExpired').classList.toggle('hidden', state !== 'expired');
