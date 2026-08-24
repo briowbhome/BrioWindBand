@@ -663,6 +663,9 @@
       <div class="sub">Brio Wind Band</div>
     </div>
     <div class="spacer"></div>
+    <a class="bell-btn hidden" id="conductorBtn" href="conductor-admin.html" aria-label="指揮後台">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none"><path d="M8.5 16.5 18.5 6.5" stroke="#20242F" stroke-width="1.5" stroke-linecap="round"/><path d="M8.3 16.8C9.455 20.52 10.4 22.5 10.4 23A2.1 2.1 0 1 1 6.2 23C6.2 22.5 7.145 20.52 8.3 16.8Z" fill="#20242F" transform="rotate(45 8.3 16.8)"/></svg>
+    </a>
     <button class="bell-btn" id="notifBtn" type="button" aria-label="通知">
       <svg width="21" height="21" viewBox="0 0 24 24" fill="none"><path d="M6 9a6 6 0 0 1 12 0v4l1.8 3.2a.6.6 0 0 1-.5.9H4.7a.6.6 0 0 1-.5-.9L6 13V9Z" stroke="#20242F" stroke-width="1.6" stroke-linejoin="round"/><path d="M9.5 19.5a2.5 2.5 0 0 0 5 0" stroke="#20242F" stroke-width="1.6" stroke-linecap="round"/></svg>
       <span class="notif-dot hidden" id="notifDot"></span>
@@ -1288,6 +1291,10 @@
     // 這幾份監聽只有 approved/pending 才會真的訂閱，rsvpReportsByEvent 宣告在檔案上方共用
     var rsvpEventCache = {}; // eventId -> { title, date, location }
     var rsvpRosterEventIds = [];
+    // 團員審核待辦：只有 admin/owner 會訂閱這個查詢（見下方身分驗證區塊），一般團員/指揮
+    // 維持 0，不會出現在通知中心，也不會多打這個查詢（firestore.rules 對非 admin-tier
+    // 本來就不會放行 list 這個 collection）
+    var pendingReviewCount = 0;
 
     async function ensureRsvpEventInfo(eventId){
       if (rsvpEventCache[eventId]) return rsvpEventCache[eventId];
@@ -1360,7 +1367,7 @@
       var unreadAnnounceCount = latestAnnouncements.filter(function(item){
         return !notificationsReadAt || item.createdAt > notificationsReadAt;
       }).length;
-      var total = pendingCount + unreadAnnounceCount;
+      var total = pendingCount + unreadAnnounceCount + pendingReviewCount;
       notifDot.textContent = total > 9 ? '9+' : String(total);
       notifDot.classList.toggle('hidden', total === 0);
       document.getElementById('notifBtn').setAttribute('aria-label',
@@ -1370,24 +1377,38 @@
     function renderNotifSheet(){
       var todoList = document.getElementById('notifTodoList');
       var pendingIds = computePendingRsvpIds();
-      if (pendingIds.length === 0){
-        todoList.innerHTML = '<div class="notif-empty">目前沒有待辦事項</div>';
-      } else {
-        todoList.innerHTML = pendingIds.map(function(id){
-          var info = rsvpEventCache[id];
-          var dateText = info.date ? (info.date.getMonth() + 1) + '/' + info.date.getDate() : '';
-          return (
-            '<button type="button" class="notif-row" data-notif-rsvp="' + id + '">' +
-              '<span class="dot"></span>' +
-              '<span class="body">' +
-                '<div class="title">尚未回報出缺席</div>' +
-                '<div class="meta">' + (dateText ? dateText + '（' + info.title + '）' : info.title) + '</div>' +
-              '</span>' +
-              '<span class="chev">›</span>' +
-            '</button>'
-          );
-        }).join('');
+      var rowsHtml = [];
+      // 團員審核放最前面——只有 admin/owner 會有非 0 值（見下方訂閱條件），一般團員/指揮
+      // 這裡永遠是空字串，不影響原本的出缺席回報待辦
+      if (pendingReviewCount > 0){
+        rowsHtml.push(
+          '<button type="button" class="notif-row" data-notif-review="1">' +
+            '<span class="dot"></span>' +
+            '<span class="body">' +
+              '<div class="title">團員審核</div>' +
+              '<div class="meta">' + pendingReviewCount + ' 位團員待審核</div>' +
+            '</span>' +
+            '<span class="chev">›</span>' +
+          '</button>'
+        );
       }
+      rowsHtml = rowsHtml.concat(pendingIds.map(function(id){
+        var info = rsvpEventCache[id];
+        var dateText = info.date ? (info.date.getMonth() + 1) + '/' + info.date.getDate() : '';
+        return (
+          '<button type="button" class="notif-row" data-notif-rsvp="' + id + '">' +
+            '<span class="dot"></span>' +
+            '<span class="body">' +
+              '<div class="title">尚未回報出缺席</div>' +
+              '<div class="meta">' + (dateText ? dateText + '（' + info.title + '）' : info.title) + '</div>' +
+            '</span>' +
+            '<span class="chev">›</span>' +
+          '</button>'
+        );
+      }));
+      todoList.innerHTML = rowsHtml.length === 0
+        ? '<div class="notif-empty">目前沒有待辦事項</div>'
+        : rowsHtml.join('');
 
       var announceListEl = document.getElementById('notifAnnounceList');
       if (latestAnnouncements.length === 0){
@@ -1445,6 +1466,11 @@
       if (e.target === notifSheetOverlay) closeNotifSheet();
     });
     document.getElementById('notifTodoList').addEventListener('click', function(e){
+      if (e.target.closest('[data-notif-review]')){
+        closeNotifSheet();
+        location.href = 'review-admin.html';
+        return;
+      }
       var btn = e.target.closest('[data-notif-rsvp]');
       if (!btn) return;
       var id = btn.getAttribute('data-notif-rsvp');
@@ -1593,6 +1619,15 @@
     resolveMemberAccess().then(function(access){
       if (!access) return; // 未通過驗證（被拒絕/停用等），resolveMemberAccess 已經處理導轉
 
+      // 未登入且沒有主動選過「訪客瀏覽」（login.html 的按鈕才會寫這個旗標）一律先導去登入頁，
+      // 避免新團員（例如點到活動分享連結）直接落在首頁、完全看不到註冊入口。這個旗標只存在
+      // sessionStorage（分頁關掉就重置），下次重新打開還是會先看到登入頁，持續給機會看到
+      // 註冊入口，同一次瀏覽過程中不會反覆被導回登入頁。8/24 討論定案，見 schema.md
+      if (access.state === 'guest' && !sessionStorage.getItem('brio_guest_browse')){
+        location.href = 'login.html?redirect=' + encodeURIComponent(location.pathname + location.search);
+        return;
+      }
+
       viewerState = access.state;
       viewerUid = access.uid;
       viewerProfile = access.profile;
@@ -1603,6 +1638,11 @@
       // 交給 profile.html 自己的守門邏輯處理（HTML 預設值本來就是 profile.html，這裡不用再改）
       // 通知鈴鐺：訪客沒有個人資料可查，整個隱藏；審核中/已核准維持顯示（自然是空狀態）
       document.getElementById('notifBtn').classList.toggle('hidden', viewerState === 'guest');
+      // 指揮後台入口：只有 admin/owner/conductor 看得到，跟 profile.html 的
+      // canSeeConductorPage 同一套判斷式，角色資料已經在 viewerProfile 裡，不用多查一次
+      var canSeeConductorPage = viewerProfile &&
+        (viewerProfile.role === 'admin' || viewerProfile.role === 'owner' || viewerProfile.role === 'conductor');
+      document.getElementById('conductorBtn').classList.toggle('hidden', !canSeeConductorPage);
       // 審核中狀態橫幅
       document.getElementById('pendingBanner').classList.toggle('hidden', viewerState !== 'pending');
 
@@ -1728,6 +1768,17 @@
           renderNotifSheet();
         }
       }, function(err){ console.error('users 監聽失敗', err); });
+
+      // 團員審核待辦：只有 admin/owner 訂閱，conductor 沒有審核權限、不會看到這項，
+      // firestore.rules 對 users collection 的 list 也只放行 admin-tier，這裡的角色判斷
+      // 只是避免非 admin-tier 白打一次一定會被拒絕的查詢
+      if (viewerProfile.role === 'admin' || viewerProfile.role === 'owner'){
+        onSnapshot(query(collection(db, 'users'), where('status', '==', 'pending')), function(snap){
+          pendingReviewCount = snap.size;
+          renderNotifDot();
+          renderNotifSheet();
+        }, function(err){ console.error('pending 團員審核監聽失敗', err); });
+      }
     });
 </script>
 </body>

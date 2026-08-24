@@ -120,6 +120,8 @@
   .profile-detail .info-row .k{ color:var(--ink-soft); }
   .profile-detail .info-row .v{ color:var(--ink); font-weight:500; text-align:right; }
   .profile-edit-btn-row{ margin-top:14px; text-align:right; }
+  .password-view-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .password-view-row .profile-edit-title{ font-family:'Noto Sans TC',sans-serif; font-size:13.5px; }
   .profile-edit-btn{
     border:1px solid var(--line); background:var(--paper); color:var(--brass-deep);
     border-radius:999px; padding:8px 18px; font-size:12.5px; font-weight:700; cursor:pointer;
@@ -132,7 +134,7 @@
     display:block; font-family:'Roboto Mono',monospace; font-size:10px; font-weight:600;
     letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:5px;
   }
-  .profile-edit-form .field input[type=text], .profile-edit-form .field input[type=tel]{
+  .profile-edit-form .field input[type=text], .profile-edit-form .field input[type=tel], .profile-edit-form .field input[type=password]{
     width:100%; border:1px solid var(--line); background:var(--paper);
     border-radius:var(--radius-sm); padding:10px 12px; font-size:13px; color:var(--ink);
   }
@@ -412,6 +414,36 @@
     </div>
   </div>
 
+  <!-- 修改密碼：跟個人資料同一套「先看後編」模式，view 狀態沒有資料可顯示，只有一顆入口按鈕 -->
+  <div class="profile-card" id="passwordCardWrap">
+    <div id="passwordViewMode" class="password-view-row">
+      <div class="profile-edit-title" style="margin-bottom:0;">帳號安全</div>
+      <button type="button" class="profile-edit-btn" id="passwordEditBtn">✎ 修改密碼</button>
+    </div>
+    <div id="passwordEditMode" class="hidden">
+      <div class="profile-edit-title">修改密碼</div>
+      <p class="profile-form-error hidden" id="passwordFormError"></p>
+      <div class="profile-edit-form">
+        <div class="field">
+          <label>目前密碼</label>
+          <input type="password" id="currentPasswordInput" autocomplete="current-password">
+        </div>
+        <div class="field">
+          <label>新密碼</label>
+          <input type="password" id="newPasswordInput" autocomplete="new-password">
+        </div>
+        <div class="field">
+          <label>確認新密碼</label>
+          <input type="password" id="confirmPasswordInput" autocomplete="new-password">
+        </div>
+      </div>
+      <div class="profile-edit-actions">
+        <button type="button" class="profile-edit-cancel" id="passwordEditCancelBtn">取消</button>
+        <button type="button" class="profile-edit-save" id="passwordEditSaveBtn">儲存變更</button>
+      </div>
+    </div>
+  </div>
+
   <div class="pref-card" id="notifPrefCard">
     <div class="pref-row">
       <div class="label">推播通知</div>
@@ -472,11 +504,14 @@
 
 <script type="module">
   import { resolveMemberAccess, peekCachedProfile, logout } from './auth-guard.js';
-  import { db } from './firebase-init.js';
+  import { db, auth } from './firebase-init.js';
   import {
     collection, query, where, orderBy, limit, onSnapshot,
     doc, getDoc, setDoc, serverTimestamp
   } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+  import {
+    EmailAuthProvider, reauthenticateWithCredential, updatePassword
+  } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
   import { APP_VERSION } from './version.js';
   import { VAPID_PUBLIC_KEY } from './push-config.js';
 
@@ -528,6 +563,7 @@
       document.getElementById('profileAvatar').classList.remove('skel');
       document.getElementById('profileCardWrap').classList.add('hidden');
       document.getElementById('guestCard').classList.remove('hidden');
+      document.getElementById('passwordCardWrap').classList.add('hidden');
       document.getElementById('notifPrefCard').classList.add('hidden');
       document.getElementById('logoutBtn').classList.add('hidden');
       document.getElementById('notifBtn').classList.add('hidden');
@@ -784,6 +820,83 @@
       });
     });
 
+    // ---------- 修改密碼：自助改「自己已知的密碼」，不是忘記密碼的救援機制（那個要幹部端
+    // 協助重設，是另一個功能）。Firebase 對變更密碼這類敏感操作要求「近期登入過」，session
+    // 太舊會丟 auth/requires-recent-login，所以流程固定先用目前密碼重新驗證身分一次，
+    // 通過才真的呼叫 updatePassword，不是隨便就能改 ----------
+    var passwordViewMode = document.getElementById('passwordViewMode');
+    var passwordEditMode = document.getElementById('passwordEditMode');
+    var currentPasswordInput = document.getElementById('currentPasswordInput');
+    var newPasswordInput = document.getElementById('newPasswordInput');
+    var confirmPasswordInput = document.getElementById('confirmPasswordInput');
+    var passwordFormError = document.getElementById('passwordFormError');
+    var passwordEditSaveBtn = document.getElementById('passwordEditSaveBtn');
+
+    function mapPasswordError(error){
+      var code = error && error.code;
+      if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') return '目前密碼不正確';
+      if (code === 'auth/weak-password') return '新密碼強度不足（至少 6 碼）';
+      if (code === 'auth/requires-recent-login') return '登入時間較久，請重新登入後再試一次';
+      if (code === 'auth/too-many-requests') return '嘗試次數過多，請稍後再試';
+      if (code === 'auth/network-request-failed') return '網路連線異常，請檢查網路後再試';
+      return '發生錯誤，請稍後再試（' + (code || 'unknown') + '）';
+    }
+
+    function enterPasswordEditMode(){
+      passwordFormError.classList.add('hidden');
+      currentPasswordInput.value = '';
+      newPasswordInput.value = '';
+      confirmPasswordInput.value = '';
+      passwordViewMode.classList.add('hidden');
+      passwordEditMode.classList.remove('hidden');
+    }
+
+    function exitPasswordEditMode(){
+      passwordEditMode.classList.add('hidden');
+      passwordViewMode.classList.remove('hidden');
+    }
+
+    document.getElementById('passwordEditBtn').addEventListener('click', enterPasswordEditMode);
+    document.getElementById('passwordEditCancelBtn').addEventListener('click', exitPasswordEditMode);
+
+    passwordEditSaveBtn.addEventListener('click', function(){
+      var currentPassword = currentPasswordInput.value;
+      var newPassword = newPasswordInput.value;
+      var confirmPassword = confirmPasswordInput.value;
+
+      if (!currentPassword){
+        passwordFormError.textContent = '請輸入目前密碼';
+        passwordFormError.classList.remove('hidden');
+        return;
+      }
+      if (newPassword.length < 6){
+        passwordFormError.textContent = '新密碼至少要 6 碼';
+        passwordFormError.classList.remove('hidden');
+        return;
+      }
+      if (newPassword !== confirmPassword){
+        passwordFormError.textContent = '兩次輸入的新密碼不一致';
+        passwordFormError.classList.remove('hidden');
+        return;
+      }
+
+      passwordFormError.classList.add('hidden');
+      passwordEditSaveBtn.disabled = true;
+
+      var credential = EmailAuthProvider.credential(auth.currentUser.email, currentPassword);
+      reauthenticateWithCredential(auth.currentUser, credential)
+        .then(function(){ return updatePassword(auth.currentUser, newPassword); })
+        .then(function(){
+          passwordEditSaveBtn.disabled = false;
+          exitPasswordEditMode();
+        })
+        .catch(function(err){
+          passwordEditSaveBtn.disabled = false;
+          passwordFormError.textContent = mapPasswordError(err);
+          passwordFormError.classList.remove('hidden');
+        });
+    });
+
     // ---------- 通知中心（跟 index.html 同一套計算邏輯，這頁沒有出缺席回報 sheet／
     // 公告清單本體，待辦列跟「查看全部」點擊都導去首頁處理，不重做整個互動流程） ----------
     function formatRelativeTime(date){
@@ -802,6 +915,7 @@
     var rsvpEventCache = {};
     var rsvpReportsByEvent = {};
     var rsvpRosterEventIds = [];
+    var pendingReviewCount = 0; // 只有 admin/owner 會訂閱這個查詢，見下方訂閱條件
     var latestAnnouncements = [];
     var notificationsReadAt = null;
     var NOTIF_ANNOUNCE_LIMIT = 3;
@@ -840,30 +954,42 @@
       var hasUnreadAnnounce = latestAnnouncements.some(function(item){
         return !notificationsReadAt || item.createdAt > notificationsReadAt;
       });
-      notifDot.classList.toggle('hidden', !(hasPendingTodo || hasUnreadAnnounce));
+      notifDot.classList.toggle('hidden', !(hasPendingTodo || hasUnreadAnnounce || pendingReviewCount > 0));
     }
 
     function renderNotifSheet(){
       var todoList = document.getElementById('notifTodoList');
       var pendingIds = computePendingRsvpIds();
-      if (pendingIds.length === 0){
-        todoList.innerHTML = '<div class="notif-empty">目前沒有待辦事項</div>';
-      } else {
-        todoList.innerHTML = pendingIds.map(function(id){
-          var info = rsvpEventCache[id];
-          var dateText = info.date ? (info.date.getMonth() + 1) + '/' + info.date.getDate() : '';
-          return (
-            '<button type="button" class="notif-row" data-notif-rsvp="' + id + '">' +
-              '<span class="dot"></span>' +
-              '<span class="body">' +
-                '<div class="title">尚未回報出缺席</div>' +
-                '<div class="meta">' + (dateText ? dateText + '（' + info.title + '）' : info.title) + '</div>' +
-              '</span>' +
-              '<span class="chev">›</span>' +
-            '</button>'
-          );
-        }).join('');
+      var rowsHtml = [];
+      if (pendingReviewCount > 0){
+        rowsHtml.push(
+          '<button type="button" class="notif-row" data-notif-review="1">' +
+            '<span class="dot"></span>' +
+            '<span class="body">' +
+              '<div class="title">團員審核</div>' +
+              '<div class="meta">' + pendingReviewCount + ' 位團員待審核</div>' +
+            '</span>' +
+            '<span class="chev">›</span>' +
+          '</button>'
+        );
       }
+      rowsHtml = rowsHtml.concat(pendingIds.map(function(id){
+        var info = rsvpEventCache[id];
+        var dateText = info.date ? (info.date.getMonth() + 1) + '/' + info.date.getDate() : '';
+        return (
+          '<button type="button" class="notif-row" data-notif-rsvp="' + id + '">' +
+            '<span class="dot"></span>' +
+            '<span class="body">' +
+              '<div class="title">尚未回報出缺席</div>' +
+              '<div class="meta">' + (dateText ? dateText + '（' + info.title + '）' : info.title) + '</div>' +
+            '</span>' +
+            '<span class="chev">›</span>' +
+          '</button>'
+        );
+      }));
+      todoList.innerHTML = rowsHtml.length === 0
+        ? '<div class="notif-empty">目前沒有待辦事項</div>'
+        : rowsHtml.join('');
 
       var announceListEl = document.getElementById('notifAnnounceList');
       if (latestAnnouncements.length === 0){
@@ -913,8 +1039,12 @@
     notifSheetOverlay.addEventListener('click', function(e){
       if (e.target === notifSheetOverlay) closeNotifSheet();
     });
-    // 待辦列點擊：這頁沒有出缺席回報 sheet，直接導去首頁處理
+    // 待辦列點擊：出缺席回報這頁沒有對應 sheet，直接導去首頁處理；團員審核直接導去審核頁
     document.getElementById('notifTodoList').addEventListener('click', function(e){
+      if (e.target.closest('[data-notif-review]')){
+        location.href = 'review-admin.html';
+        return;
+      }
       var btn = e.target.closest('[data-notif-rsvp]');
       if (!btn) return;
       location.href = 'index.html';
@@ -983,6 +1113,16 @@
     // 後台管理／指揮專用連結：跟 index.html 同一套判斷式
     var isAdmin = profile.role === 'admin' || profile.role === 'owner';
     var canSeeConductorPage = isAdmin || profile.role === 'conductor';
+
+    // 團員審核待辦：只有 admin/owner 訂閱，理由跟 index.html 同一套（conductor 沒有審核權限、
+    // firestore.rules 的 users list 也只放行 admin-tier）
+    if (isAdmin){
+      onSnapshot(query(collection(db, 'users'), where('status', '==', 'pending')), function(snap){
+        pendingReviewCount = snap.size;
+        renderNotifDot();
+        renderNotifSheet();
+      }, function(err){ console.error('pending 團員審核監聽失敗', err); });
+    }
     var linksHtml = '';
     if (isAdmin){
       linksHtml += '<a class="link-row" href="admin-index.html">後台管理<span class="chev">›</span></a>';

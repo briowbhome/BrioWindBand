@@ -1,7 +1,9 @@
 const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
+const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
+const { getAuth } = require('firebase-admin/auth');
 const { sendPushToUids } = require('./push');
 
 initializeApp();
@@ -66,3 +68,40 @@ exports.onSurveyOpened = onDocumentUpdated(
     }, VAPID_PRIVATE_KEY.value());
   }
 );
+
+// 幹部協助重設團員密碼——這個專案第一個 callable function（前兩個都是背景 Firestore
+// trigger）。前端只在 role==='admin'/'owner' 且沒有 canManageRoles 時就不會顯示重設按鈕，
+// 但那只是 UI 層面的方便，權限的真正防線在這裡：伺服器端重新查一次 caller 的 users/{uid}
+// 文件，不相信任何前端傳來的角色資訊，避免有人繞過前端直接呼叫這個 function
+exports.resetMemberPassword = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', '請先登入');
+  }
+
+  const callerSnap = await db.collection('users').doc(request.auth.uid).get();
+  const caller = callerSnap.exists ? callerSnap.data() : null;
+  const isOwner = !!caller && caller.role === 'owner';
+  const canManageRoles = isOwner || (!!caller && !!caller.permissions && caller.permissions.canManageRoles === true);
+  if (!canManageRoles) {
+    throw new HttpsError('permission-denied', '沒有權限執行這個操作');
+  }
+
+  const targetUid = request.data && request.data.uid;
+  const newPassword = request.data && request.data.newPassword;
+  if (!targetUid || typeof newPassword !== 'string' || newPassword.length < 6) {
+    throw new HttpsError('invalid-argument', '請提供團員帳號跟至少 6 碼的新密碼');
+  }
+
+  // 不能重設 Owner 的密碼，跟 firestore.rules 對 Owner 敏感欄位的保護是同一個原則——
+  // 避免持有 canManageRoles 但不是 Owner 本人的人連 Owner 帳號都能接管
+  const targetSnap = await db.collection('users').doc(targetUid).get();
+  if (!targetSnap.exists) {
+    throw new HttpsError('not-found', '找不到這個團員的資料');
+  }
+  if (targetSnap.data().role === 'owner') {
+    throw new HttpsError('permission-denied', '不能重設 Owner 的密碼');
+  }
+
+  await getAuth().updateUser(targetUid, { password: newPassword });
+  return { ok: true };
+});

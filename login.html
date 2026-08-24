@@ -446,6 +446,7 @@
           <button type="submit" class="cta-btn" id="loginBtn">登入</button>
         </div>
         <p class="switchline">還沒有帳號？<button type="button" id="toRegister">申請帳號</button></p>
+        <p class="switchline">或<button type="button" id="guestBrowseBtn">先以訪客身分瀏覽</button></p>
       </form>
 
       <!-- 申請帳號 -->
@@ -864,6 +865,16 @@
       btn.textContent = '登入';
       showFormError('loginFormError', error.message);
     });
+  });
+
+  // 訪客瀏覽：寫一個只在這次瀏覽（分頁關掉就重置）有效的 sessionStorage 旗標，index.html
+  // 檢查到這個旗標才會放行訪客看受限版首頁，否則一律先導回這裡——避免新團員誤以為
+  // 首頁就是終點、看不到註冊入口（8/24 討論定案，見 schema.md）
+  document.getElementById('guestBrowseBtn').addEventListener('click', function(){
+    sessionStorage.setItem('brio_guest_browse', 'true');
+    var redirect = new URLSearchParams(location.search).get('redirect');
+    var target = (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) ? redirect : 'index.html';
+    location.href = target;
   });
 
   // 申請帳號表單（送出動作只會在步驟 2 觸發，步驟 1 的 Enter 已另外攔截）

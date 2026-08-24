@@ -248,6 +248,26 @@
   }
   .form-error.show{ display:block; }
 
+  /* ---------- 重設密碼（成員編輯 sheet 內的獨立小區塊，跟角色/權限的儲存流程分開） ---------- */
+  .reset-pw-wrap input{
+    border:1px solid var(--line); background:var(--paper);
+    border-radius:var(--radius-sm); padding:11px 13px;
+    font-size:14px; color:var(--ink); width:100%;
+  }
+  .reset-pw-trigger{
+    border:1px solid var(--line); background:var(--paper); color:var(--burgundy);
+    border-radius:var(--radius-sm); padding:9px 14px; font-size:12.5px; font-weight:700; cursor:pointer;
+  }
+  .reset-pw-trigger:active{ background:var(--paper-raised); }
+  .reset-pw-actions{ display:flex; gap:8px; margin-top:8px; }
+  .reset-pw-actions button{
+    flex:1; border:none; border-radius:var(--radius-sm); padding:10px 14px;
+    font-size:12.5px; font-weight:700; cursor:pointer;
+  }
+  .reset-pw-confirm{ background:var(--brass); color:var(--ink); }
+  .reset-pw-confirm:disabled{ opacity:.5; cursor:default; }
+  .reset-pw-cancel{ background:none; color:var(--ink-soft); border:1px solid var(--line) !important; }
+
   /* ---------- Instrument list ---------- */
   .inst-group-label{
     padding:10px 16px 4px; font-family:'Roboto Mono',monospace; font-size:10px;
@@ -389,6 +409,21 @@
       <div class="account" id="sheetMemberAccount">—</div>
     </div>
     <div class="sheet-body" id="memberSheetBody"></div>
+    <!-- 重設密碼獨立於 memberSheetBody 之外，避免角色/權限的每次勾選重繪把已經打開的
+         表單／已輸入的密碼一起清掉——只有 Owner／canManageRoles 才進得了這頁，這裡不用
+         再重複判斷權限，伺服器端（Cloud Function）還是會再驗證一次 -->
+    <div class="reset-pw-wrap hidden" id="resetPasswordWrap" style="padding:0 20px 14px;">
+      <label style="display:block;font-family:'Roboto Mono',monospace;font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px;">帳號安全</label>
+      <button type="button" class="reset-pw-trigger" id="resetPasswordBtn">重設密碼</button>
+      <div id="resetPasswordForm" class="hidden" style="margin-top:10px;">
+        <input type="password" id="resetPasswordInput" placeholder="輸入新密碼（至少 6 碼）">
+        <div class="reset-pw-actions">
+          <button type="button" class="reset-pw-cancel" id="resetPasswordCancelBtn">取消</button>
+          <button type="button" class="reset-pw-confirm" id="resetPasswordConfirmBtn">確認重設</button>
+        </div>
+        <p class="form-error" id="resetPasswordError"></p>
+      </div>
+    </div>
     <div class="sheet-footer">
       <button type="button" class="cta-btn cta-btn-secondary" id="cancelMemberBtn">取消</button>
       <button type="button" class="cta-btn" id="saveMemberBtn" disabled>儲存變更</button>
@@ -398,13 +433,16 @@
 
 <script type="module">
   import { requireAdmin, peekCachedProfile } from './auth-guard.js';
-  import { db } from './firebase-init.js';
+  import { db, functions } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { subscribeInstruments, addInstrument, removeInstrument, setInstrumentsOrder, FAMILY_LABELS, FAMILY_ORDER } from './instruments.js';
   import { subscribeSeatingSections, setSeatingSections } from './seating-chart.js';
   import {
     collection, query, where, onSnapshot, doc, updateDoc
   } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+  import { httpsCallable } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-functions.js';
+
+  var resetMemberPasswordFn = httpsCallable(functions, 'resetMemberPassword');
 
   var MEMBER_SKELETON_HTML = [1, 2, 3].map(function(){
     return (
@@ -479,6 +517,55 @@
   var memberSheetOverlay = document.getElementById('memberSheetOverlay');
   var memberSheetBody = document.getElementById('memberSheetBody');
   var saveMemberBtn = document.getElementById('saveMemberBtn');
+  var resetPasswordWrap = document.getElementById('resetPasswordWrap');
+  var resetPasswordForm = document.getElementById('resetPasswordForm');
+  var resetPasswordInput = document.getElementById('resetPasswordInput');
+  var resetPasswordError = document.getElementById('resetPasswordError');
+  var resetPasswordConfirmBtn = document.getElementById('resetPasswordConfirmBtn');
+
+  function resetResetPasswordForm(){
+    resetPasswordForm.classList.add('hidden');
+    resetPasswordInput.value = '';
+    resetPasswordError.classList.remove('show');
+    resetPasswordError.textContent = '';
+    resetPasswordConfirmBtn.disabled = false;
+    resetPasswordConfirmBtn.textContent = '確認重設';
+  }
+
+  document.getElementById('resetPasswordBtn').addEventListener('click', function(){
+    resetResetPasswordForm();
+    resetPasswordForm.classList.remove('hidden');
+    resetPasswordInput.focus();
+  });
+
+  document.getElementById('resetPasswordCancelBtn').addEventListener('click', resetResetPasswordForm);
+
+  resetPasswordConfirmBtn.addEventListener('click', function(){
+    var newPassword = resetPasswordInput.value;
+    if (newPassword.length < 6){
+      resetPasswordError.textContent = '新密碼至少要 6 碼';
+      resetPasswordError.classList.add('show');
+      return;
+    }
+    if (!openMemberId) return;
+
+    resetPasswordError.classList.remove('show');
+    resetPasswordConfirmBtn.disabled = true;
+    resetPasswordConfirmBtn.textContent = '重設中…';
+
+    resetMemberPasswordFn({ uid: openMemberId, newPassword: newPassword }).then(function(){
+      resetPasswordConfirmBtn.textContent = '✓ 已重設';
+      resetPasswordInput.value = '';
+      setTimeout(function(){
+        resetResetPasswordForm();
+      }, 1200);
+    }).catch(function(err){
+      resetPasswordConfirmBtn.disabled = false;
+      resetPasswordConfirmBtn.textContent = '確認重設';
+      resetPasswordError.textContent = (err && err.message) ? err.message : '重設失敗，請稍後再試';
+      resetPasswordError.classList.add('show');
+    });
+  });
   memberList.innerHTML = MEMBER_SKELETON_HTML;
   instList.innerHTML = INST_SKELETON_HTML;
   seatList.innerHTML = SEAT_SKELETON_HTML;
@@ -635,12 +722,15 @@
     document.getElementById('sheetMemberAccount').textContent = '@' + (m.account || '');
     saveMemberBtn.textContent = '儲存變更';
     renderMemberSheetBody();
+    resetPasswordWrap.classList.toggle('hidden', uid === currentAdminUid || m.role === 'owner');
+    resetResetPasswordForm();
     memberSheetOverlay.classList.add('active');
   }
 
   function closeMemberSheet(){
     memberSheetOverlay.classList.remove('active');
     openMemberId = null;
+    resetResetPasswordForm();
   }
 
   memberList.addEventListener('click', function(e){
