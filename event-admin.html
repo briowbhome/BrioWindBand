@@ -365,6 +365,14 @@
     border-radius:var(--radius-sm); padding:9px 11px;
     font-size:13px; color:var(--ink); width:100%; font-family:inherit; resize:vertical; min-height:56px;
   }
+  /* ---------- 手動新增回報：跟代改用同一套 status-picker，但獨立在 .survey-edit-form 外，
+     所以 textarea 樣式要另外補一份 ---------- */
+  #reportAddPanel .status-picker{ margin-bottom:8px; }
+  #reportAddPanel textarea{
+    margin-bottom:10px; border:1px solid var(--line); background:var(--paper);
+    border-radius:var(--radius-sm); padding:9px 11px;
+    font-size:13px; color:var(--ink); width:100%; font-family:inherit; resize:vertical; min-height:56px;
+  }
   .survey-edit-actions{ display:flex; gap:8px; margin-top:8px; }
   .survey-edit-actions button{
     border-radius:var(--radius-sm); padding:7px 12px; font-size:11.5px; font-weight:700; cursor:pointer;
@@ -641,6 +649,27 @@
           <div class="survey-toggle-group">
             <div id="surveyToggleSlot"></div>
             <div id="surveyToggleHint" class="survey-toggle-hint hidden"></div>
+          </div>
+        </div>
+        <div class="survey-section-row">
+          <div class="survey-section-label">回報清單</div>
+          <button type="button" class="add-btn" id="reportAddToggleBtn">＋ 手動新增回報</button>
+        </div>
+        <div id="reportAddPanel" class="hidden">
+          <div class="status-picker" id="reportAddStatusPicker">
+            <button type="button" class="status-chip-btn attending selected" data-report-add-status="attending">出席</button>
+            <button type="button" class="status-chip-btn leave" data-report-add-status="leave">請假</button>
+          </div>
+          <textarea id="reportAddReasonInput" class="hidden" placeholder="請假原因（選填，會套用到這次選的所有人）"></textarea>
+          <div class="survey-section-label" id="reportAddCounter">已選 0 人</div>
+          <div class="survey-bulk-row">
+            <button type="button" id="reportAddSelectAllBtn">全選</button>
+            <button type="button" id="reportAddClearAllBtn">全部取消</button>
+          </div>
+          <div class="check-list" id="reportAddChecklist"></div>
+          <div class="survey-edit-actions">
+            <button type="button" id="reportAddCancelBtn">取消</button>
+            <button type="button" class="btn-save" id="reportAddConfirmBtn" disabled>新增</button>
           </div>
         </div>
         <div id="rosterReportsSlot"><div class="survey-empty">載入中…</div></div>
@@ -1740,7 +1769,152 @@
     });
   });
 
+  // ---------- 手動新增出缺席回報（多選勾選清單＋出席/請假選擇，比照「手動新增簽到」
+  // 那套既有模式，差別是回報還要多選一個狀態，選單只列「應到名單內、還沒回報」的人，
+  // 跟 renderReportsSlot() 的 notReported 同一套邏輯，這裡另外算一次含姓名/帳號的版本 ----------
+  var reportAddStatus = 'attending';
+  var reportAddDraftSet = {}; // {uid: true}
+  var reportAvailableMembers = []; // 目前尚未回報、且還在應到名單內的已核准團員
+  var reportAddToggleBtn = document.getElementById('reportAddToggleBtn');
+  var reportAddPanel = document.getElementById('reportAddPanel');
+  var reportAddChecklist = document.getElementById('reportAddChecklist');
+  var reportAddCounter = document.getElementById('reportAddCounter');
+  var reportAddConfirmBtn = document.getElementById('reportAddConfirmBtn');
+  var reportAddReasonInput = document.getElementById('reportAddReasonInput');
+  var reportAddStatusPicker = document.getElementById('reportAddStatusPicker');
+
+  function computeReportAvailableMembers(eventId){
+    var roster = rostersById[eventId];
+    var reports = reportsByEvent[eventId] || [];
+    var reportedUids = {};
+    reports.forEach(function(r){ reportedUids[r.uid] = true; });
+    var namesByUid = {};
+    (approvedMembers || []).forEach(function(m){ namesByUid[m.uid] = m; });
+    return (roster ? roster.members : [])
+      .filter(function(uid){ return !reportedUids[uid]; })
+      .map(function(uid){
+        var m = namesByUid[uid];
+        return { uid: uid, name: m ? m.name : uid, account: m ? m.account : '' };
+      });
+  }
+
+  function resetReportAddStatusPicker(){
+    reportAddStatus = 'attending';
+    reportAddReasonInput.value = '';
+    reportAddReasonInput.classList.add('hidden');
+    reportAddStatusPicker.querySelectorAll('[data-report-add-status]').forEach(function(btn){
+      btn.classList.toggle('selected', btn.getAttribute('data-report-add-status') === 'attending');
+    });
+  }
+
+  function hideReportAddPanel(){
+    reportAddPanel.classList.add('hidden');
+    reportAddDraftSet = {};
+    resetReportAddStatusPicker();
+  }
+
+  function renderReportAddChecklist(){
+    reportAddChecklist.innerHTML = reportAvailableMembers.map(function(m){
+      var on = !!reportAddDraftSet[m.uid];
+      return (
+        '<div class="check-row">' +
+          '<button type="button" class="checkbox' + (on ? ' on' : '') + '" data-report-add-uid="' + m.uid + '">' + (on ? '✓' : '') + '</button>' +
+          '<button type="button" class="check-text" data-report-add-uid="' + m.uid + '">' + escapeHtml(m.name) + '（' + escapeHtml(m.account) + '）</button>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function updateReportAddCounter(){
+    var count = Object.keys(reportAddDraftSet).length;
+    reportAddCounter.textContent = '已選 ' + count + ' 人';
+    reportAddConfirmBtn.disabled = count === 0;
+  }
+
+  reportAddToggleBtn.addEventListener('click', function(){
+    var eventId = openRosterEventId;
+    if (!eventId) return;
+    reportAvailableMembers = computeReportAvailableMembers(eventId);
+    if (reportAvailableMembers.length === 0){
+      alert('應到名單內的人都已經回報過了，沒有可以手動新增的對象');
+      return;
+    }
+    reportAddDraftSet = {};
+    resetReportAddStatusPicker();
+    renderReportAddChecklist();
+    updateReportAddCounter();
+    reportAddPanel.classList.remove('hidden');
+  });
+
+  document.getElementById('reportAddCancelBtn').addEventListener('click', hideReportAddPanel);
+
+  document.getElementById('reportAddSelectAllBtn').addEventListener('click', function(){
+    reportAvailableMembers.forEach(function(m){ reportAddDraftSet[m.uid] = true; });
+    renderReportAddChecklist();
+    updateReportAddCounter();
+  });
+
+  document.getElementById('reportAddClearAllBtn').addEventListener('click', function(){
+    reportAddDraftSet = {};
+    renderReportAddChecklist();
+    updateReportAddCounter();
+  });
+
+  reportAddChecklist.addEventListener('click', function(e){
+    var btn = e.target.closest('[data-report-add-uid]');
+    if (!btn) return;
+    var uid = btn.getAttribute('data-report-add-uid');
+    if (reportAddDraftSet[uid]) delete reportAddDraftSet[uid]; else reportAddDraftSet[uid] = true;
+    var row = btn.closest('.check-row');
+    var checkboxEl = row.querySelector('.checkbox');
+    var on = !!reportAddDraftSet[uid];
+    checkboxEl.classList.toggle('on', on);
+    checkboxEl.textContent = on ? '✓' : '';
+    updateReportAddCounter();
+  });
+
+  reportAddStatusPicker.addEventListener('click', function(e){
+    var btn = e.target.closest('[data-report-add-status]');
+    if (!btn) return;
+    reportAddStatus = btn.getAttribute('data-report-add-status');
+    reportAddStatusPicker.querySelectorAll('[data-report-add-status]').forEach(function(b){
+      b.classList.toggle('selected', b === btn);
+    });
+    reportAddReasonInput.classList.toggle('hidden', reportAddStatus !== 'leave');
+  });
+
+  async function addManualReport(eventId, targetUid, status, reason){
+    var member = (approvedMembers || []).find(function(m){ return m.uid === targetUid; });
+    await setDoc(doc(db, 'attendanceReports', eventId + '_' + targetUid), {
+      eventId: eventId,
+      uid: targetUid,
+      account: member ? member.account : '',
+      name: member ? member.name : '',
+      status: status,
+      reason: status === 'leave' ? reason : '',
+      respondedAt: serverTimestamp()
+    });
+  }
+
+  reportAddConfirmBtn.addEventListener('click', function(){
+    var eventId = openRosterEventId;
+    if (!eventId) return;
+    var uids = Object.keys(reportAddDraftSet);
+    if (uids.length === 0) return;
+    var status = reportAddStatus;
+    var reason = reportAddReasonInput.value.trim();
+    reportAddConfirmBtn.disabled = true;
+    Promise.all(uids.map(function(uid){ return addManualReport(eventId, uid, status, reason); })).then(function(){
+      hideReportAddPanel();
+      if (openRosterEventId === eventId) loadReports(eventId);
+    }).catch(function(err){
+      alert('新增失敗：' + err.code);
+      reportAddConfirmBtn.disabled = false;
+    });
+  });
+
   async function loadReports(eventId){
+    hideReportAddPanel(); // 資料要重新整理了，先收合新增面板，避免殘留上一次的勾選草稿或過期的可選名單
     try {
       var snap = await getDocs(query(collection(db, 'attendanceReports'), where('eventId', '==', eventId)));
       reportsByEvent[eventId] = snap.docs.map(function(d){ return d.data(); });
