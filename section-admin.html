@@ -208,7 +208,7 @@
   import { initAccountMenu } from './account-menu.js';
   import { subscribeRepertoire } from './repertoire.js';
   import {
-    collection, doc, getDoc, getDocs, onSnapshot, query, where, setDoc, serverTimestamp
+    collection, doc, getDoc, getDocs, onSnapshot, setDoc, serverTimestamp
   } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
   function escapeHtml(s){
@@ -231,23 +231,6 @@
   var concertsById = {};
   var repertoireById = {};
   var repertoireList = [];
-  var approvedMembers = null;
-
-  async function ensureApprovedMembers(){
-    if (approvedMembers) return approvedMembers;
-    var snap = await getDocs(query(collection(db, 'users'), where('status', '==', 'approved')));
-    approvedMembers = snap.docs.map(function(docSnap){
-      var data = docSnap.data();
-      return { uid: docSnap.id, name: data.name, account: data.account };
-    });
-    return approvedMembers;
-  }
-
-  function namesByUidFromApprovedMembers(){
-    var map = {};
-    (approvedMembers || []).forEach(function(m){ map[m.uid] = m.name; });
-    return map;
-  }
 
   function instrumentsForPiece(piece){
     var seen = {};
@@ -407,7 +390,10 @@
   var assignmentDraft = {}; // {partId: [uid, ...]}
 
   function renderAssignmentPanel(parts, eligibleMembers){
-    var namesByUid = namesByUidFromApprovedMembers();
+    // 人名直接取自 concertRosters.members 反正規化下來的 name 欄位——分部長（非 admin-tier）
+    // 沒有 users 的 list 權限，不能自己去撈全團名單來對照
+    var namesByUid = {};
+    eligibleMembers.forEach(function(m){ namesByUid[m.uid] = m.name || m.uid; });
     var assignedUidSet = {};
     Object.keys(assignmentDraft).forEach(function(partId){
       assignmentDraft[partId].forEach(function(uid){ assignedUidSet[uid] = true; });
@@ -471,7 +457,6 @@
     currentParts = (piece.parts || []).filter(function(p){ return p.instrumentName === instrumentName; });
 
     try {
-      await ensureApprovedMembers();
       var rosterSnap = await getDoc(doc(db, 'concertRosters', concertId));
       var sectionSnap = await getDoc(doc(db, 'concerts', concertId, 'pieces', pieceId, 'sections', instrumentName));
       if (openConcertId !== concertId || openPieceId !== pieceId || openInstrumentName !== instrumentName) return;
@@ -489,6 +474,8 @@
 
       renderAssignmentPanel(currentParts, currentEligibleMembers);
     } catch (err) {
+      // 使用者可能已經切走了，過期的非同步失敗不該蓋掉現在的畫面（跟上面成功路徑同一組守衛）
+      if (openConcertId !== concertId || openPieceId !== pieceId || openInstrumentName !== instrumentName) return;
       document.getElementById('assignmentSlot').innerHTML = '<div class="empty">載入失敗（' + err.code + '）</div>';
     }
   }

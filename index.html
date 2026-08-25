@@ -942,6 +942,25 @@
   var segPanelPersonal = document.getElementById('segPanelPersonal');
   var segPanelOverview = document.getElementById('segPanelOverview');
   var overviewLocked = true;
+  // 「我的音樂會」要撈 concertRosters/repertoire/各場曲目+分部，是這一頁最重的一組讀取。
+  // 首頁預設停在「個人焦點」分頁，所以改成第一次真的切到「團務總覽」才載入，載過就不再重撈。
+  // 載入函式由下方身分驗證完成的區塊掛上來（那裡才拿得到 viewerUid）
+  var overviewLazyLoad = null;
+  var overviewLazyRequested = false;
+  var overviewLazyLoaded = false;
+
+  function runOverviewLazyLoad(){
+    overviewLazyRequested = true;
+    if (overviewLazyLoaded || !overviewLazyLoad) return;
+    overviewLazyLoaded = true;
+    overviewLazyLoad();
+  }
+
+  // 若使用者在載入函式掛上來之前就已經切到「團務總覽」，掛上的當下立刻補跑一次
+  function setOverviewLazyLoad(fn){
+    overviewLazyLoad = fn;
+    if (overviewLazyRequested) runOverviewLazyLoad();
+  }
 
   function selectSegTab(tab){
     var isPersonal = tab === 'personal';
@@ -957,6 +976,7 @@
   segTabOverview.addEventListener('click', function(){
     if (overviewLocked){ showToast('請先登入後即可查看'); return; }
     selectSegTab('overview');
+    runOverviewLazyLoad();
   });
 
   // 骨架畫面：頁面一開始就顯示（不等驗證），大頭貼縮寫不是敏感資訊，
@@ -1632,7 +1652,7 @@
     });
 
     // ---------- 團務總覽：我的音樂會（唯讀） ----------
-    // concertRosters.members 是 array<{uid, instrument}>，沒辦法用 array-contains 查詢直接
+    // concertRosters.members 是 array<{uid, instrument, name, account}>，沒辦法用 array-contains 查詢直接
     // 篩出「包含我」的文件，這裡整份撈回來前端過濾（跟 checkin-stats-admin.html 撈整份
     // collection 再篩選同一種模式，資料量小，全團音樂會數量不會多）
     async function loadMyConcerts(uid){
@@ -1774,9 +1794,13 @@
       renderNotifDot();
       renderNotifSheet();
 
-      // 審核中也算真團員（讀取權限跟已核准一樣），一併載入，跟團務總覽分頁對審核中開放的既有原則一致
-      loadMyConcerts(viewerUid).then(renderMyConcerts).catch(function(err){
-        console.error('我的音樂會 載入失敗', err);
+      // 審核中也算真團員（讀取權限跟已核准一樣），一併載入，跟團務總覽分頁對審核中開放的既有原則一致。
+      // 不在這裡直接跑：這組讀取只有「團務總覽」分頁用得到，掛成 lazy loader，等使用者第一次
+      // 切過去才真的發出請求（大多數人只看首頁的「個人焦點」分頁就離開了）
+      setOverviewLazyLoad(function(){
+        loadMyConcerts(viewerUid).then(renderMyConcerts).catch(function(err){
+          console.error('我的音樂會 載入失敗', err);
+        });
       });
 
       // ---------- 通知開關推廣提示：只給已核准會員看，審核中的人已經可以在個人中心自行開通知，

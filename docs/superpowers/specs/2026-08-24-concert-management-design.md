@@ -63,7 +63,7 @@
 
 | 欄位 | 型別 | 說明 |
 |---|---|---|
-| `members` | `array<{uid, instrument}>` | 參與者 + 各自這場音樂會負責的樂器身分。`instrument` 是單一字串（對應 `settings/instruments` 的 `name`），不是陣列——跟 `users.instruments`（個人資料的能力清單，可複選）是不同概念：這裡代表「這場音樂會的參與身分」，只能是一個 |
+| `members` | `array<{uid, instrument, name, account}>` | 參與者 + 各自這場音樂會負責的樂器身分。`instrument` 是單一字串（對應 `settings/instruments` 的 `name`），不是陣列——跟 `users.instruments`（個人資料的能力清單，可複選）是不同概念：這裡代表「這場音樂會的參與身分」，只能是一個。`name`/`account` 是寫入當下從 `users` 反正規化複製過來的顯示用欄位：`firestore.rules` 只開放 `isAdminTier()` 對 `users` 做 `list`，分部長（一般團員身分）不能自己撈全團名單來對照人名，只能靠這裡存下來的值顯示。這兩個欄位是快照，不會跟著 `users` 的改名同步，下次名單存檔時才刷新 |
 | `sourceTemplateId` / `templateAppliedAt` | string \| null / timestamp \| null | 套用名單範本的來源記錄，比照 `eventRosters` 同樣欄位的語意 |
 | `createdBy` / `updatedAt` | uid / timestamp | |
 

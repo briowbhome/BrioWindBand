@@ -289,7 +289,7 @@ service cloud.firestore {
     }
 
     // 音樂會參與名單，跟 eventRosters 同樣的文件 ID 慣例（= concertId）。讀取開放給所有
-    // 登入者——members 是 array<{uid, instrument}>（不是純 uid 陣列），沒辦法比照
+    // 登入者——members 是 array<{uid, instrument, name, account}>（不是純 uid 陣列），沒辦法比照
     // eventRosters 用 hasAny() 限定只回傳自己所屬的名單，這輪先開放整份可讀，曝露程度
     // 比 events/eventTypes 現在對所有人（含訪客）完全公開讀取更低，只是登入者才看得到
     match /concertRosters/{concertId} {

@@ -1032,6 +1032,7 @@
   function enterCreateMode(){
     editingId = null;
     eventForm.reset();
+    setEventConcertSelectValue(document.getElementById('eventConcertId'), ''); // 順便把上一次編輯留下的「找不到這場音樂會」暫時選項清掉
     document.getElementById('createRosterTemplate').value = ''; // 不在 #eventForm 節點裡，reset() 管不到，另外重置
     setDefaultEventDate();
     updateTimeFieldsVisibility();
@@ -1052,7 +1053,7 @@
     document.getElementById('eventStartTime').value = evt.date && !evt.allDay ? toTimeValue(evt.date) : '';
     document.getElementById('eventEndTime').value = evt.endTime ? toTimeValue(evt.endTime) : '';
     document.getElementById('eventLocation').value = evt.location || '';
-    document.getElementById('eventConcertId').value = evt.concertId || '';
+    setEventConcertSelectValue(document.getElementById('eventConcertId'), evt.concertId || '');
     updateTimeFieldsVisibility();
     eventSubmitBtn.disabled = false;
     eventSubmitBtn.textContent = '儲存變更';
@@ -1111,7 +1112,26 @@
       return '<option value="' + c.id + '">' + escapeHtml(c.title) + '</option>';
     }).join('');
     select.innerHTML = '<option value="">（不屬於任何音樂會）</option>' + optsHtml;
-    if (current && concertsById[current]) select.value = current;
+    setEventConcertSelectValue(select, current);
+  }
+
+  // 把 concertId 設進「屬於哪場音樂會」下拉選單，找不到對應 option 時補一個代表舊值的
+  // option（比照 renderConcertRosterChecklist 對已被刪除/改名的樂器的做法）。沒有這層保護的話，
+  // 音樂會已刪除、或 concerts 快照還沒回來就先開了編輯表單時，瀏覽器會默默退回
+  // 「（不屬於任何音樂會）」，管理員按下儲存就把活動的音樂會連結清成 null 而毫無提示
+  function setEventConcertSelectValue(select, concertId){
+    Array.prototype.slice.call(select.querySelectorAll('option[data-fallback]')).forEach(function(opt){
+      opt.parentNode.removeChild(opt);
+    });
+    var known = Array.prototype.some.call(select.options, function(opt){ return opt.value === concertId; });
+    if (concertId && !known){
+      var fallback = document.createElement('option');
+      fallback.value = concertId;
+      fallback.setAttribute('data-fallback', '1');
+      fallback.textContent = '（找不到這場音樂會）';
+      select.appendChild(fallback);
+    }
+    select.value = concertId || '';
   }
 
   var editingConcertId = null; // null = 新增模式，比照 editingId 對 #eventForm 的作用
@@ -1221,10 +1241,12 @@
     );
     if (!ok) return;
     deleteBtn.disabled = true;
-    Promise.all([
-      deleteDoc(doc(db, 'concerts', concertId)),
-      deleteDoc(doc(db, 'concertRosters', concertId)).catch(function(){})
-    ]).catch(function(err){
+    // 先刪音樂會本身，成功後才刪參與名單：兩個一起併發送出的話，萬一 concerts 刪除失敗
+    // 而 concertRosters 成功，音樂會會活著但名單被清掉。反過來（音樂會刪掉、名單殘留）
+    // 只是既有慣例接受的孤兒文件，所以名單刪除照樣吞掉錯誤
+    deleteDoc(doc(db, 'concerts', concertId)).then(function(){
+      return deleteDoc(doc(db, 'concertRosters', concertId)).catch(function(){});
+    }).catch(function(err){
       alert('刪除失敗：' + err.code);
       deleteBtn.disabled = false;
     });
@@ -1812,8 +1834,11 @@
   document.getElementById('concertRosterSaveBtn').addEventListener('click', function(){
     if (!openConcertId) return;
     var concertId = openConcertId;
+    // 名字/帳號一併反正規化寫進名單文件：分部長（非 admin-tier）沒有 users 的 list 權限，
+    // section-admin.html 只能靠這裡存下來的 name/account 顯示人名，不能自己去讀 users
     var members = Object.keys(concertRosterDraftMap).map(function(uid){
-      return { uid: uid, instrument: concertRosterDraftMap[uid] };
+      var m = (approvedMembers || []).filter(function(x){ return x.uid === uid; })[0];
+      return { uid: uid, instrument: concertRosterDraftMap[uid], name: m ? m.name : uid, account: m ? m.account : '' };
     });
     var saveBtn = document.getElementById('concertRosterSaveBtn');
     saveBtn.disabled = true;
@@ -1849,7 +1874,8 @@
       var instrument = existingByUid.hasOwnProperty(uid)
         ? existingByUid[uid]
         : ((member && member.instruments && member.instruments[0]) || (instrumentsList[0] ? instrumentsList[0].name : ''));
-      return { uid: uid, instrument: instrument };
+      // name/account 跟手動編輯名單同一套反正規化欄位（見 concertRosterSaveBtn 的說明）
+      return { uid: uid, instrument: instrument, name: member ? member.name : uid, account: member ? member.account : '' };
     });
     var payload = {
       members: newMembers,
