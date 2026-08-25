@@ -1582,6 +1582,7 @@
       var eligibleMembers = members.filter(function(m){ return m.instrument === instrumentName; });
       renderAssignmentPanel(parts, eligibleMembers);
     } catch (err) {
+      if (openConcertId !== concertId || openPieceId !== pieceId || openInstrumentName !== instrumentName) return;
       document.getElementById('assignmentSlot').innerHTML = '<div class="survey-empty">載入失敗（' + err.code + '）</div>';
     }
   }
