@@ -121,6 +121,19 @@
   }
   .add-btn:active{ background:var(--sage-bg); }
 
+  /* ---------- 活動／音樂會 切換分頁（跟 index.html 首頁「個人焦點／團務總覽」同一套元件） ---------- */
+  .seg-tabs{
+    display:flex; gap:6px; margin:14px 20px 6px;
+    background:var(--sage-bg); padding:4px; border-radius:999px;
+  }
+  .seg-tab{
+    flex:1; text-align:center; padding:8px 4px; border-radius:999px;
+    font-family:'Noto Sans TC',sans-serif; font-size:13px; font-weight:500;
+    color:var(--sage); background:none; border:none; cursor:pointer;
+  }
+  .seg-tab.active{ background:var(--ink); color:var(--paper); }
+  .seg-panel.hidden{ display:none; }
+
   /* ---------- Event form ---------- */
   .card{
     margin:14px 20px 20px;
@@ -490,6 +503,13 @@
 
   <div class="staff"></div>
 
+  <div class="seg-tabs" role="tablist">
+    <button type="button" class="seg-tab active" id="segTabEvents" role="tab" aria-selected="true">活動</button>
+    <button type="button" class="seg-tab" id="segTabConcerts" role="tab" aria-selected="false">音樂會</button>
+  </div>
+
+  <div class="seg-panel" id="segPanelEvents">
+
   <div class="section-label hidden" id="typesSectionLabel">
     <span class="tw">活動類型管理</span>
     <span class="en">Event Types</span>
@@ -529,6 +549,60 @@
 
   <div class="list" id="eventList"></div>
 
+  </div>
+
+  <div class="seg-panel hidden" id="segPanelConcerts">
+    <div class="section-label">
+      <span class="tw">所有音樂會</span>
+      <span class="en">Concerts</span>
+      <button type="button" class="add-btn" id="createConcertBtn">＋ 新增音樂會</button>
+    </div>
+    <div class="list" id="concertList"></div>
+  </div>
+
+</div>
+
+<!-- 建立音樂會 Bottom Sheet：點「所有音樂會」旁的＋按鈕開啟。#concertForm 這個 DOM 節點預設
+     放在 #concertFormSlot 裡，Task 6 加入音樂會明細 sheet 後，編輯既有音樂會會比照 #eventForm
+     的做法把這個節點搬過去用 -->
+<div class="sheet-overlay" id="createConcertSheetOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button type="button" class="sheet-close" id="createConcertSheetClose" aria-label="關閉">×</button>
+      <div class="name">建立音樂會</div>
+    </div>
+    <div class="sheet-body">
+      <p class="create-success hidden" id="concertCreateSuccessMsg"></p>
+      <div id="concertFormSlot">
+        <form id="concertForm">
+          <div class="field">
+            <label>音樂會名稱</label>
+            <input type="text" id="concertTitle" placeholder="例如：2026 校友團公演" required>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>開始日期</label>
+              <input type="date" id="concertStartDate" required>
+            </div>
+            <div class="field">
+              <label>結束日期（選填）</label>
+              <input type="date" id="concertEndDate">
+            </div>
+          </div>
+          <div class="field">
+            <label>說明（選填）</label>
+            <input type="text" id="concertDescription" placeholder="例如：年度公演，含售票演出">
+          </div>
+          <p class="form-error" id="concertFormError"></p>
+          <div class="form-buttons">
+            <button type="submit" class="cta-btn" id="concertSubmitBtn">建立音樂會</button>
+            <button type="button" class="cancel-btn hidden" id="concertCancelBtn">取消</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- 建立活動 Bottom Sheet：點「所有活動」旁的＋按鈕開啟。#eventForm 這個 DOM 節點預設就放在
@@ -716,6 +790,25 @@
     serverTimestamp, Timestamp, getDoc, getDocs, query, where, setDoc
   } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
+  // ---------- 活動／音樂會 切換分頁：純畫面狀態，不影響底下任何資料監聽 ----------
+  var segTabEvents = document.getElementById('segTabEvents');
+  var segTabConcerts = document.getElementById('segTabConcerts');
+  var segPanelEvents = document.getElementById('segPanelEvents');
+  var segPanelConcerts = document.getElementById('segPanelConcerts');
+
+  function selectSegTab(tab){
+    var isEvents = tab === 'events';
+    segTabEvents.classList.toggle('active', isEvents);
+    segTabConcerts.classList.toggle('active', !isEvents);
+    segTabEvents.setAttribute('aria-selected', String(isEvents));
+    segTabConcerts.setAttribute('aria-selected', String(!isEvents));
+    segPanelEvents.classList.toggle('hidden', !isEvents);
+    segPanelConcerts.classList.toggle('hidden', isEvents);
+  }
+
+  segTabEvents.addEventListener('click', function(){ selectSegTab('events'); });
+  segTabConcerts.addEventListener('click', function(){ selectSegTab('concerts'); });
+
   function escapeHtml(s){
     return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
       return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
@@ -846,6 +939,124 @@
     eventCancelBtn.classList.remove('hidden');
     showEventFormError('');
   }
+
+  // ---------- 音樂會：清單 + 建立 + 刪除（Task 6 會加上點擊開明細 sheet 的行為） ----------
+  var concertsById = {};
+  var concertsList = [];
+  var concertList = document.getElementById('concertList');
+  var concertForm = document.getElementById('concertForm');
+  var concertFormError = document.getElementById('concertFormError');
+  var concertSubmitBtn = document.getElementById('concertSubmitBtn');
+  var createConcertSheetOverlay = document.getElementById('createConcertSheetOverlay');
+
+  function showConcertFormError(message){
+    concertFormError.textContent = message;
+    concertFormError.classList.toggle('show', !!message);
+  }
+
+  function formatConcertPeriod(c){
+    if (!c.startDate) return '期間未定';
+    var startText = (c.startDate.getMonth() + 1) + '/' + c.startDate.getDate();
+    if (!c.endDate) return startText + ' 起';
+    var endText = (c.endDate.getMonth() + 1) + '/' + c.endDate.getDate();
+    return startText + '–' + endText;
+  }
+
+  function renderConcertList(){
+    if (concertsList.length === 0){
+      concertList.innerHTML = '<div class="empty">目前沒有任何音樂會</div>';
+      return;
+    }
+    concertList.innerHTML = concertsList.map(function(c){
+      return (
+        '<div class="event-item" data-concert="' + c.id + '">' +
+          '<button type="button" class="event-open" data-open-concert="' + c.id + '">' +
+            '<div class="event-title">' + escapeHtml(c.title) + '</div>' +
+            '<div class="event-meta">' + formatConcertPeriod(c) + (c.description ? ' · ' + escapeHtml(c.description) : '') + '</div>' +
+          '</button>' +
+          '<button type="button" class="btn-delete-icon" data-delete-concert="' + c.id + '" aria-label="刪除音樂會">' +
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0-1 13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+          '</button>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function openCreateConcertSheet(){
+    concertForm.reset();
+    showConcertFormError('');
+    document.getElementById('concertCreateSuccessMsg').classList.add('hidden');
+    concertSubmitBtn.disabled = false;
+    concertSubmitBtn.textContent = '建立音樂會';
+    createConcertSheetOverlay.classList.add('active');
+  }
+
+  function closeCreateConcertSheet(){
+    createConcertSheetOverlay.classList.remove('active');
+  }
+
+  document.getElementById('createConcertBtn').addEventListener('click', openCreateConcertSheet);
+  document.getElementById('createConcertSheetClose').addEventListener('click', closeCreateConcertSheet);
+  createConcertSheetOverlay.addEventListener('click', function(e){
+    if (e.target === createConcertSheetOverlay) closeCreateConcertSheet();
+  });
+
+  concertForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    showConcertFormError('');
+    var title = document.getElementById('concertTitle').value.trim();
+    var startDateVal = document.getElementById('concertStartDate').value;
+    var endDateVal = document.getElementById('concertEndDate').value;
+    var description = document.getElementById('concertDescription').value.trim();
+
+    if (!title || !startDateVal){
+      showConcertFormError('請填寫音樂會名稱與開始日期');
+      return;
+    }
+
+    concertSubmitBtn.disabled = true;
+    concertSubmitBtn.textContent = '建立中…';
+
+    addDoc(collection(db, 'concerts'), {
+      title: title,
+      startDate: Timestamp.fromDate(new Date(startDateVal + 'T00:00')),
+      endDate: endDateVal ? Timestamp.fromDate(new Date(endDateVal + 'T00:00')) : null,
+      description: description,
+      createdBy: currentAdminUid,
+      createdAt: serverTimestamp()
+    }).then(function(){
+      concertForm.reset();
+      concertSubmitBtn.disabled = false;
+      concertSubmitBtn.textContent = '建立音樂會';
+      document.getElementById('concertCreateSuccessMsg').textContent = '已建立「' + title + '」，可以繼續新增';
+      document.getElementById('concertCreateSuccessMsg').classList.remove('hidden');
+    }).catch(function(err){
+      concertSubmitBtn.disabled = false;
+      concertSubmitBtn.textContent = '建立音樂會';
+      showConcertFormError('操作失敗（' + err.code + '）');
+    });
+  });
+
+  concertList.addEventListener('click', function(e){
+    var deleteBtn = e.target.closest('[data-delete-concert]');
+    if (!deleteBtn) return;
+    var concertId = deleteBtn.getAttribute('data-delete-concert');
+    var c = concertsById[concertId];
+    var ok = confirm(
+      '確定要刪除「' + (c ? c.title : '這場音樂會') + '」嗎？\n' +
+      '底下的曲目/分部指派/參與名單資料也會一併找不到（不會自動清除，只是沒有入口存取）。\n' +
+      '此動作無法復原。'
+    );
+    if (!ok) return;
+    deleteBtn.disabled = true;
+    Promise.all([
+      deleteDoc(doc(db, 'concerts', concertId)),
+      deleteDoc(doc(db, 'concertRosters', concertId)).catch(function(){})
+    ]).catch(function(err){
+      alert('刪除失敗：' + err.code);
+      deleteBtn.disabled = false;
+    });
+  });
 
   eventCancelBtn.addEventListener('click', function(){
     enterCreateMode();
@@ -2301,6 +2512,29 @@
       eventsLoaded = true;
       maybeRender();
     }, renderEventsAdminError);
+
+    onSnapshot(collection(db, 'concerts'), function(snap){
+      concertsById = {};
+      concertsList = [];
+      snap.forEach(function(docSnap){
+        var data = docSnap.data();
+        var c = {
+          id: docSnap.id,
+          title: data.title,
+          startDate: data.startDate && data.startDate.toDate ? data.startDate.toDate() : null,
+          endDate: data.endDate && data.endDate.toDate ? data.endDate.toDate() : null,
+          description: data.description || ''
+        };
+        concertsById[docSnap.id] = c;
+        concertsList.push(c);
+      });
+      concertsList.sort(function(a, b){
+        var ta = a.startDate ? a.startDate.getTime() : 0;
+        var tb = b.startDate ? b.startDate.getTime() : 0;
+        return tb - ta;
+      });
+      renderConcertList();
+    }, function(err){ console.error('concerts 監聽失敗', err); });
 
     onSnapshot(collection(db, 'eventRosters'), function(snap){
       rostersById = {};
