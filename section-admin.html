@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>布利歐管樂團｜分部長專屬</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#F2EFE5">
+<link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+<script src="./pwa-register.js" defer></script>
+<style>
+  :root{
+    --ink:#20242F;
+    --ink-soft:#4A4F5C;
+    --paper:#F2EFE5;
+    --paper-raised:#FBFAF4;
+    --line:#DAD3BE;
+    --brass:#B8863A;
+    --brass-deep:#8F6A2C;
+    --burgundy:#7A2331;
+    --burgundy-deep:#5C1A26;
+    --sage:#5F6E58;
+    --sage-bg:#E7EBDF;
+    --radius-lg:20px;
+    --radius-md:14px;
+    --radius-sm:9px;
+    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% -10%, #EFE9D6 0%, transparent 45%),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Noto Sans TC','Noto Sans',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    min-height:100dvh;
+    display:flex;
+    justify-content:center;
+    padding: 0 0 calc(48px + env(safe-area-inset-bottom));
+  }
+
+  button, a, input, select{ -webkit-tap-highlight-color: transparent; font-family:inherit; }
+  :focus-visible{ outline:2.5px solid var(--brass-deep); outline-offset:2px; border-radius:6px; }
+
+  .app{
+    width:100%;
+    max-width:460px;
+    min-height:100vh;
+    min-height:100dvh;
+    background:var(--paper);
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .hidden{ display:none !important; }
+
+  .appbar{ display:flex; align-items:center; gap:12px; padding:18px 20px 14px; }
+  .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
+  .brandtext{ display:flex; flex-direction:column; line-height:1.1; }
+  .brandtext .name{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:19px; letter-spacing:.02em; }
+  .brandtext .sub{ font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.14em; color:var(--ink-soft); margin-top:3px; text-transform:uppercase; }
+  .appbar .spacer{ flex:1; }
+  .avatar{
+    width:38px; height:38px; border-radius:50%;
+    background:var(--burgundy); color:#F2EFE5;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Noto Serif TC',serif; font-weight:700; font-size:14px;
+    border:2px solid var(--paper-raised); box-shadow:0 0 0 1.5px var(--line);
+    padding:0; cursor:pointer;
+  }
+  .avatar.skel{ background:var(--line); }
+  .back-btn{
+    width:30px; height:30px; flex:none;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--ink); text-decoration:none;
+  }
+  .brand-link{ display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; }
+
+  .staff{
+    height:16px; margin:0 20px 6px;
+    background-image: repeating-linear-gradient(var(--line), var(--line) 1px, transparent 1px, transparent 4px);
+    opacity:.9;
+  }
+
+  .section-label{ display:flex; align-items:baseline; gap:8px; margin:20px 20px 4px; }
+  .section-label .tw{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:15.5px; }
+  .section-label .en{ font-family:'Roboto Mono',monospace; font-size:10px; letter-spacing:.12em; color:var(--ink-soft); text-transform:uppercase; }
+  .lede{ margin:6px 20px 14px; font-size:12.5px; line-height:1.6; color:var(--ink-soft); }
+
+  .list{
+    margin:0 20px 24px;
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-card);
+    overflow:hidden;
+    padding:6px 16px;
+  }
+  .row-item{ display:flex; align-items:center; }
+  .row-item + .row-item{ border-top:1px solid var(--line); }
+  .row-open{ flex:1; min-width:0; background:none; border:none; padding:12px 0; text-align:left; cursor:pointer; }
+  .row-open:active{ opacity:.7; }
+  .row-title{ font-weight:700; font-size:13.5px; color:var(--ink); }
+  .row-meta{ margin-top:3px; font-size:11.5px; color:var(--ink-soft); }
+  .empty{ padding:36px 20px; text-align:center; font-size:13px; color:var(--ink-soft); }
+
+  .back-link-btn{
+    border:none; background:none; color:var(--brass-deep); font-size:12.5px; font-weight:700;
+    cursor:pointer; padding:4px 0 12px;
+  }
+
+  .survey-section-label{
+    font-family:'Roboto Mono',monospace; font-size:10.5px; font-weight:700;
+    letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft);
+    margin:16px 20px 8px;
+  }
+  .check-list{
+    margin:0 20px; display:flex; flex-direction:column; gap:2px; background:var(--paper-raised);
+    border:1px solid var(--line); border-radius:var(--radius-sm); padding:4px 10px;
+  }
+  .check-row{ display:flex; align-items:center; gap:10px; padding:7px 2px; }
+  .check-row + .check-row{ border-top:1px solid var(--line); }
+  .assign-name{ flex:1; font-size:12.5px; color:var(--ink); }
+  .assign-row-wrap{ flex-wrap:wrap; }
+  .assign-pills{ display:flex; gap:6px; flex-wrap:wrap; width:100%; margin-top:6px; }
+  .part-remove{
+    flex:none; width:22px; height:22px; border-radius:50%; border:none; background:none;
+    color:var(--ink-soft); cursor:pointer; font-size:15px; line-height:1;
+  }
+  .part-remove:active{ color:var(--burgundy-deep); }
+  .part-add-btn{
+    flex:none; border:1px solid var(--line); background:var(--paper); color:var(--brass-deep);
+    border-radius:var(--radius-sm); padding:6px 12px; font-size:11.5px; font-weight:700; cursor:pointer;
+  }
+  .part-add-btn:active{ background:var(--sage-bg); }
+  .part-empty{ padding:8px 2px; font-size:12px; color:var(--ink-soft); margin:0 20px 12px; }
+
+  .survey-edit-actions{ display:flex; gap:8px; margin:16px 20px calc(20px + env(safe-area-inset-bottom)); }
+  .survey-edit-actions button{
+    border-radius:var(--radius-sm); padding:10px 16px; font-size:12.5px; font-weight:700; cursor:pointer;
+    border:1px solid var(--line); background:var(--paper);
+  }
+  .survey-edit-actions .btn-save{ background:var(--brass); color:var(--ink); border:none; }
+  .survey-edit-actions .btn-save:disabled{ opacity:.5; }
+</style>
+</head>
+<body>
+<div class="app" id="appRoot">
+
+  <div class="appbar">
+    <a class="back-btn" href="index.html" aria-label="回首頁">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="m15 5-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <a class="brand-link" href="index.html">
+      <img class="mark" src="assets/BrioLogo.jpg" alt="布利歐管樂團 Logo">
+      <div class="brandtext">
+        <div class="name">布利歐管樂團</div>
+        <div class="sub">Brio Wind Band</div>
+      </div>
+    </a>
+    <div class="spacer"></div>
+    <button class="avatar skel" id="avatarBtn" type="button" aria-label="帳號選單"></button>
+  </div>
+
+  <div class="staff"></div>
+
+  <div id="concertListView">
+    <div class="section-label">
+      <span class="tw">分部長專屬</span>
+      <span class="en">Section Leader</span>
+    </div>
+    <p class="lede">選一場音樂會，指派你負責的聲部（<span id="viewerSectionsText">—</span>）在各首曲子的分部名單。</p>
+    <div class="list" id="concertListSlot"></div>
+  </div>
+
+  <div id="pieceListView" class="hidden">
+    <button type="button" class="back-link-btn" id="pieceListBackBtn" style="margin-left:20px;">‹ 回音樂會清單</button>
+    <div class="section-label"><span class="tw" id="pieceListConcertTitle">—</span></div>
+    <div class="list" id="pieceListSlot"></div>
+  </div>
+
+  <div id="instrumentListView" class="hidden">
+    <button type="button" class="back-link-btn" id="instrumentListBackBtn" style="margin-left:20px;">‹ 回曲目清單</button>
+    <div class="section-label"><span class="tw" id="instrumentListPieceTitle">—</span></div>
+    <div class="list" id="instrumentListSlot"></div>
+  </div>
+
+  <div id="assignmentView" class="hidden">
+    <button type="button" class="back-link-btn" id="assignmentBackBtn" style="margin-left:20px;">‹ 回分部清單</button>
+    <div class="section-label"><span class="tw" id="assignmentTitle">—</span></div>
+    <div id="assignmentSlot"></div>
+  </div>
+
+</div>
+
+<script type="module">
+  import { requireSectionLeader, peekCachedProfile } from './auth-guard.js';
+  import { db } from './firebase-init.js';
+  import { initAccountMenu } from './account-menu.js';
+  import { subscribeRepertoire } from './repertoire.js';
+  import {
+    collection, doc, getDoc, getDocs, onSnapshot, query, where, setDoc, serverTimestamp
+  } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+
+  function escapeHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+
+  var cachedProfile = peekCachedProfile();
+  if (cachedProfile && cachedProfile.name){
+    var avatarBtnEl = document.getElementById('avatarBtn');
+    avatarBtnEl.textContent = cachedProfile.name.charAt(0);
+    avatarBtnEl.classList.remove('skel');
+  }
+
+  var currentUid = null;
+  var viewerSectionLeaderFor = []; // 這個人可以操作的樂器分部（admin/owner 這輪視同全部樂器都能操作，見下方 isViewerAdminTier）
+  var isViewerAdminTier = false;
+
+  var concertsById = {};
+  var repertoireById = {};
+  var repertoireList = [];
+  var approvedMembers = null;
+
+  async function ensureApprovedMembers(){
+    if (approvedMembers) return approvedMembers;
+    var snap = await getDocs(query(collection(db, 'users'), where('status', '==', 'approved')));
+    approvedMembers = snap.docs.map(function(docSnap){
+      var data = docSnap.data();
+      return { uid: docSnap.id, name: data.name, account: data.account };
+    });
+    return approvedMembers;
+  }
+
+  function namesByUidFromApprovedMembers(){
+    var map = {};
+    (approvedMembers || []).forEach(function(m){ map[m.uid] = m.name; });
+    return map;
+  }
+
+  function instrumentsForPiece(piece){
+    var seen = {};
+    var list = [];
+    (piece.parts || []).forEach(function(part){
+      if (!seen[part.instrumentName]){ seen[part.instrumentName] = true; list.push(part.instrumentName); }
+    });
+    return list;
+  }
+
+  // 分部長只看得到自己 sectionLeaderFor 範圍內的樂器；admin/owner 這輪視同管得到全部樂器
+  // （對齊 event-admin.html 曲目管理分頁裡管理員的權限範圍，不是刻意放寬）
+  function viewerAllowedInstruments(allInstrumentNames){
+    if (isViewerAdminTier) return allInstrumentNames;
+    return allInstrumentNames.filter(function(name){ return viewerSectionLeaderFor.indexOf(name) !== -1; });
+  }
+
+  function formatConcertPeriod(c){
+    if (!c.startDate) return '期間未定';
+    var startText = (c.startDate.getMonth() + 1) + '/' + c.startDate.getDate();
+    if (!c.endDate) return startText + ' 起';
+    var endText = (c.endDate.getMonth() + 1) + '/' + c.endDate.getDate();
+    return startText + '–' + endText;
+  }
+
+  // ---------- 第一層：音樂會清單 ----------
+  function renderConcertListSlot(){
+    var ids = Object.keys(concertsById);
+    var slot = document.getElementById('concertListSlot');
+    if (ids.length === 0){
+      slot.innerHTML = '<div class="empty">目前沒有任何音樂會</div>';
+      return;
+    }
+    slot.innerHTML = ids.map(function(id){
+      var c = concertsById[id];
+      return (
+        '<div class="row-item">' +
+          '<button type="button" class="row-open" data-open-concert="' + id + '">' +
+            '<div class="row-title">' + escapeHtml(c.title) + '</div>' +
+            '<div class="row-meta">' + formatConcertPeriod(c) + '</div>' +
+          '</button>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  document.getElementById('concertListSlot').addEventListener('click', function(e){
+    var btn = e.target.closest('[data-open-concert]');
+    if (btn) openPieceListView(btn.getAttribute('data-open-concert'));
+  });
+
+  // ---------- 第二層：曲目清單（只保留至少有一個樂器落在 viewer 可操作範圍內的曲子） ----------
+  var openConcertId = null;
+  var openConcertPieces = []; // [{id, order}]
+
+  async function openPieceListView(concertId){
+    var c = concertsById[concertId];
+    if (!c) return;
+    openConcertId = concertId;
+    document.getElementById('concertListView').classList.add('hidden');
+    document.getElementById('pieceListView').classList.remove('hidden');
+    document.getElementById('instrumentListView').classList.add('hidden');
+    document.getElementById('assignmentView').classList.add('hidden');
+    document.getElementById('pieceListConcertTitle').textContent = c.title;
+    document.getElementById('pieceListSlot').innerHTML = '<div class="empty">載入中…</div>';
+
+    try {
+      var snap = await getDocs(collection(db, 'concerts', concertId, 'pieces'));
+      if (openConcertId !== concertId) return;
+      var list = snap.docs.map(function(d){
+        var data = d.data();
+        return { id: d.id, order: data.order || 0 };
+      });
+      list.sort(function(a, b){ return a.order - b.order; });
+      openConcertPieces = list;
+      renderPieceListSlot();
+    } catch (err) {
+      if (openConcertId === concertId) document.getElementById('pieceListSlot').innerHTML = '<div class="empty">讀取失敗（' + err.code + '）</div>';
+    }
+  }
+
+  function renderPieceListSlot(){
+    var relevant = openConcertPieces.filter(function(cp){
+      var piece = repertoireById[cp.id];
+      if (!piece) return false;
+      return viewerAllowedInstruments(instrumentsForPiece(piece)).length > 0;
+    });
+    var slot = document.getElementById('pieceListSlot');
+    if (relevant.length === 0){
+      slot.innerHTML = '<div class="empty">這場音樂會目前沒有曲子用到你負責的聲部</div>';
+      return;
+    }
+    slot.innerHTML = relevant.map(function(cp){
+      var piece = repertoireById[cp.id];
+      return (
+        '<div class="row-item">' +
+          '<button type="button" class="row-open" data-open-piece="' + cp.id + '">' +
+            '<div class="row-title">' + escapeHtml(piece.title) + '</div>' +
+          '</button>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  document.getElementById('pieceListBackBtn').addEventListener('click', function(){
+    document.getElementById('concertListView').classList.remove('hidden');
+    document.getElementById('pieceListView').classList.add('hidden');
+    openConcertId = null;
+  });
+
+  document.getElementById('pieceListSlot').addEventListener('click', function(e){
+    var btn = e.target.closest('[data-open-piece]');
+    if (btn) openInstrumentListView(btn.getAttribute('data-open-piece'));
+  });
+
+  // ---------- 第三層：分部清單（只列出 viewer 可操作的樂器） ----------
+  var openPieceId = null;
+
+  function openInstrumentListView(pieceId){
+    var piece = repertoireById[pieceId];
+    if (!piece) return;
+    openPieceId = pieceId;
+    document.getElementById('pieceListView').classList.add('hidden');
+    document.getElementById('instrumentListView').classList.remove('hidden');
+    document.getElementById('assignmentView').classList.add('hidden');
+    document.getElementById('instrumentListPieceTitle').textContent = piece.title;
+
+    // 8/25 調整：跟 event-admin.html 曲目管理分頁同一輪一致，分部數 >1 的樂器直接標示分部名稱
+    var instruments = viewerAllowedInstruments(instrumentsForPiece(piece));
+    document.getElementById('instrumentListSlot').innerHTML = instruments.map(function(name){
+      var partsForInstrument = (piece.parts || []).filter(function(p){ return p.instrumentName === name; });
+      var meta = partsForInstrument.length > 1
+        ? partsForInstrument.map(function(p){ return p.label; }).join('、')
+        : '';
+      return (
+        '<div class="row-item">' +
+          '<button type="button" class="row-open" data-open-instrument="' + escapeHtml(name) + '">' +
+            '<div class="row-title">' + escapeHtml(name) + '</div>' +
+            (meta ? '<div class="row-meta">' + escapeHtml(meta) + '</div>' : '') +
+          '</button>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  document.getElementById('instrumentListBackBtn').addEventListener('click', function(){
+    if (openConcertId) openPieceListView(openConcertId);
+  });
+
+  document.getElementById('instrumentListSlot').addEventListener('click', function(e){
+    var btn = e.target.closest('[data-open-instrument]');
+    if (btn) openAssignmentView(btn.getAttribute('data-open-instrument'));
+  });
+
+  // ---------- 第四層：指派畫面（跟 event-admin.html Task 8 同一套互動邏輯，範圍限定單一樂器） ----------
+  var openInstrumentName = null;
+  var assignmentDraft = {}; // {partId: [uid, ...]}
+
+  function renderAssignmentPanel(parts, eligibleMembers){
+    var namesByUid = namesByUidFromApprovedMembers();
+    var assignedUidSet = {};
+    Object.keys(assignmentDraft).forEach(function(partId){
+      assignmentDraft[partId].forEach(function(uid){ assignedUidSet[uid] = true; });
+    });
+    var unassigned = eligibleMembers.filter(function(m){ return !assignedUidSet[m.uid]; });
+
+    var partsHtml = parts.map(function(part){
+      var rows = assignmentDraft[part.partId].map(function(uid){
+        var name = namesByUid[uid] || uid;
+        return (
+          '<div class="check-row">' +
+            '<span class="assign-name">' + escapeHtml(name) + '</span>' +
+            '<button type="button" class="part-remove" data-unassign="' + part.partId + '|' + uid + '" aria-label="移除指派">×</button>' +
+          '</div>'
+        );
+      }).join('') || '<div class="part-empty">尚未指派任何人</div>';
+      return '<div class="survey-section-label">' + escapeHtml(part.label) + '</div><div class="check-list">' + rows + '</div>';
+    }).join('');
+
+    var unassignedHtml = unassigned.length === 0
+      ? '<div class="part-empty">參與名單中這個樂器的人都已經指派完畢</div>'
+      : unassigned.map(function(m){
+          var name = namesByUid[m.uid] || m.uid;
+          var pillsHtml = parts.map(function(part){
+            return '<button type="button" class="part-add-btn" data-assign="' + part.partId + '|' + m.uid + '">' + escapeHtml(part.label) + '</button>';
+          }).join('');
+          return (
+            '<div class="check-row assign-row-wrap">' +
+              '<span class="assign-name">' + escapeHtml(name) + '</span>' +
+              '<div class="assign-pills">' + pillsHtml + '</div>' +
+            '</div>'
+          );
+        }).join('');
+
+    document.getElementById('assignmentSlot').innerHTML =
+      partsHtml +
+      '<div class="survey-section-label">尚未指派（參與名單中此樂器的成員）</div><div class="check-list">' + unassignedHtml + '</div>' +
+      '<div class="survey-edit-actions">' +
+        '<button type="button" id="assignmentCancelBtn">取消</button>' +
+        '<button type="button" class="btn-save" id="assignmentSaveBtn">儲存指派</button>' +
+      '</div>';
+  }
+
+  var currentEligibleMembers = [];
+  var currentParts = [];
+
+  function reRenderCurrentAssignment(){
+    renderAssignmentPanel(currentParts, currentEligibleMembers);
+  }
+
+  async function openAssignmentView(instrumentName){
+    var piece = repertoireById[openPieceId];
+    if (!piece) return;
+    var concertId = openConcertId, pieceId = openPieceId;
+    openInstrumentName = instrumentName;
+    document.getElementById('instrumentListView').classList.add('hidden');
+    document.getElementById('assignmentView').classList.remove('hidden');
+    document.getElementById('assignmentTitle').textContent = piece.title + '｜' + instrumentName;
+    document.getElementById('assignmentSlot').innerHTML = '<div class="empty">載入中…</div>';
+
+    currentParts = (piece.parts || []).filter(function(p){ return p.instrumentName === instrumentName; });
+
+    try {
+      await ensureApprovedMembers();
+      var rosterSnap = await getDoc(doc(db, 'concertRosters', concertId));
+      var sectionSnap = await getDoc(doc(db, 'concerts', concertId, 'pieces', pieceId, 'sections', instrumentName));
+      if (openConcertId !== concertId || openPieceId !== pieceId || openInstrumentName !== instrumentName) return;
+
+      var members = rosterSnap.exists() ? (rosterSnap.data().members || []) : [];
+      currentEligibleMembers = members.filter(function(m){ return m.instrument === instrumentName; });
+
+      assignmentDraft = {};
+      currentParts.forEach(function(part){ assignmentDraft[part.partId] = []; });
+      if (sectionSnap.exists()){
+        (sectionSnap.data().parts || []).forEach(function(saved){
+          if (assignmentDraft.hasOwnProperty(saved.partId)) assignmentDraft[saved.partId] = (saved.members || []).slice();
+        });
+      }
+
+      renderAssignmentPanel(currentParts, currentEligibleMembers);
+    } catch (err) {
+      document.getElementById('assignmentSlot').innerHTML = '<div class="empty">載入失敗（' + err.code + '）</div>';
+    }
+  }
+
+  document.getElementById('assignmentBackBtn').addEventListener('click', function(){
+    if (openPieceId) openInstrumentListView(openPieceId);
+  });
+
+  function saveAssignment(){
+    var concertId = openConcertId, pieceId = openPieceId, instrumentName = openInstrumentName;
+    if (!concertId || !pieceId || !instrumentName) return;
+    var saveBtn = document.getElementById('assignmentSaveBtn');
+    saveBtn.disabled = true;
+    var partsPayload = Object.keys(assignmentDraft).map(function(partId){
+      return { partId: partId, members: assignmentDraft[partId] };
+    });
+    setDoc(doc(db, 'concerts', concertId, 'pieces', pieceId, 'sections', instrumentName), {
+      parts: partsPayload,
+      updatedBy: currentUid,
+      updatedAt: serverTimestamp()
+    }).then(function(){
+      if (openPieceId) openInstrumentListView(openPieceId);
+    }).catch(function(err){
+      // 已知限制：非 admin-tier 的分部長這輪會在這裡收到 permission-denied（見這個任務開頭說明），
+      // 錯誤處理沿用專案既有的 alert 慣例，不特別針對這個情境客製文案
+      alert('儲存失敗：' + err.code);
+      saveBtn.disabled = false;
+    });
+  }
+
+  document.getElementById('assignmentSlot').addEventListener('click', function(e){
+    var assignBtn = e.target.closest('[data-assign]');
+    if (assignBtn){
+      var assignParts = assignBtn.getAttribute('data-assign').split('|');
+      assignmentDraft[assignParts[0]].push(assignParts[1]);
+      reRenderCurrentAssignment();
+      return;
+    }
+    var unassignBtn = e.target.closest('[data-unassign]');
+    if (unassignBtn){
+      var unassignParts = unassignBtn.getAttribute('data-unassign').split('|');
+      assignmentDraft[unassignParts[0]] = assignmentDraft[unassignParts[0]].filter(function(uid){ return uid !== unassignParts[1]; });
+      reRenderCurrentAssignment();
+      return;
+    }
+    if (e.target.closest('#assignmentCancelBtn')){
+      if (openPieceId) openInstrumentListView(openPieceId);
+      return;
+    }
+    if (e.target.closest('#assignmentSaveBtn')){
+      saveAssignment();
+      return;
+    }
+  });
+
+  requireSectionLeader().then(function(result){
+    if (!result) return;
+    currentUid = result.uid;
+    viewerSectionLeaderFor = Array.isArray(result.profile.sectionLeaderFor) ? result.profile.sectionLeaderFor : [];
+    isViewerAdminTier = result.profile.role === 'admin' || result.profile.role === 'owner';
+
+    var avatarBtn = document.getElementById('avatarBtn');
+    avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
+    avatarBtn.classList.remove('skel');
+    initAccountMenu(result.profile.name);
+
+    document.getElementById('viewerSectionsText').textContent =
+      isViewerAdminTier ? '不限（管理員身分）' : (viewerSectionLeaderFor.length ? viewerSectionLeaderFor.join('、') : '（尚未指派任何聲部）');
+
+    onSnapshot(collection(db, 'concerts'), function(snap){
+      concertsById = {};
+      snap.forEach(function(docSnap){
+        var data = docSnap.data();
+        concertsById[docSnap.id] = {
+          id: docSnap.id,
+          title: data.title,
+          startDate: data.startDate && data.startDate.toDate ? data.startDate.toDate() : null,
+          endDate: data.endDate && data.endDate.toDate ? data.endDate.toDate() : null
+        };
+      });
+      renderConcertListSlot();
+    }, function(err){ console.error('concerts 監聽失敗', err); });
+
+    subscribeRepertoire(db, function(pieces){
+      repertoireById = {};
+      repertoireList = pieces.slice();
+      pieces.forEach(function(p){ repertoireById[p.id] = p; });
+      if (openConcertId) renderPieceListSlot();
+    }, function(err){ console.error('repertoire 監聽失敗', err); });
+  });
+</script>
+</body>
+</html>
