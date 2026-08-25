@@ -776,6 +776,40 @@
   </div>
 </div>
 
+<!-- 音樂會明細 Bottom Sheet：音樂會資訊/曲目管理/參與名單 三個分頁，跟活動明細 sheet
+     同一套「先看後編」互動模式 -->
+<div class="sheet-overlay" id="concertSheetOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button type="button" class="sheet-close" id="concertSheetClose" aria-label="關閉">×</button>
+      <div class="name" id="concertSheetTitle">—</div>
+      <div class="account" id="concertSheetMeta">—</div>
+    </div>
+    <div class="sheet-tabs">
+      <button type="button" class="sheet-tab active" id="tabConcertInfo">音樂會資訊</button>
+      <button type="button" class="sheet-tab" id="tabConcertPieces">曲目管理</button>
+      <button type="button" class="sheet-tab" id="tabConcertRoster">參與名單</button>
+    </div>
+    <div class="sheet-body">
+      <div id="sheetConcertInfoTab">
+        <div id="concertInfoViewMode">
+          <div class="info-row"><span class="k">期間</span><span class="v" id="concertInfoPeriod">—</span></div>
+          <div class="info-row"><span class="k">說明</span><span class="v" id="concertInfoDescription">—</span></div>
+          <button type="button" class="info-edit-btn" id="concertInfoEditBtn">✎ 編輯</button>
+        </div>
+        <div id="concertInfoEditMode" class="hidden"></div>
+      </div>
+      <div id="sheetConcertPiecesTab" class="hidden">
+        <!-- Task 7/8 補上：曲目清單 + 指派畫面 -->
+      </div>
+      <div id="sheetConcertRosterTab" class="hidden">
+        <!-- Task 9 補上：參與名單 -->
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="qr-zoom-overlay" id="qrZoomOverlay">
   <img id="qrZoomImg" alt="簽到 QR Code 放大">
 </div>
@@ -982,12 +1016,35 @@
     }).join('');
   }
 
-  function openCreateConcertSheet(){
+  var editingConcertId = null; // null = 新增模式，比照 editingId 對 #eventForm 的作用
+
+  function enterConcertCreateMode(){
+    editingConcertId = null;
     concertForm.reset();
-    showConcertFormError('');
-    document.getElementById('concertCreateSuccessMsg').classList.add('hidden');
     concertSubmitBtn.disabled = false;
     concertSubmitBtn.textContent = '建立音樂會';
+    document.getElementById('concertCancelBtn').classList.add('hidden');
+    showConcertFormError('');
+  }
+
+  function enterConcertEditMode(concertId){
+    var c = concertsById[concertId];
+    if (!c) return;
+    editingConcertId = concertId;
+    document.getElementById('concertTitle').value = c.title || '';
+    document.getElementById('concertStartDate').value = c.startDate ? toDateValue(c.startDate) : '';
+    document.getElementById('concertEndDate').value = c.endDate ? toDateValue(c.endDate) : '';
+    document.getElementById('concertDescription').value = c.description || '';
+    concertSubmitBtn.disabled = false;
+    concertSubmitBtn.textContent = '儲存變更';
+    document.getElementById('concertCancelBtn').classList.remove('hidden');
+    showConcertFormError('');
+  }
+
+  function openCreateConcertSheet(){
+    document.getElementById('concertFormSlot').appendChild(concertForm);
+    enterConcertCreateMode();
+    document.getElementById('concertCreateSuccessMsg').classList.add('hidden');
     createConcertSheetOverlay.classList.add('active');
   }
 
@@ -1014,27 +1071,44 @@
       return;
     }
 
+    var wasEditing = !!editingConcertId;
+    var editingConcertIdSnapshot = editingConcertId;
     concertSubmitBtn.disabled = true;
-    concertSubmitBtn.textContent = '建立中…';
+    concertSubmitBtn.textContent = wasEditing ? '儲存中…' : '建立中…';
 
-    addDoc(collection(db, 'concerts'), {
+    var payload = {
       title: title,
       startDate: Timestamp.fromDate(new Date(startDateVal + 'T00:00')),
       endDate: endDateVal ? Timestamp.fromDate(new Date(endDateVal + 'T00:00')) : null,
-      description: description,
-      createdBy: currentAdminUid,
-      createdAt: serverTimestamp()
-    }).then(function(){
-      concertForm.reset();
-      concertSubmitBtn.disabled = false;
-      concertSubmitBtn.textContent = '建立音樂會';
-      document.getElementById('concertCreateSuccessMsg').textContent = '已建立「' + title + '」，可以繼續新增';
-      document.getElementById('concertCreateSuccessMsg').classList.remove('hidden');
+      description: description
+    };
+
+    var task = wasEditing
+      ? updateDoc(doc(db, 'concerts', editingConcertIdSnapshot), payload)
+      : addDoc(collection(db, 'concerts'), Object.assign({}, payload, {
+          createdBy: currentAdminUid,
+          createdAt: serverTimestamp()
+        }));
+
+    task.then(function(){
+      if (wasEditing){
+        enterConcertCreateMode();
+        showConcertInfoView(); // 編輯是在音樂會明細 sheet 裡做的，存完回到唯讀摘要，不關閉整個 sheet
+      } else {
+        enterConcertCreateMode();
+        document.getElementById('concertCreateSuccessMsg').textContent = '已建立「' + title + '」，可以繼續新增';
+        document.getElementById('concertCreateSuccessMsg').classList.remove('hidden');
+      }
     }).catch(function(err){
       concertSubmitBtn.disabled = false;
-      concertSubmitBtn.textContent = '建立音樂會';
+      concertSubmitBtn.textContent = wasEditing ? '儲存變更' : '建立音樂會';
       showConcertFormError('操作失敗（' + err.code + '）');
     });
+  });
+
+  document.getElementById('concertCancelBtn').addEventListener('click', function(){
+    enterConcertCreateMode();
+    showConcertInfoView();
   });
 
   concertList.addEventListener('click', function(e){
@@ -1056,6 +1130,83 @@
       alert('刪除失敗：' + err.code);
       deleteBtn.disabled = false;
     });
+  });
+
+  // ---------- 音樂會明細 Sheet ----------
+  var openConcertId = null;
+  var activeConcertSheetTab = 'info'; // 'info' | 'pieces' | 'roster'
+  var concertSheetOverlay = document.getElementById('concertSheetOverlay');
+
+  function showConcertInfoView(){
+    document.getElementById('concertInfoViewMode').classList.remove('hidden');
+    document.getElementById('concertInfoEditMode').classList.add('hidden');
+    var c = concertsById[openConcertId];
+    if (!c) return;
+    document.getElementById('concertInfoPeriod').textContent = formatConcertPeriod(c);
+    document.getElementById('concertInfoDescription').textContent = c.description || '未填寫';
+  }
+
+  function setConcertSheetTab(tab){
+    activeConcertSheetTab = tab;
+    document.getElementById('tabConcertInfo').classList.toggle('active', tab === 'info');
+    document.getElementById('tabConcertPieces').classList.toggle('active', tab === 'pieces');
+    document.getElementById('tabConcertRoster').classList.toggle('active', tab === 'roster');
+    document.getElementById('sheetConcertInfoTab').classList.toggle('hidden', tab !== 'info');
+    document.getElementById('sheetConcertPiecesTab').classList.toggle('hidden', tab !== 'pieces');
+    document.getElementById('sheetConcertRosterTab').classList.toggle('hidden', tab !== 'roster');
+  }
+
+  function openConcertSheet(concertId){
+    var c = concertsById[concertId];
+    if (!c) return;
+    if (editingConcertId) enterConcertCreateMode(); // 保險：放棄任何還沒存檔的音樂會資訊編輯草稿
+    openConcertId = concertId;
+    document.getElementById('concertSheetTitle').textContent = c.title;
+    document.getElementById('concertSheetMeta').textContent = formatConcertPeriod(c);
+    showConcertInfoView();
+    setConcertSheetTab('info');
+    concertSheetOverlay.classList.add('active');
+  }
+
+  function closeConcertSheet(){
+    concertSheetOverlay.classList.remove('active');
+    if (editingConcertId) enterConcertCreateMode();
+    openConcertId = null;
+  }
+
+  concertList.addEventListener('click', function(e){
+    var openBtn = e.target.closest('[data-open-concert]');
+    if (openBtn) openConcertSheet(openBtn.getAttribute('data-open-concert'));
+  });
+
+  document.getElementById('concertSheetClose').addEventListener('click', closeConcertSheet);
+  concertSheetOverlay.addEventListener('click', function(e){
+    if (e.target === concertSheetOverlay) closeConcertSheet();
+  });
+
+  document.getElementById('tabConcertInfo').addEventListener('click', function(){
+    if (!openConcertId) return;
+    if (editingConcertId) enterConcertCreateMode();
+    showConcertInfoView();
+    setConcertSheetTab('info');
+  });
+  document.getElementById('tabConcertPieces').addEventListener('click', function(){
+    if (!openConcertId) return;
+    if (editingConcertId) enterConcertCreateMode();
+    setConcertSheetTab('pieces');
+  });
+  document.getElementById('tabConcertRoster').addEventListener('click', function(){
+    if (!openConcertId) return;
+    if (editingConcertId) enterConcertCreateMode();
+    setConcertSheetTab('roster');
+  });
+
+  document.getElementById('concertInfoEditBtn').addEventListener('click', function(){
+    if (!openConcertId) return;
+    document.getElementById('concertInfoEditMode').appendChild(concertForm);
+    enterConcertEditMode(openConcertId);
+    document.getElementById('concertInfoViewMode').classList.add('hidden');
+    document.getElementById('concertInfoEditMode').classList.remove('hidden');
   });
 
   eventCancelBtn.addEventListener('click', function(){
