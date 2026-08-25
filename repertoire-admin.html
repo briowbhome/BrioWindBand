@@ -187,6 +187,34 @@
   }
   .form-error.show{ display:block; }
 
+  .part-group-label{
+    font-family:'Roboto Mono',monospace; font-size:10px; font-weight:700;
+    letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft); margin:14px 0 4px;
+  }
+  .part-row{ display:flex; align-items:center; gap:10px; padding:8px 2px; border-bottom:1px solid var(--line); }
+  .part-row:last-child{ border-bottom:none; }
+  .part-label{ flex:1; font-size:12.5px; color:var(--ink); }
+  .part-remove{
+    flex:none; width:22px; height:22px; border-radius:50%; border:none; background:none;
+    color:var(--ink-soft); cursor:pointer; font-size:15px; line-height:1;
+  }
+  .part-remove:active{ color:var(--burgundy-deep); }
+  .part-add-row{ display:flex; gap:8px; margin-top:10px; }
+  .part-add-row select{
+    flex:1; border:1px solid var(--line); background:var(--paper);
+    border-radius:var(--radius-sm); padding:9px 10px; font-size:13px; color:var(--ink);
+  }
+  .part-add-row input{
+    flex:1; min-width:0; border:1px solid var(--line); background:var(--paper);
+    border-radius:var(--radius-sm); padding:9px 10px; font-size:13px; color:var(--ink);
+  }
+  .part-add-btn{
+    flex:none; border:1px solid var(--line); background:var(--paper); color:var(--brass-deep);
+    border-radius:var(--radius-sm); padding:9px 14px; font-size:12px; font-weight:700; cursor:pointer;
+  }
+  .part-add-btn:active{ background:var(--sage-bg); }
+  .part-empty{ padding:8px 2px; font-size:12px; color:var(--ink-soft); }
+
   .sheet-footer{
     display:flex; gap:10px;
     padding:14px 20px calc(14px + env(safe-area-inset-bottom));
@@ -261,6 +289,15 @@
           <label>作曲/編曲者（選填）</label>
           <input type="text" id="pieceComposer" placeholder="例如：John Williams">
         </div>
+        <div class="field">
+          <label>分部欄位</label>
+          <div id="partGroups"></div>
+          <div class="part-add-row">
+            <select id="partInstrumentSelect"></select>
+            <input type="text" id="partLabelInput" placeholder="例如：單簧管 1st">
+            <button type="button" class="part-add-btn" id="partAddBtn">＋ 新增</button>
+          </div>
+        </div>
         <p class="form-error" id="pieceFormError"></p>
       </div>
     </div>
@@ -275,7 +312,8 @@
   import { requireAdmin, peekCachedProfile } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
-  import { subscribeRepertoire, addPiece, updatePiece, deletePiece } from './repertoire.js';
+  import { subscribeRepertoire, addPiece, updatePiece, deletePiece, randomPartId } from './repertoire.js';
+  import { subscribeInstruments, FAMILY_LABELS, FAMILY_ORDER } from './instruments.js';
 
   function escapeHtml(s){
     return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
@@ -304,6 +342,75 @@
   var piecesList = [];
   var piecesLoaded = false;
   var editingPieceId = null; // null = 新增模式
+  var draftParts = []; // [{partId, instrumentName, label}]，編輯中的分部欄位草稿
+  var instrumentsList = [];
+
+  function renderPartInstrumentOptions(){
+    var current = document.getElementById('partInstrumentSelect').value;
+    document.getElementById('partInstrumentSelect').innerHTML = instrumentsList.map(function(inst){
+      return '<option value="' + escapeHtml(inst.name) + '">' + escapeHtml(inst.name) + '</option>';
+    }).join('');
+    if (current && instrumentsList.some(function(i){ return i.name === current; })){
+      document.getElementById('partInstrumentSelect').value = current;
+    }
+  }
+
+  // 分部欄位依樂器分組顯示（比照 roles-admin.html 樂器清單依 family 分組的做法，這裡是依
+  // instrumentName 分組），組內維持新增順序，不提供排序按鈕——這輪範圍不需要
+  function renderPartGroups(){
+    var container = document.getElementById('partGroups');
+    if (draftParts.length === 0){
+      container.innerHTML = '<div class="part-empty">還沒有任何分部欄位，用下面的表單新增</div>';
+      return;
+    }
+    var byInstrument = {};
+    var order = [];
+    draftParts.forEach(function(part){
+      if (!byInstrument[part.instrumentName]){
+        byInstrument[part.instrumentName] = [];
+        order.push(part.instrumentName);
+      }
+      byInstrument[part.instrumentName].push(part);
+    });
+    container.innerHTML = order.map(function(instrumentName){
+      return (
+        '<div class="part-group-label">' + escapeHtml(instrumentName) + '</div>' +
+        byInstrument[instrumentName].map(function(part){
+          return (
+            '<div class="part-row">' +
+              '<span class="part-label">' + escapeHtml(part.label) + '</span>' +
+              '<button type="button" class="part-remove" data-remove-part="' + part.partId + '" aria-label="刪除分部欄位">×</button>' +
+            '</div>'
+          );
+        }).join('')
+      );
+    }).join('');
+  }
+
+  document.getElementById('partAddBtn').addEventListener('click', function(){
+    var instrumentName = document.getElementById('partInstrumentSelect').value;
+    var label = document.getElementById('partLabelInput').value.trim();
+    if (!instrumentName){
+      showFormError('請先在「樂器/聲部」新增至少一種樂器才能設定分部欄位');
+      return;
+    }
+    if (!label){
+      showFormError('請輸入分部欄位名稱');
+      return;
+    }
+    showFormError('');
+    draftParts.push({ partId: randomPartId(), instrumentName: instrumentName, label: label });
+    document.getElementById('partLabelInput').value = '';
+    renderPartGroups();
+  });
+
+  document.getElementById('partGroups').addEventListener('click', function(e){
+    var btn = e.target.closest('[data-remove-part]');
+    if (!btn) return;
+    var partId = btn.getAttribute('data-remove-part');
+    draftParts = draftParts.filter(function(p){ return p.partId !== partId; });
+    renderPartGroups();
+  });
 
   var pieceList = document.getElementById('pieceList');
   pieceList.innerHTML = SKELETON_ROWS_HTML;
@@ -365,10 +472,12 @@
     editingPieceId = null;
     pieceTitleInput.value = '';
     pieceComposerInput.value = '';
+    draftParts = [];
     document.getElementById('pieceSheetTitle').textContent = '新增曲目';
     pieceSaveBtn.textContent = '建立曲目';
     pieceCancelBtn.classList.add('hidden'); // 新增沒有「唯讀」畫面可以取消回去，只有關閉整個 sheet
     showFormError('');
+    renderPartGroups();
     showPieceEditForm();
     pieceSheetOverlay.classList.add('active');
   }
@@ -391,6 +500,8 @@
     if (!p) return;
     pieceTitleInput.value = p.title || '';
     pieceComposerInput.value = p.composer || '';
+    draftParts = (p.parts || []).slice();
+    renderPartGroups();
     showPieceEditForm();
   });
 
@@ -425,12 +536,9 @@
     showFormError('');
     pieceSaveBtn.disabled = true;
 
-    // Task 4 會在這裡把 draftParts 一起存進去；這輪新增/編輯一律先用既有的 parts（編輯時
-    // 保留原本的分部欄位，新增時是空陣列），不會因為這輪還沒做分部編輯器就把既有分部清空
-    var existingParts = editingPieceId && piecesById[editingPieceId] ? piecesById[editingPieceId].parts : [];
     var task = editingPieceId
-      ? updatePiece(db, editingPieceId, title, composer, existingParts)
-      : addPiece(db, currentAdminUid, title, composer, []);
+      ? updatePiece(db, editingPieceId, title, composer, draftParts)
+      : addPiece(db, currentAdminUid, title, composer, draftParts);
 
     task.then(function(){
       pieceSaveBtn.disabled = false;
@@ -477,6 +585,13 @@
       piecesLoaded = true;
       renderPieceList();
     }, renderPieceAdminError);
+
+    // 分部欄位的樂器下拉選單來源，跟 roles-admin.html 讀同一份 settings/instruments；
+    // 這裡不需要 seedIfMissing（true 的那個參數只給第一次建立清單的頁面用，這裡只是讀取）
+    subscribeInstruments(db, function(list){
+      instrumentsList = list;
+      renderPartInstrumentOptions();
+    }, false, function(err){ console.error('instruments 監聽失敗', err); });
   });
 </script>
 </body>
