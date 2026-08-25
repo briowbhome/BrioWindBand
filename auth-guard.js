@@ -226,6 +226,51 @@ export async function requireAdminOrConductor() {
   return { uid: user.uid, profile: profile };
 }
 
+// 分部長專屬頁面（section-admin.html）用：必須登入、審核通過，且「role 是 admin/owner」或
+// 「sectionLeaderFor 陣列不是空的」。刻意跟 requireAdminOrConductor() 分開——這裡放行的
+// 判斷依據是陣列欄位有沒有值，不是角色列舉，跟其他守門函式的角色判斷邏輯不同
+export async function requireSectionLeader() {
+  var user = await waitForAuthUser();
+  if (!user) {
+    clearProfileCache();
+    goToLogin();
+    return null;
+  }
+
+  function isAllowed(p) {
+    return !!p && (p.role === "admin" || p.role === "owner" ||
+      (Array.isArray(p.sectionLeaderFor) && p.sectionLeaderFor.length > 0));
+  }
+
+  var profile;
+  try {
+    profile = await resolveProfile(user.uid, function (fresh) {
+      if (!fresh || fresh.status !== "approved") {
+        clearProfileCache();
+        signOut(auth).then(goToLogin);
+      } else if (!isAllowed(fresh)) {
+        clearProfileCache();
+        location.href = "index.html";
+      }
+    });
+  } catch (e) {
+    showConnectionError();
+    return null;
+  }
+
+  if (!profile || profile.status !== "approved") {
+    clearProfileCache();
+    await signOut(auth);
+    goToLogin();
+    return null;
+  }
+  if (!isAllowed(profile)) {
+    location.href = "index.html";
+    return null;
+  }
+  return { uid: user.uid, profile: profile };
+}
+
 // index.html／profile.html 用：訪客（未登入）、審核中（pending）、已核准都算「看得到」，
 // 只有真的被拒絕/停用/移除的帳號才會被踢出登入頁。刻意跟 requireApprovedMember() 分開——
 // 後者維持嚴格闔門給 checkin.html 用，這裡放寬只給這兩個頁面用，不影響其他頁面的守門邏輯

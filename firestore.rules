@@ -1,0 +1,300 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function hasProfile() {
+      return request.auth != null &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function selfProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isOwner() {
+      return hasProfile() && selfProfile().role == 'owner';
+    }
+
+    // 8/23 新增：hasProfile() 只檢查「users/{uid} 文件存在」，不檢查 status——pending/
+    // suspended/removed 依設計都會保留文件，單靠 hasProfile() 會讓這些本該被擋住的帳號
+    // 還是能通過檢查。簽到／出缺席回報這幾個「操作性」規則要用這個而不是 hasProfile()，
+    // 才能真正把已停權/退團/尚未審核的帳號擋在外面
+    function isApprovedMember() {
+      return hasProfile() && selfProfile().status == 'approved';
+    }
+
+    // Owner，或被個別授予 canManageRoles 的人（例如團長/行政老師）
+    function canManageRoles() {
+      return isOwner() ||
+        (hasProfile() &&
+          selfProfile().permissions != null &&
+          selfProfile().permissions.canManageRoles == true);
+    }
+
+    // Owner，或被個別授予 canManageEventTypes 的人（活動類型清單管理）
+    function canManageEventTypes() {
+      return isOwner() ||
+        (hasProfile() &&
+          selfProfile().permissions != null &&
+          selfProfile().permissions.canManageEventTypes == true);
+    }
+
+    // 一般 Admin 審核用：role 是 admin 或 owner 就算「幹部層級」
+    function isAdminTier() {
+      return hasProfile() && selfProfile().role in ['admin', 'owner'];
+    }
+
+    // 指揮專用頁面（conductor-admin.html）讀取用：role 是 conductor。
+    // 刻意跟 isAdminTier() 分開、不合併成同一個函式——指揮跟幹部是不同的角色，只是這裡
+    // 剛好需要讀同一批資料，合併判斷式之後容易漏改任何一邊各自要調整的權限範圍
+    function isConductor() {
+      return hasProfile() && selfProfile().role == 'conductor';
+    }
+
+    function touchesRoleOrPermissions() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'permissions']);
+    }
+
+    // 簽到碼是否仍然有效：checkinSessions/{eventId} 存在、code 相符、還沒過期
+    function sessionValid(eventId, code) {
+      return exists(/databases/$(database)/documents/checkinSessions/$(eventId)) &&
+        get(/databases/$(database)/documents/checkinSessions/$(eventId)).data.code == code &&
+        get(/databases/$(database)/documents/checkinSessions/$(eventId)).data.windowEnd > request.time;
+    }
+
+    match /users/{uid} {
+      // 本人可以讀自己的資料（登入後檢查審核狀態用）
+      allow get: if request.auth != null && request.auth.uid == uid;
+
+      // 幹部層級可以讀取／列出所有團員資料（審核畫面用）
+      allow get, list: if isAdminTier();
+
+      // 註冊：只能建立「自己」的文件，且狀態一定要是待審核、一般團員角色
+      // 防止有人自己把自己設成 approved 或 admin
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.role == 'member';
+
+      // 一般審核操作：Admin/Owner 對「一般團員」核准／拒絕／標記停用／軟刪除
+      // 不能透過這條規則動到 role 或 permissions 欄位
+      allow update: if isAdminTier()
+        && resource.data.role == 'member'
+        && !touchesRoleOrPermissions();
+
+      // 角色與權限調整：Owner，或持有 canManageRoles 的人
+      // 對象不能是 Owner；也不能把任何人設成 owner，除非操作者本人就是 Owner
+      allow update: if canManageRoles()
+        && resource.data.role != 'owner'
+        && (request.resource.data.role != 'owner' || isOwner());
+
+      // Owner 編輯自己的安全欄位：上面兩條規則都把 Owner 自己的文件排除在外（刻意設計，
+      // 防止 role/permissions 被任何管道改動，即使是 Owner 本人），但這樣 Owner 連自己的
+      // 樂器/聲部、分部長都沒地方能改。這裡只放行這兩個欄位，role/permissions/status/account
+      // 等敏感欄位仍然完全鎖死，不因為是本人操作就放寬
+      allow update: if isOwner()
+        && request.auth.uid == uid
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(
+          ['role', 'permissions', 'status', 'account', 'accountLower', 'approvedAt', 'approvedBy', 'createdAt', 'expiresAt']
+        );
+
+      // 通知訂閱：本人可以自行開關推播通知、寫入/清除訂閱物件，不需要幹部層級權限，
+      // 只放行這四個欄位，role/permissions/status 等敏感欄位仍然完全鎖死。
+      // isAdminTier() 本來就能 get/list 整個 users collection（審核/名冊用途），代表幹部
+      // 技術上讀得到別人的 pushSubscription，但缺少對應的 VAPID 私鑰就無法用這個 subscription
+      // 送出任何東西，已跟使用者確認這個取捨可以接受
+      allow update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+          ['notificationsEnabled', 'pushSubscription', 'notificationsUpdatedAt', 'notificationsReadAt']
+        );
+
+      // 個人資料自我編輯：任何登入者都能改自己的姓名/生日/電話/車牌，不需要幹部層級權限。
+      // 刻意不放行 instruments/sectionLeaderFor——樂器/聲部牽動座位圖、簽到分區、分部長指派
+      // 等多處邏輯，維持由幹部在 roles-admin.html 調整，不開放團員自行更改；account/role/
+      // permissions/status 等敏感欄位一樣完全鎖死。這條跟上面 Owner 專屬的自編輯規則是分開
+      // 獨立的規則，兩條並存不衝突（Owner 改 instruments/sectionLeaderFor 走上面那條，
+      // 改姓名/生日/電話/車牌走這條）
+      allow update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+          ['name', 'birthday', 'phone', 'licensePlate']
+        );
+
+      // 硬刪除：只開放給「已拒絕」的申請（對應已拒絕清單的「立即移除」）
+      // 現役帳號一律走軟刪除（status: removed），真正的硬刪除由 Owner 在 Console 手動處理，不走這裡
+      allow delete: if isAdminTier() && resource.data.status == 'rejected';
+    }
+
+    // 活動（通用，音樂會/團練都在這裡）
+    // 8/22 起改成完全公開讀取——首頁改成訪客（未登入）也看得到活動列表/下次團練，
+    // 是刻意的決定：任何拿得到網址的人都能讀到活動名稱/時間/地點，不再需要帳號
+    match /events/{eventId} {
+      allow get, list: if true;
+      allow create, update, delete: if isAdminTier();
+    }
+
+    // 活動類型清單（給活動的 type 欄位用，決定顯示名稱/顏色，首頁也靠 homeHighlight
+    // 判斷哪一場算「下次團練」）。同上，改成公開讀取讓訪客也能正確算出下次團練卡片
+    match /eventTypes/{typeId} {
+      allow get, list: if true;
+      allow create, update, delete: if canManageEventTypes();
+    }
+
+    // 公告，首頁顯示用。發布者（createdBy）只記錄留存，不對團員顯示。
+    // 同上改成公開讀取，訪客首頁也看得到公告內容
+    match /announcements/{announcementId} {
+      allow get, list: if true;
+      allow create, update, delete: if isAdminTier();
+    }
+
+    // 樂器/聲部清單，註冊頁（未登入）也要能讀，所以開放公開讀取；調整交給 canManageRoles
+    match /settings/instruments {
+      allow get: if true;
+      allow write: if canManageRoles();
+    }
+
+    // 座位圖分區清單（哪個扇形分區對應哪個樂器），conductor-admin.html 讀取用，
+    // 所有登入的人都能讀（資料本身不敏感，跟 eventTypes/instruments 一樣）。
+    // 寫入刻意收緊成只有 Owner——8/19 使用者要求「暫時不希望其他人能編輯座位圖」，
+    // 跟 instruments/eventTypes 慣用的 canManageRoles/canManageEventTypes 不同層級，
+    // 之後如果要放寬給其他幹部編輯，把這裡換回 canManageRoles() 就好
+    match /settings/seatingSections {
+      allow get: if hasProfile();
+      allow write: if isOwner();
+    }
+
+    // 簽到中狀態，一場活動最多一份，過期後由 TTL 或幹部手動清除
+    match /checkinSessions/{eventId} {
+      // 團員掃碼時要讀這份資料驗證 code／期限。8/23 從 hasProfile() 收緊成
+      // isApprovedMember()——否則 pending/suspended/removed 的帳號也能直接讀到有效簽到碼
+      allow get: if isApprovedMember();
+      // 幹部後台「生效中清單」用
+      allow list: if isAdminTier();
+      allow create, update, delete: if isAdminTier();
+    }
+
+    // 簽到紀錄，永久保留
+    match /checkins/{checkinId} {
+      // 本人可以查自己是否已簽到過（用文件 ID 判斷，不依賴文件是否存在）
+      allow get: if request.auth != null &&
+        (checkinId.split('_')[1] == request.auth.uid || isAdminTier());
+      allow list: if isAdminTier();
+      // 指揮專用頁面唯讀查看統計，不開放建立/修改/刪除
+      allow get, list: if isConductor();
+
+      // 團員掃碼簽到：只能建立「自己」的紀錄，文件 ID 必須對應 eventId_uid，
+      // 且對應的簽到中狀態必須存在、code 相符、還在有效期限內。8/23 加上 isApprovedMember()
+      // ——原本沒檢查 status，被停權/退團的帳號只要還留著登入態，一樣能幫自己寫入簽到紀錄
+      allow create: if request.auth != null
+        && isApprovedMember()
+        && checkinId == request.resource.data.eventId + '_' + request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.method == 'qr'
+        && sessionValid(request.resource.data.eventId, request.resource.data.code);
+
+      // 幹部手動補登／修正／刪除（event-admin.html 活動明細 sheet 的「簽到」分頁）
+      allow create, update, delete: if isAdminTier();
+    }
+
+    // 可重複使用的參與名單範本（名單管理，roster-admin.html）：文件 ID 自動產生，
+    // members 套用到 eventRosters 時是複製快照，不是即時參照，跟 eventTypes 同樣的權限層級
+    match /rosterTemplates/{templateId} {
+      allow get, list: if isAdminTier();
+      allow create, update, delete: if isAdminTier();
+    }
+
+    // 出缺席調查：幹部建立的參與名單（應到名單），文件 ID = eventId
+    match /eventRosters/{eventId} {
+      // 幹部後台可讀取全部
+      allow get, list: if isAdminTier();
+      // 團員查詢自己在哪些活動的名單內（首頁回報用），搭配 array-contains 查詢，
+      // 只有回傳結果本來就包含自己 uid 的文件才會通過這條規則
+      allow list: if hasProfile() && resource.data.members.hasAny([request.auth.uid]);
+      allow create, update, delete: if isAdminTier();
+      // 指揮專用頁面唯讀查看應到名單，不開放建立/修改/刪除
+      allow get, list: if isConductor();
+    }
+
+    // 出缺席調查：團員自主回報，文件 ID = eventId_uid（跟 checkins 同樣的去重方式）
+    match /attendanceReports/{reportId} {
+      // 幹部後台可讀取全部
+      allow get, list: if isAdminTier();
+      // 本人查詢/讀取自己的回報狀態
+      allow list: if hasProfile() && resource.data.uid == request.auth.uid;
+      allow get: if request.auth != null && reportId.split('_')[1] == request.auth.uid;
+
+      // 團員回報：文件 ID 必須對應 eventId_uid，且必須在該活動的參與名單內才能回報。
+      // 8/23 加上 isApprovedMember()——原本沒檢查 status，被停權/退團的帳號如果還留在
+      // 某場活動的應到名單裡（名單是快照，事後被移除狀態不會回頭清掉名單），一樣能寫入回報
+      allow create, update: if isApprovedMember()
+        && reportId == request.resource.data.eventId + '_' + request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && exists(/databases/$(database)/documents/eventRosters/$(request.resource.data.eventId))
+        && get(/databases/$(database)/documents/eventRosters/$(request.resource.data.eventId)).data.members.hasAny([request.auth.uid]);
+
+      // 幹部手動修正／刪除
+      allow create, update, delete: if isAdminTier();
+      // 指揮專用頁面唯讀查看回報狀況，不開放建立/修改/刪除
+      allow get, list: if isConductor();
+    }
+
+    // 指揮頁面的私人筆記本——8/19 又一輪從「綁活動、文件 ID = eventId_uid」改成「不綁活動，
+    // 可以新增多則、永久保留」，因為原本設計換一場活動舊筆記就看不到了，使用者覺得不合理。
+    // 文件 ID 改用 Firestore 自動產生（沒有天然的去重鍵可以組，是刻意跟其他 collection
+    // 手動組 ID 慣例不同的例外），改用文件裡的 uid 欄位判斷歸屬，不再靠切字串解析 ID。
+    // 「本人」不限定 conductor 角色——conductor-admin.html 是 admin/owner/conductor 都能
+    // 進的頁面，筆記本身是「誰用這頁誰就有自己的筆記」。「私人」是字面意思：只有本人可以
+    // 讀寫，Owner 額外開放讀取方便測試/必要時查看，其他人看不到別人的筆記
+    match /conductorNotes/{noteId} {
+      allow get: if request.auth != null &&
+        (resource.data.uid == request.auth.uid || isOwner());
+      allow list: if hasProfile() && resource.data.uid == request.auth.uid;
+
+      allow create: if request.auth != null
+        && (isConductor() || isAdminTier())
+        && request.resource.data.uid == request.auth.uid;
+
+      allow update, delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+
+    // 曲目資料庫（全團共用，跨音樂會重複使用，repertoire-admin.html 管理）：讀取開放給
+    // 所有登入者（含審核中），跟 settings/seatingSections 同一層級的非敏感共用清單一樣；
+    // 寫入這輪範圍內收在 isAdminTier()
+    match /repertoire/{pieceId} {
+      allow get, list: if hasProfile();
+      allow create, update, delete: if isAdminTier();
+    }
+
+    // 音樂會（event-admin.html「音樂會」區塊管理）。讀取開放給所有登入者，讓團員能在
+    // 首頁「團務總覽／我的音樂會」查到自己參與的音樂會內容
+    match /concerts/{concertId} {
+      allow get, list: if hasProfile();
+      allow create, update, delete: if isAdminTier();
+
+      // 音樂會引用曲目資料庫裡的曲子（文件 ID 沿用 repertoire 的 pieceId），這裡只存
+      // order/addedAt，曲名/分部結構一律讀 repertoire/{pieceId}
+      match /pieces/{pieceId} {
+        allow get, list: if hasProfile();
+        allow create, update, delete: if isAdminTier();
+
+        // 每曲 × 每樂器分部指派，文件 ID = 樂器名稱。分部長（一般團員身分）要能寫入自己
+        // sectionLeaderFor 範圍內的文件，是刻意留到下一輪權限篇的已知限制——這輪寫入
+        // 一律收在 isAdminTier()，section-admin.html 頁面本身照樣做出來，但非 admin-tier
+        // 的分部長點「儲存指派」目前會被這裡擋下，收到權限不足的錯誤
+        match /sections/{instrumentName} {
+          allow get, list: if hasProfile();
+          allow create, update, delete: if isAdminTier();
+        }
+      }
+    }
+
+    // 音樂會參與名單，跟 eventRosters 同樣的文件 ID 慣例（= concertId）。讀取開放給所有
+    // 登入者——members 是 array<{uid, instrument, name, account}>（不是純 uid 陣列），沒辦法比照
+    // eventRosters 用 hasAny() 限定只回傳自己所屬的名單，這輪先開放整份可讀，曝露程度
+    // 比 events/eventTypes 現在對所有人（含訪客）完全公開讀取更低，只是登入者才看得到
+    match /concertRosters/{concertId} {
+      allow get, list: if hasProfile();
+      allow create, update, delete: if isAdminTier();
+    }
+  }
+}

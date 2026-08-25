@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>布利歐管樂團｜曲目資料庫</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#F2EFE5">
+<link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+<script src="./pwa-register.js" defer></script>
+<style>
+  :root{
+    --ink:#20242F;
+    --ink-soft:#4A4F5C;
+    --paper:#F2EFE5;
+    --paper-raised:#FBFAF4;
+    --line:#DAD3BE;
+    --brass:#B8863A;
+    --brass-deep:#8F6A2C;
+    --burgundy:#7A2331;
+    --burgundy-deep:#5C1A26;
+    --sage:#5F6E58;
+    --sage-bg:#E7EBDF;
+    --radius-lg:20px;
+    --radius-md:14px;
+    --radius-sm:9px;
+    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% -10%, #EFE9D6 0%, transparent 45%),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Noto Sans TC','Noto Sans',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    min-height:100dvh;
+    display:flex;
+    justify-content:center;
+    padding: 0 0 calc(48px + env(safe-area-inset-bottom));
+  }
+
+  button, a, input{ -webkit-tap-highlight-color: transparent; font-family:inherit; }
+  :focus-visible{ outline:2.5px solid var(--brass-deep); outline-offset:2px; border-radius:6px; }
+
+  .app{
+    width:100%;
+    max-width:460px;
+    min-height:100vh;
+    min-height:100dvh;
+    background:var(--paper);
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .hidden{ display:none !important; }
+
+  @keyframes skel-pulse{ 0%,100%{ opacity:.55; } 50%{ opacity:1; } }
+  .skel{ background:var(--line); animation:skel-pulse 1.4s ease-in-out infinite; }
+  .avatar.skel{ animation:skel-pulse 1.4s ease-in-out infinite; }
+  .skel-bar{ display:inline-block; border-radius:5px; }
+  @media (prefers-reduced-motion: reduce){
+    .skel, .avatar.skel{ animation:none; opacity:.75; }
+  }
+  .rp-skel-lines{ flex:1; display:flex; flex-direction:column; gap:7px; padding-top:2px; }
+
+  .appbar{ display:flex; align-items:center; gap:12px; padding:18px 20px 14px; }
+  .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
+  .brandtext{ display:flex; flex-direction:column; line-height:1.1; }
+  .brandtext .name{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:19px; letter-spacing:.02em; }
+  .brandtext .sub{ font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.14em; color:var(--ink-soft); margin-top:3px; text-transform:uppercase; }
+  .appbar .spacer{ flex:1; }
+  .avatar{
+    width:38px; height:38px; border-radius:50%;
+    background:var(--burgundy); color:#F2EFE5;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Noto Serif TC',serif; font-weight:700; font-size:14px;
+    border:2px solid var(--paper-raised); box-shadow:0 0 0 1.5px var(--line);
+    padding:0; cursor:pointer;
+  }
+  .back-btn{
+    width:30px; height:30px; flex:none;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--ink); text-decoration:none;
+  }
+  .brand-link{ display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; }
+
+  .staff{
+    height:16px; margin:0 20px 6px;
+    background-image: repeating-linear-gradient(var(--line), var(--line) 1px, transparent 1px, transparent 4px);
+    opacity:.9;
+  }
+
+  .section-label{ display:flex; align-items:baseline; gap:8px; margin:20px 20px 4px; }
+  .section-label .tw{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:15.5px; }
+  .section-label .en{ font-family:'Roboto Mono',monospace; font-size:10px; letter-spacing:.12em; color:var(--ink-soft); text-transform:uppercase; }
+  .lede{ margin:6px 20px 10px; font-size:12.5px; line-height:1.6; color:var(--ink-soft); }
+  .add-btn{
+    margin-left:auto; align-self:center;
+    border:1px solid var(--line); background:var(--paper); color:var(--brass-deep);
+    border-radius:999px; padding:6px 14px; font-size:11.5px; font-weight:700; cursor:pointer;
+  }
+  .add-btn:active{ background:var(--sage-bg); }
+
+  .list{
+    margin:0 20px 24px;
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-card);
+    overflow:hidden;
+  }
+  .rp-item{ padding:10px 10px 10px 16px; display:flex; align-items:center; gap:4px; }
+  .rp-item + .rp-item{ border-top:1px solid var(--line); }
+  .rp-open{ flex:1; min-width:0; background:none; border:none; padding:8px 0; text-align:left; cursor:pointer; }
+  .rp-open:active{ opacity:.7; }
+  .rp-title{ font-weight:700; font-size:13.5px; color:var(--ink); }
+  .rp-meta{ margin-top:3px; font-size:11.5px; color:var(--ink-soft); }
+  .empty{ padding:36px 20px; text-align:center; font-size:13px; color:var(--ink-soft); }
+
+  .sheet-overlay{
+    position:fixed; inset:0; z-index:80;
+    background:rgba(32,36,47,.45);
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  .sheet-overlay.active{ display:flex; }
+  .sheet{
+    width:100%; max-width:460px; max-height:85vh;
+    background:var(--paper-raised);
+    border-radius:20px 20px 0 0;
+    display:flex; flex-direction:column;
+    box-shadow:0 -10px 30px rgba(32,36,47,.3);
+  }
+  .sheet-handle{ width:36px; height:4px; background:var(--line); border-radius:999px; margin:10px auto 2px; }
+  .sheet-header{ position:relative; padding:6px 44px 12px 20px; border-bottom:1px solid var(--line); }
+  .sheet-header .name{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:16px; }
+  .sheet-close{
+    position:absolute; top:4px; right:10px;
+    width:30px; height:30px; border-radius:50%; border:none; background:none;
+    color:var(--ink-soft); font-size:19px; line-height:1; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .sheet-close:active{ background:var(--paper); }
+  .sheet-body{ overflow-y:auto; padding:14px 20px 8px; }
+
+  .field{ margin-top:12px; display:flex; flex-direction:column; gap:6px; }
+  .field:first-child{ margin-top:0; }
+  .field label{
+    font-family:'Roboto Mono',monospace; font-size:10.5px; font-weight:600;
+    letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft);
+  }
+  .field input, .field select{
+    border:1px solid var(--line); background:var(--paper);
+    border-radius:var(--radius-sm); padding:11px 13px;
+    font-size:14px; color:var(--ink); width:100%;
+  }
+
+  .info-row{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:9px 0; font-size:13px; border-bottom:1px solid var(--line); }
+  .info-row .k{ flex:none; color:var(--ink-soft); font-family:'Roboto Mono',monospace; font-size:10px; letter-spacing:.05em; }
+  .info-row .v{ font-weight:500; color:var(--ink); text-align:right; }
+  .info-edit-btn{
+    border:1px solid var(--line); background:var(--paper); color:var(--brass-deep);
+    border-radius:999px; padding:8px 18px; font-size:12.5px; font-weight:700; cursor:pointer;
+  }
+  .info-edit-btn:active{ background:var(--sage-bg); }
+  .info-edit-row{ display:flex; gap:8px; margin-top:14px; }
+  #pieceDeleteBtn{ color:var(--burgundy-deep); border-color:#EFD4D8; }
+
+  .survey-section-label{
+    font-family:'Roboto Mono',monospace; font-size:10.5px; font-weight:700;
+    letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft);
+    margin:16px 0 8px;
+  }
+
+  .form-error{
+    margin-top:12px; font-size:12.5px; color:var(--burgundy);
+    background:#FBF3F3; border:1px solid #EFD4D8; border-radius:var(--radius-sm);
+    padding:10px 12px; display:none;
+  }
+  .form-error.show{ display:block; }
+
+  .part-group-label{
+    font-family:'Roboto Mono',monospace; font-size:10px; font-weight:700;
+    letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft); margin:14px 0 4px;
+  }
+  .part-row{ display:flex; align-items:center; gap:10px; padding:8px 2px; border-bottom:1px solid var(--line); }
+  .part-row:last-child{ border-bottom:none; }
+  .part-label{ flex:1; font-size:12.5px; color:var(--ink); }
+  .part-remove{
+    flex:none; width:22px; height:22px; border-radius:50%; border:none; background:none;
+    color:var(--ink-soft); cursor:pointer; font-size:15px; line-height:1;
+  }
+  .part-remove:active{ color:var(--burgundy-deep); }
+  .part-add-row{ display:flex; gap:8px; margin-top:10px; }
+  .part-add-row select{
+    flex:1; border:1px solid var(--line); background:var(--paper);
+    border-radius:var(--radius-sm); padding:9px 10px; font-size:13px; color:var(--ink);
+  }
+  .part-add-row input{
+    flex:1; min-width:0; border:1px solid var(--line); background:var(--paper);
+    border-radius:var(--radius-sm); padding:9px 10px; font-size:13px; color:var(--ink);
+  }
+  .part-add-btn{
+    flex:none; border:1px solid var(--line); background:var(--paper); color:var(--brass-deep);
+    border-radius:var(--radius-sm); padding:9px 14px; font-size:12px; font-weight:700; cursor:pointer;
+  }
+  .part-add-btn:active{ background:var(--sage-bg); }
+  .part-empty{ padding:8px 2px; font-size:12px; color:var(--ink-soft); }
+
+  .sheet-footer{
+    display:flex; gap:10px;
+    padding:14px 20px calc(14px + env(safe-area-inset-bottom));
+    border-top:1px solid var(--line);
+  }
+  .cta-btn{
+    flex:1;
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    background:var(--brass); color:var(--ink); border:none;
+    border-radius:var(--radius-md); padding:14px 16px;
+    font-weight:700; font-size:14.5px; cursor:pointer;
+    transition:transform .12s ease, background .12s ease;
+  }
+  .cta-btn:active{ transform:scale(.98); background:var(--brass-deep); }
+  .cta-btn:disabled{ opacity:.55; cursor:default; transform:none; }
+  .cta-btn-secondary{ background:var(--paper); color:var(--ink-soft); border:1px solid var(--line); }
+  .cta-btn-secondary:active{ transform:scale(.98); background:var(--paper); }
+</style>
+</head>
+<body>
+<div class="app" id="appRoot">
+
+  <div class="appbar">
+    <a class="back-btn" href="admin-index.html" aria-label="回控制台首頁">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="m15 5-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <a class="brand-link" href="index.html">
+      <img class="mark" src="assets/BrioLogo.jpg" alt="布利歐管樂團 Logo">
+      <div class="brandtext">
+        <div class="name">布利歐管樂團</div>
+        <div class="sub">Brio Wind Band</div>
+      </div>
+    </a>
+    <div class="spacer"></div>
+    <button class="avatar skel" id="avatarBtn" type="button" aria-label="帳號選單"></button>
+  </div>
+
+  <div class="staff"></div>
+
+  <div class="section-label">
+    <span class="tw">曲目資料庫</span>
+    <span class="en">Repertoire</span>
+    <button type="button" class="add-btn" id="createPieceBtn">＋ 新增曲目</button>
+  </div>
+  <p class="lede">全團共用的曲目清單，音樂會可以直接引用這裡的曲目與分部設定，不用每場重複建立。</p>
+
+  <div class="list" id="pieceList"></div>
+
+</div>
+
+<div class="sheet-overlay" id="pieceSheetOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button type="button" class="sheet-close" id="pieceSheetClose" aria-label="關閉">×</button>
+      <div class="name" id="pieceSheetTitle">新增曲目</div>
+    </div>
+    <div class="sheet-body">
+      <div id="pieceViewMode" class="hidden">
+        <div class="info-row"><span class="k">作曲/編曲</span><span class="v" id="pieceViewComposer">—</span></div>
+        <div class="info-edit-row">
+          <button type="button" class="info-edit-btn" id="pieceEditBtn">✎ 編輯</button>
+          <button type="button" class="info-edit-btn" id="pieceDeleteBtn">刪除</button>
+        </div>
+      </div>
+      <div id="pieceEditForm">
+        <div class="field">
+          <label>曲名</label>
+          <input type="text" id="pieceTitle" placeholder="例如：星際大戰組曲" required>
+        </div>
+        <div class="field">
+          <label>作曲/編曲者（選填）</label>
+          <input type="text" id="pieceComposer" placeholder="例如：John Williams">
+        </div>
+        <div class="field">
+          <label>分部欄位</label>
+          <div id="partGroups"></div>
+          <div class="part-add-row">
+            <select id="partInstrumentSelect"></select>
+            <input type="text" id="partLabelInput" placeholder="例如：單簧管 1st">
+            <button type="button" class="part-add-btn" id="partAddBtn">＋ 新增</button>
+          </div>
+        </div>
+        <p class="form-error" id="pieceFormError"></p>
+      </div>
+    </div>
+    <div class="sheet-footer" id="pieceFormFooter">
+      <button type="button" class="cta-btn cta-btn-secondary hidden" id="pieceCancelBtn">取消</button>
+      <button type="button" class="cta-btn" id="pieceSaveBtn">建立曲目</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { requireAdmin, peekCachedProfile } from './auth-guard.js';
+  import { db } from './firebase-init.js';
+  import { initAccountMenu } from './account-menu.js';
+  import { subscribeRepertoire, addPiece, updatePiece, deletePiece, randomPartId } from './repertoire.js';
+  import { subscribeInstruments, FAMILY_LABELS, FAMILY_ORDER } from './instruments.js';
+
+  function escapeHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+
+  var SKELETON_ROWS_HTML = [1, 2, 3].map(function(){
+    return (
+      '<div class="rp-item"><div class="rp-skel-lines">' +
+        '<span class="skel skel-bar" style="width:45%;height:13px;"></span>' +
+        '<span class="skel skel-bar" style="width:25%;height:10px;"></span>' +
+      '</div></div>'
+    );
+  }).join('');
+
+  var cachedProfile = peekCachedProfile();
+  if (cachedProfile && cachedProfile.name){
+    var avatarBtnEl = document.getElementById('avatarBtn');
+    avatarBtnEl.textContent = cachedProfile.name.charAt(0);
+    avatarBtnEl.classList.remove('skel');
+  }
+
+  var currentAdminUid = null;
+  var piecesById = {};
+  var piecesList = [];
+  var piecesLoaded = false;
+  var editingPieceId = null; // null = 新增模式
+  var draftParts = []; // [{partId, instrumentName, label}]，編輯中的分部欄位草稿
+  var instrumentsList = [];
+
+  function renderPartInstrumentOptions(){
+    var current = document.getElementById('partInstrumentSelect').value;
+    document.getElementById('partInstrumentSelect').innerHTML = instrumentsList.map(function(inst){
+      return '<option value="' + escapeHtml(inst.name) + '">' + escapeHtml(inst.name) + '</option>';
+    }).join('');
+    if (current && instrumentsList.some(function(i){ return i.name === current; })){
+      document.getElementById('partInstrumentSelect').value = current;
+    }
+  }
+
+  // 分部欄位依樂器分組顯示（比照 roles-admin.html 樂器清單依 family 分組的做法，這裡是依
+  // instrumentName 分組），組內維持新增順序，不提供排序按鈕——這輪範圍不需要
+  function renderPartGroups(){
+    var container = document.getElementById('partGroups');
+    if (draftParts.length === 0){
+      container.innerHTML = '<div class="part-empty">還沒有任何分部欄位，用下面的表單新增</div>';
+      return;
+    }
+    var byInstrument = {};
+    var order = [];
+    draftParts.forEach(function(part){
+      if (!byInstrument[part.instrumentName]){
+        byInstrument[part.instrumentName] = [];
+        order.push(part.instrumentName);
+      }
+      byInstrument[part.instrumentName].push(part);
+    });
+    container.innerHTML = order.map(function(instrumentName){
+      return (
+        '<div class="part-group-label">' + escapeHtml(instrumentName) + '</div>' +
+        byInstrument[instrumentName].map(function(part){
+          return (
+            '<div class="part-row">' +
+              '<span class="part-label">' + escapeHtml(part.label) + '</span>' +
+              '<button type="button" class="part-remove" data-remove-part="' + part.partId + '" aria-label="刪除分部欄位">×</button>' +
+            '</div>'
+          );
+        }).join('')
+      );
+    }).join('');
+  }
+
+  document.getElementById('partAddBtn').addEventListener('click', function(){
+    var instrumentName = document.getElementById('partInstrumentSelect').value;
+    var label = document.getElementById('partLabelInput').value.trim();
+    if (!instrumentName){
+      showFormError('請先在「樂器/聲部」新增至少一種樂器才能設定分部欄位');
+      return;
+    }
+    if (!label){
+      showFormError('請輸入分部欄位名稱');
+      return;
+    }
+    showFormError('');
+    draftParts.push({ partId: randomPartId(), instrumentName: instrumentName, label: label });
+    document.getElementById('partLabelInput').value = '';
+    renderPartGroups();
+  });
+
+  document.getElementById('partGroups').addEventListener('click', function(e){
+    var btn = e.target.closest('[data-remove-part]');
+    if (!btn) return;
+    var partId = btn.getAttribute('data-remove-part');
+    draftParts = draftParts.filter(function(p){ return p.partId !== partId; });
+    renderPartGroups();
+  });
+
+  var pieceList = document.getElementById('pieceList');
+  pieceList.innerHTML = SKELETON_ROWS_HTML;
+
+  function renderPieceAdminError(){
+    pieceList.innerHTML = '<div class="empty">讀取失敗，請重新整理再試一次</div>';
+  }
+
+  function renderPieceList(){
+    if (!piecesLoaded) return;
+    if (piecesList.length === 0){
+      pieceList.innerHTML = '<div class="empty">目前還沒有任何曲目</div>';
+      return;
+    }
+    pieceList.innerHTML = piecesList.map(function(p){
+      return (
+        '<div class="rp-item">' +
+          '<button type="button" class="rp-open" data-open-piece="' + p.id + '">' +
+            '<div class="rp-title">' + escapeHtml(p.title) + '</div>' +
+            '<div class="rp-meta">' + (p.composer ? escapeHtml(p.composer) + ' · ' : '') + (p.parts || []).length + ' 個分部欄位</div>' +
+          '</button>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function showFormError(message){
+    var el = document.getElementById('pieceFormError');
+    el.textContent = message;
+    el.classList.toggle('show', !!message);
+  }
+
+  var pieceSheetOverlay = document.getElementById('pieceSheetOverlay');
+  var pieceTitleInput = document.getElementById('pieceTitle');
+  var pieceComposerInput = document.getElementById('pieceComposer');
+  var pieceSaveBtn = document.getElementById('pieceSaveBtn');
+  var pieceDeleteBtn = document.getElementById('pieceDeleteBtn');
+  var pieceCancelBtn = document.getElementById('pieceCancelBtn');
+  var pieceViewMode = document.getElementById('pieceViewMode');
+  var pieceEditForm = document.getElementById('pieceEditForm');
+  var pieceFormFooter = document.getElementById('pieceFormFooter');
+  var pieceViewComposer = document.getElementById('pieceViewComposer');
+
+  function showPieceView(p){
+    pieceViewMode.classList.remove('hidden');
+    pieceEditForm.classList.add('hidden');
+    pieceFormFooter.classList.add('hidden');
+    document.getElementById('pieceSheetTitle').textContent = p.title || '—';
+    pieceViewComposer.textContent = p.composer || '未填寫';
+  }
+
+  function showPieceEditForm(){
+    pieceViewMode.classList.add('hidden');
+    pieceEditForm.classList.remove('hidden');
+    pieceFormFooter.classList.remove('hidden');
+  }
+
+  function openCreateSheet(){
+    editingPieceId = null;
+    pieceTitleInput.value = '';
+    pieceComposerInput.value = '';
+    draftParts = [];
+    document.getElementById('pieceSheetTitle').textContent = '新增曲目';
+    pieceSaveBtn.textContent = '建立曲目';
+    pieceCancelBtn.classList.add('hidden'); // 新增沒有「唯讀」畫面可以取消回去，只有關閉整個 sheet
+    showFormError('');
+    renderPartGroups();
+    showPieceEditForm();
+    pieceSheetOverlay.classList.add('active');
+  }
+
+  // 點清單裡的曲目，先看唯讀摘要，點「✎ 編輯」才進表單，不會一點開就是可編輯狀態
+  function openEditSheet(pieceId){
+    var p = piecesById[pieceId];
+    if (!p) return;
+    editingPieceId = pieceId;
+    pieceSaveBtn.textContent = '儲存變更';
+    pieceCancelBtn.classList.remove('hidden');
+    showFormError('');
+    showPieceView(p);
+    pieceSheetOverlay.classList.add('active');
+  }
+
+  document.getElementById('pieceEditBtn').addEventListener('click', function(){
+    if (!editingPieceId) return;
+    var p = piecesById[editingPieceId];
+    if (!p) return;
+    pieceTitleInput.value = p.title || '';
+    pieceComposerInput.value = p.composer || '';
+    draftParts = (p.parts || []).slice();
+    renderPartGroups();
+    showPieceEditForm();
+  });
+
+  pieceCancelBtn.addEventListener('click', function(){
+    if (!editingPieceId) return;
+    var p = piecesById[editingPieceId];
+    if (p) showPieceView(p); // 放棄未存檔的草稿，回到唯讀摘要
+  });
+
+  function closePieceSheet(){
+    pieceSheetOverlay.classList.remove('active');
+  }
+
+  document.getElementById('createPieceBtn').addEventListener('click', openCreateSheet);
+  document.getElementById('pieceSheetClose').addEventListener('click', closePieceSheet);
+  pieceSheetOverlay.addEventListener('click', function(e){
+    if (e.target === pieceSheetOverlay) closePieceSheet();
+  });
+
+  pieceList.addEventListener('click', function(e){
+    var openBtn = e.target.closest('[data-open-piece]');
+    if (openBtn) openEditSheet(openBtn.getAttribute('data-open-piece'));
+  });
+
+  pieceSaveBtn.addEventListener('click', function(){
+    var title = pieceTitleInput.value.trim();
+    var composer = pieceComposerInput.value.trim();
+    if (!title){
+      showFormError('請輸入曲名');
+      return;
+    }
+    showFormError('');
+    pieceSaveBtn.disabled = true;
+
+    var task = editingPieceId
+      ? updatePiece(db, editingPieceId, title, composer, draftParts)
+      : addPiece(db, currentAdminUid, title, composer, draftParts);
+
+    task.then(function(){
+      pieceSaveBtn.disabled = false;
+      closePieceSheet();
+    }).catch(function(err){
+      pieceSaveBtn.disabled = false;
+      showFormError('操作失敗（' + err.code + '）');
+    });
+  });
+
+  pieceDeleteBtn.addEventListener('click', function(){
+    if (!editingPieceId) return;
+    var p = piecesById[editingPieceId];
+    var ok = confirm(
+      '確定要刪除「' + (p ? p.title : '這首曲目') + '」嗎？\n' +
+      '已經在某場音樂會引用過這首曲子的資料不會被清掉，只是往後那場音樂會的曲目管理會顯示「（曲目已刪除）」。\n' +
+      '此動作無法復原。'
+    );
+    if (!ok) return;
+    pieceDeleteBtn.disabled = true;
+    deletePiece(db, editingPieceId).then(function(){
+      pieceDeleteBtn.disabled = false;
+      closePieceSheet();
+    }).catch(function(err){
+      pieceDeleteBtn.disabled = false;
+      alert('刪除失敗：' + err.code);
+    });
+  });
+
+  requireAdmin().then(function(result){
+    if (!result) return;
+    currentAdminUid = result.uid;
+
+    var avatarBtn = document.getElementById('avatarBtn');
+    avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
+    avatarBtn.classList.remove('skel');
+    initAccountMenu(result.profile.name);
+
+    subscribeRepertoire(db, function(pieces){
+      piecesById = {};
+      piecesList = pieces.slice();
+      pieces.forEach(function(p){ piecesById[p.id] = p; });
+      piecesList.sort(function(a, b){ return (a.title || '').localeCompare(b.title || '', 'zh-Hant'); });
+      piecesLoaded = true;
+      renderPieceList();
+    }, renderPieceAdminError);
+
+    // 分部欄位的樂器下拉選單來源，跟 roles-admin.html 讀同一份 settings/instruments；
+    // 這裡不需要 seedIfMissing（true 的那個參數只給第一次建立清單的頁面用，這裡只是讀取）
+    subscribeInstruments(db, function(list){
+      instrumentsList = list;
+      renderPartInstrumentOptions();
+    }, false, function(err){ console.error('instruments 監聽失敗', err); });
+  });
+</script>
+</body>
+</html>
