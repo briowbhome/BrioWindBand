@@ -1110,9 +1110,10 @@
       }
     }, function(err){ console.error('users 監聽失敗', err); });
 
-    // 後台管理／指揮專用連結：跟 index.html 同一套判斷式
+    // 後台管理／指揮專用／分部長專屬連結：跟 index.html 同一套判斷式
     var isAdmin = profile.role === 'admin' || profile.role === 'owner';
     var canSeeConductorPage = isAdmin || profile.role === 'conductor';
+    var canSeeSectionLeaderPage = isAdmin || (Array.isArray(profile.sectionLeaderFor) && profile.sectionLeaderFor.length > 0);
 
     // 團員審核待辦：只有 admin/owner 訂閱，理由跟 index.html 同一套（conductor 沒有審核權限、
     // firestore.rules 的 users list 也只放行 admin-tier）
@@ -1129,6 +1130,9 @@
     }
     if (canSeeConductorPage){
       linksHtml += '<a class="link-row" href="conductor-admin.html">指揮專用<span class="chev">›</span></a>';
+    }
+    if (canSeeSectionLeaderPage){
+      linksHtml += '<a class="link-row" href="section-admin.html">分部長專屬<span class="chev">›</span></a>';
     }
     document.getElementById('adminLinks').innerHTML = linksHtml;
 
