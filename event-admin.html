@@ -481,6 +481,26 @@
     color:var(--ink-soft); cursor:pointer; font-size:15px; line-height:1;
   }
   .ci-remove:active{ color:var(--burgundy-deep); }
+
+  /* ---------- 曲目管理：分部清單／指派畫面 ---------- */
+  .assign-name{ flex:1; font-size:12.5px; color:var(--ink); }
+  .assign-row-wrap{ flex-wrap:wrap; }
+  .assign-pills{ display:flex; gap:6px; flex-wrap:wrap; width:100%; margin-top:6px; }
+  .part-remove{
+    flex:none; width:22px; height:22px; border-radius:50%; border:none; background:none;
+    color:var(--ink-soft); cursor:pointer; font-size:15px; line-height:1;
+  }
+  .part-remove:active{ color:var(--burgundy-deep); }
+  .part-add-btn{
+    flex:none; border:1px solid var(--line); background:var(--paper); color:var(--brass-deep);
+    border-radius:var(--radius-sm); padding:6px 12px; font-size:11.5px; font-weight:700; cursor:pointer;
+  }
+  .part-add-btn:active{ background:var(--sage-bg); }
+  .part-empty{ padding:8px 2px; font-size:12px; color:var(--ink-soft); }
+  .back-link-btn{
+    border:none; background:none; color:var(--brass-deep); font-size:12.5px; font-weight:700;
+    cursor:pointer; padding:4px 0; margin-bottom:10px;
+  }
 </style>
 </head>
 <body>
@@ -801,22 +821,34 @@
         <div id="concertInfoEditMode" class="hidden"></div>
       </div>
       <div id="sheetConcertPiecesTab" class="hidden">
-        <div class="survey-section-row">
-          <div class="survey-section-label">已加入的曲目</div>
-          <button type="button" class="add-btn" id="addPieceToggleBtn">＋ 加入曲目</button>
-        </div>
-        <div id="piecePickerPanel" class="hidden">
-          <div class="survey-bulk-row">
-            <button type="button" id="piecePickerSelectAllBtn">全選</button>
-            <button type="button" id="piecePickerClearAllBtn">全部取消</button>
+        <div id="piecesListView">
+          <div class="survey-section-row">
+            <div class="survey-section-label">已加入的曲目</div>
+            <button type="button" class="add-btn" id="addPieceToggleBtn">＋ 加入曲目</button>
           </div>
-          <div class="check-list" id="piecePickerChecklist"></div>
-          <div class="survey-edit-actions">
-            <button type="button" id="piecePickerCancelBtn">取消</button>
-            <button type="button" class="btn-save" id="piecePickerConfirmBtn" disabled>加入</button>
+          <div id="piecePickerPanel" class="hidden">
+            <div class="survey-bulk-row">
+              <button type="button" id="piecePickerSelectAllBtn">全選</button>
+              <button type="button" id="piecePickerClearAllBtn">全部取消</button>
+            </div>
+            <div class="check-list" id="piecePickerChecklist"></div>
+            <div class="survey-edit-actions">
+              <button type="button" id="piecePickerCancelBtn">取消</button>
+              <button type="button" class="btn-save" id="piecePickerConfirmBtn" disabled>加入</button>
+            </div>
           </div>
+          <div id="concertPiecesSlot"><div class="survey-empty">載入中…</div></div>
         </div>
-        <div id="concertPiecesSlot"><div class="survey-empty">載入中…</div></div>
+        <div id="pieceDetailView" class="hidden">
+          <button type="button" class="back-link-btn" id="pieceDetailBackBtn">‹ 回曲目清單</button>
+          <div class="survey-section-label" id="pieceDetailTitle">—</div>
+          <div id="pieceDetailInstrumentsSlot"></div>
+        </div>
+        <div id="assignmentView" class="hidden">
+          <button type="button" class="back-link-btn" id="assignmentBackBtn">‹ 回分部清單</button>
+          <div class="survey-section-label" id="assignmentTitle">—</div>
+          <div id="assignmentSlot"></div>
+        </div>
       </div>
       <div id="sheetConcertRosterTab" class="hidden">
         <!-- Task 9 補上：參與名單 -->
@@ -1187,6 +1219,7 @@
   function closeConcertSheet(){
     concertSheetOverlay.classList.remove('active');
     if (editingConcertId) enterConcertCreateMode();
+    showPiecesListView(); // 保險：關閉時放棄目前停留的分部/指派子畫面狀態
     openConcertId = null;
   }
 
@@ -1210,6 +1243,7 @@
     if (!openConcertId) return;
     if (editingConcertId) enterConcertCreateMode();
     document.getElementById('piecePickerPanel').classList.add('hidden'); // 保險：切走分頁放棄未確認的加入曲目草稿
+    showPiecesListView(); // 一律先回到曲目清單，不會保留上次切走時停留的分部/指派子畫面
     setConcertSheetTab('pieces');
     refreshConcertPieces(openConcertId);
   });
@@ -1361,6 +1395,11 @@
   });
 
   document.getElementById('concertPiecesSlot').addEventListener('click', function(e){
+    var openBtn = e.target.closest('[data-open-concert-piece]');
+    if (openBtn){
+      showPieceDetailView(openBtn.getAttribute('data-open-concert-piece'));
+      return;
+    }
     var removeBtn = e.target.closest('[data-remove-concert-piece]');
     if (!removeBtn) return;
     var pieceId = removeBtn.getAttribute('data-remove-concert-piece');
@@ -1377,6 +1416,219 @@
       alert('移除失敗：' + err.code);
       removeBtn.disabled = false;
     });
+  });
+
+  // ---------- 三層子畫面：曲目清單／分部清單／指派畫面 ----------
+  var openPieceId = null;
+  var openInstrumentName = null;
+  var concertRosterMembersCache = {}; // concertId -> [{uid, instrument}]，Task 9 建立/調整名單後要清掉對應快取
+  var assignmentDraft = {}; // {partId: [uid, ...]}
+
+  async function loadConcertRosterMembers(concertId){
+    if (concertRosterMembersCache[concertId]) return concertRosterMembersCache[concertId];
+    var snap = await getDoc(doc(db, 'concertRosters', concertId));
+    var members = snap.exists() ? (snap.data().members || []) : [];
+    concertRosterMembersCache[concertId] = members;
+    return members;
+  }
+
+  function instrumentsForPiece(piece){
+    var seen = {};
+    var list = [];
+    (piece.parts || []).forEach(function(part){
+      if (!seen[part.instrumentName]){ seen[part.instrumentName] = true; list.push(part.instrumentName); }
+    });
+    return list;
+  }
+
+  function showPiecesListView(){
+    document.getElementById('piecesListView').classList.remove('hidden');
+    document.getElementById('pieceDetailView').classList.add('hidden');
+    document.getElementById('assignmentView').classList.add('hidden');
+    openPieceId = null;
+    openInstrumentName = null;
+  }
+
+  function showPieceDetailView(pieceId){
+    var piece = repertoireById[pieceId];
+    if (!piece) return;
+    openPieceId = pieceId;
+    openInstrumentName = null;
+    document.getElementById('piecesListView').classList.add('hidden');
+    document.getElementById('pieceDetailView').classList.remove('hidden');
+    document.getElementById('assignmentView').classList.add('hidden');
+    document.getElementById('pieceDetailTitle').textContent = piece.title;
+    var instruments = instrumentsForPiece(piece);
+    var slot = document.getElementById('pieceDetailInstrumentsSlot');
+    if (instruments.length === 0){
+      slot.innerHTML = '<div class="survey-empty">這首曲子在曲目資料庫裡還沒有設定任何分部欄位，請先到「曲目資料庫」補上</div>';
+      return;
+    }
+    // 8/25 調整：分部數 >1 的樂器直接在卡片上標示分部名稱（例如「單簧管 1st、單簧管 2nd」），
+    // 不用多點一層才知道這個樂器有沒有拆分——只有 1 個分部（沒拆分）維持現狀不加標示
+    slot.innerHTML = instruments.map(function(name){
+      var partsForInstrument = (piece.parts || []).filter(function(p){ return p.instrumentName === name; });
+      var meta = partsForInstrument.length > 1
+        ? partsForInstrument.map(function(p){ return p.label; }).join('、')
+        : '';
+      return (
+        '<div class="event-item">' +
+          '<button type="button" class="event-open" data-open-instrument="' + escapeHtml(name) + '">' +
+            '<div class="event-title">' + escapeHtml(name) + '</div>' +
+            (meta ? '<div class="event-meta">' + escapeHtml(meta) + '</div>' : '') +
+          '</button>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  document.getElementById('pieceDetailBackBtn').addEventListener('click', showPiecesListView);
+  document.getElementById('assignmentBackBtn').addEventListener('click', function(){
+    if (openPieceId) showPieceDetailView(openPieceId);
+  });
+
+  document.getElementById('pieceDetailInstrumentsSlot').addEventListener('click', function(e){
+    var btn = e.target.closest('[data-open-instrument]');
+    if (btn) openAssignmentPanel(btn.getAttribute('data-open-instrument'));
+  });
+
+  function namesByUidFromApprovedMembers(){
+    var map = {};
+    (approvedMembers || []).forEach(function(m){ map[m.uid] = m.name; });
+    return map;
+  }
+
+  function renderAssignmentPanel(parts, eligibleMembers){
+    var namesByUid = namesByUidFromApprovedMembers();
+    var assignedUidSet = {};
+    Object.keys(assignmentDraft).forEach(function(partId){
+      assignmentDraft[partId].forEach(function(uid){ assignedUidSet[uid] = true; });
+    });
+    var unassigned = eligibleMembers.filter(function(m){ return !assignedUidSet[m.uid]; });
+
+    var partsHtml = parts.map(function(part){
+      var rows = assignmentDraft[part.partId].map(function(uid){
+        var name = namesByUid[uid] || uid;
+        return (
+          '<div class="check-row">' +
+            '<span class="assign-name">' + escapeHtml(name) + '</span>' +
+            '<button type="button" class="part-remove" data-unassign="' + part.partId + '|' + uid + '" aria-label="移除指派">×</button>' +
+          '</div>'
+        );
+      }).join('') || '<div class="part-empty">尚未指派任何人</div>';
+      return '<div class="survey-section-label">' + escapeHtml(part.label) + '</div><div class="check-list">' + rows + '</div>';
+    }).join('');
+
+    var unassignedHtml = unassigned.length === 0
+      ? '<div class="part-empty">參與名單中這個樂器的人都已經指派完畢</div>'
+      : unassigned.map(function(m){
+          var name = namesByUid[m.uid] || m.uid;
+          var pillsHtml = parts.map(function(part){
+            return '<button type="button" class="part-add-btn" data-assign="' + part.partId + '|' + m.uid + '">' + escapeHtml(part.label) + '</button>';
+          }).join('');
+          return (
+            '<div class="check-row assign-row-wrap">' +
+              '<span class="assign-name">' + escapeHtml(name) + '</span>' +
+              '<div class="assign-pills">' + pillsHtml + '</div>' +
+            '</div>'
+          );
+        }).join('');
+
+    document.getElementById('assignmentSlot').innerHTML =
+      partsHtml +
+      '<div class="survey-section-label">尚未指派（參與名單中此樂器的成員）</div><div class="check-list">' + unassignedHtml + '</div>' +
+      '<div class="survey-edit-actions">' +
+        '<button type="button" id="assignmentCancelBtn">取消</button>' +
+        '<button type="button" class="btn-save" id="assignmentSaveBtn">儲存指派</button>' +
+      '</div>';
+  }
+
+  function reRenderCurrentAssignment(){
+    var piece = repertoireById[openPieceId];
+    if (!piece || !openInstrumentName) return;
+    var parts = (piece.parts || []).filter(function(p){ return p.instrumentName === openInstrumentName; });
+    var members = concertRosterMembersCache[openConcertId] || [];
+    var eligibleMembers = members.filter(function(m){ return m.instrument === openInstrumentName; });
+    renderAssignmentPanel(parts, eligibleMembers);
+  }
+
+  async function openAssignmentPanel(instrumentName){
+    var piece = repertoireById[openPieceId];
+    if (!piece) return;
+    var concertId = openConcertId;
+    var pieceId = openPieceId;
+    openInstrumentName = instrumentName;
+    document.getElementById('pieceDetailView').classList.add('hidden');
+    document.getElementById('assignmentView').classList.remove('hidden');
+    document.getElementById('assignmentTitle').textContent = piece.title + '｜' + instrumentName;
+    document.getElementById('assignmentSlot').innerHTML = '<div class="survey-empty">載入中…</div>';
+
+    var parts = (piece.parts || []).filter(function(p){ return p.instrumentName === instrumentName; });
+
+    try {
+      await ensureApprovedMembers();
+      var members = await loadConcertRosterMembers(concertId);
+      var sectionSnap = await getDoc(doc(db, 'concerts', concertId, 'pieces', pieceId, 'sections', instrumentName));
+      if (openConcertId !== concertId || openPieceId !== pieceId || openInstrumentName !== instrumentName) return;
+
+      assignmentDraft = {};
+      parts.forEach(function(part){ assignmentDraft[part.partId] = []; });
+      if (sectionSnap.exists()){
+        (sectionSnap.data().parts || []).forEach(function(saved){
+          if (assignmentDraft.hasOwnProperty(saved.partId)) assignmentDraft[saved.partId] = (saved.members || []).slice();
+        });
+      }
+
+      var eligibleMembers = members.filter(function(m){ return m.instrument === instrumentName; });
+      renderAssignmentPanel(parts, eligibleMembers);
+    } catch (err) {
+      document.getElementById('assignmentSlot').innerHTML = '<div class="survey-empty">載入失敗（' + err.code + '）</div>';
+    }
+  }
+
+  function saveAssignment(){
+    var concertId = openConcertId, pieceId = openPieceId, instrumentName = openInstrumentName;
+    if (!concertId || !pieceId || !instrumentName) return;
+    var saveBtn = document.getElementById('assignmentSaveBtn');
+    saveBtn.disabled = true;
+    var partsPayload = Object.keys(assignmentDraft).map(function(partId){
+      return { partId: partId, members: assignmentDraft[partId] };
+    });
+    setDoc(doc(db, 'concerts', concertId, 'pieces', pieceId, 'sections', instrumentName), {
+      parts: partsPayload,
+      updatedBy: currentAdminUid,
+      updatedAt: serverTimestamp()
+    }).then(function(){
+      if (openPieceId) showPieceDetailView(openPieceId); // 存檔後回到分部清單，不留在指派畫面
+    }).catch(function(err){
+      alert('儲存失敗：' + err.code);
+      saveBtn.disabled = false;
+    });
+  }
+
+  document.getElementById('assignmentSlot').addEventListener('click', function(e){
+    var assignBtn = e.target.closest('[data-assign]');
+    if (assignBtn){
+      var assignParts = assignBtn.getAttribute('data-assign').split('|');
+      assignmentDraft[assignParts[0]].push(assignParts[1]);
+      reRenderCurrentAssignment();
+      return;
+    }
+    var unassignBtn = e.target.closest('[data-unassign]');
+    if (unassignBtn){
+      var unassignParts = unassignBtn.getAttribute('data-unassign').split('|');
+      assignmentDraft[unassignParts[0]] = assignmentDraft[unassignParts[0]].filter(function(uid){ return uid !== unassignParts[1]; });
+      reRenderCurrentAssignment();
+      return;
+    }
+    if (e.target.closest('#assignmentCancelBtn')){
+      if (openPieceId) showPieceDetailView(openPieceId);
+      return;
+    }
+    if (e.target.closest('#assignmentSaveBtn')){
+      saveAssignment();
+      return;
+    }
   });
 
   eventCancelBtn.addEventListener('click', function(){
