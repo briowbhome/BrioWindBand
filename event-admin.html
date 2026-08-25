@@ -801,7 +801,22 @@
         <div id="concertInfoEditMode" class="hidden"></div>
       </div>
       <div id="sheetConcertPiecesTab" class="hidden">
-        <!-- Task 7/8 補上：曲目清單 + 指派畫面 -->
+        <div class="survey-section-row">
+          <div class="survey-section-label">已加入的曲目</div>
+          <button type="button" class="add-btn" id="addPieceToggleBtn">＋ 加入曲目</button>
+        </div>
+        <div id="piecePickerPanel" class="hidden">
+          <div class="survey-bulk-row">
+            <button type="button" id="piecePickerSelectAllBtn">全選</button>
+            <button type="button" id="piecePickerClearAllBtn">全部取消</button>
+          </div>
+          <div class="check-list" id="piecePickerChecklist"></div>
+          <div class="survey-edit-actions">
+            <button type="button" id="piecePickerCancelBtn">取消</button>
+            <button type="button" class="btn-save" id="piecePickerConfirmBtn" disabled>加入</button>
+          </div>
+        </div>
+        <div id="concertPiecesSlot"><div class="survey-empty">載入中…</div></div>
       </div>
       <div id="sheetConcertRosterTab" class="hidden">
         <!-- Task 9 補上：參與名單 -->
@@ -819,6 +834,7 @@
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { subscribeEventTypes, COLOR_THEMES, badgeStyle } from './event-types.js';
+  import { subscribeRepertoire } from './repertoire.js';
   import {
     collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot,
     serverTimestamp, Timestamp, getDoc, getDocs, query, where, setDoc
@@ -1193,7 +1209,9 @@
   document.getElementById('tabConcertPieces').addEventListener('click', function(){
     if (!openConcertId) return;
     if (editingConcertId) enterConcertCreateMode();
+    document.getElementById('piecePickerPanel').classList.add('hidden'); // 保險：切走分頁放棄未確認的加入曲目草稿
     setConcertSheetTab('pieces');
+    refreshConcertPieces(openConcertId);
   });
   document.getElementById('tabConcertRoster').addEventListener('click', function(){
     if (!openConcertId) return;
@@ -1207,6 +1225,158 @@
     enterConcertEditMode(openConcertId);
     document.getElementById('concertInfoViewMode').classList.add('hidden');
     document.getElementById('concertInfoEditMode').classList.remove('hidden');
+  });
+
+  // ---------- 曲目管理分頁：從曲目資料庫加入曲目 ----------
+  var repertoireById = {};
+  var repertoireList = [];
+  var concertPiecesList = []; // [{id, order}]，id 沿用 repertoire 的 pieceId
+  var piecePickerDraftSet = {}; // {pieceId: true}
+
+  async function loadConcertPieces(concertId){
+    var snap = await getDocs(collection(db, 'concerts', concertId, 'pieces'));
+    var list = snap.docs.map(function(d){
+      var data = d.data();
+      return { id: d.id, order: data.order || 0 };
+    });
+    list.sort(function(a, b){ return a.order - b.order; });
+    return list;
+  }
+
+  function renderConcertPiecesList(){
+    var slot = document.getElementById('concertPiecesSlot');
+    if (concertPiecesList.length === 0){
+      slot.innerHTML = '<div class="survey-empty">這場音樂會還沒有加入任何曲目</div>';
+      return;
+    }
+    slot.innerHTML = concertPiecesList.map(function(cp){
+      var piece = repertoireById[cp.id];
+      var title = piece ? piece.title : '（曲目已刪除）';
+      var meta = piece ? ((piece.composer ? escapeHtml(piece.composer) + ' · ' : '') + (piece.parts || []).length + ' 個分部欄位') : '';
+      return (
+        '<div class="event-item" data-concert-piece="' + cp.id + '">' +
+          '<button type="button" class="event-open" data-open-concert-piece="' + cp.id + '">' +
+            '<div class="event-title">' + escapeHtml(title) + '</div>' +
+            '<div class="event-meta">' + meta + '</div>' +
+          '</button>' +
+          '<button type="button" class="btn-delete-icon" data-remove-concert-piece="' + cp.id + '" aria-label="從音樂會移除">' +
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0-1 13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+          '</button>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  // 只在切到「曲目管理」分頁時才一次性抓資料，不常駐監聽這個子集合（比照「簽到」分頁
+  // loadCheckinTab 的模式），操作（加入/移除曲目）後重新呼叫這個函式重繪
+  async function refreshConcertPieces(concertId){
+    document.getElementById('concertPiecesSlot').innerHTML = '<div class="survey-empty">載入中…</div>';
+    try {
+      var list = await loadConcertPieces(concertId);
+      if (openConcertId !== concertId) return;
+      concertPiecesList = list;
+      renderConcertPiecesList();
+    } catch (err) {
+      if (openConcertId === concertId) document.getElementById('concertPiecesSlot').innerHTML = '<div class="survey-empty">載入失敗（' + err.code + '）</div>';
+    }
+  }
+
+  function renderPiecePickerChecklist(){
+    var addedIds = {};
+    concertPiecesList.forEach(function(cp){ addedIds[cp.id] = true; });
+    var available = repertoireList.filter(function(p){ return !addedIds[p.id]; });
+    var checklist = document.getElementById('piecePickerChecklist');
+    var confirmBtn = document.getElementById('piecePickerConfirmBtn');
+    if (available.length === 0){
+      checklist.innerHTML = '<div class="survey-empty">曲目資料庫裡的曲子都已經加入這場音樂會了</div>';
+      confirmBtn.disabled = true;
+      return;
+    }
+    checklist.innerHTML = available.map(function(p){
+      var on = !!piecePickerDraftSet[p.id];
+      return (
+        '<div class="check-row">' +
+          '<button type="button" class="checkbox' + (on ? ' on' : '') + '" data-piece-pick="' + p.id + '">' + (on ? '✓' : '') + '</button>' +
+          '<button type="button" class="check-text" data-piece-pick="' + p.id + '">' + escapeHtml(p.title) + '</button>' +
+        '</div>'
+      );
+    }).join('');
+    confirmBtn.disabled = Object.keys(piecePickerDraftSet).length === 0;
+  }
+
+  document.getElementById('addPieceToggleBtn').addEventListener('click', function(){
+    piecePickerDraftSet = {};
+    renderPiecePickerChecklist();
+    document.getElementById('piecePickerPanel').classList.remove('hidden');
+  });
+
+  document.getElementById('piecePickerCancelBtn').addEventListener('click', function(){
+    document.getElementById('piecePickerPanel').classList.add('hidden');
+  });
+
+  document.getElementById('piecePickerSelectAllBtn').addEventListener('click', function(){
+    var addedIds = {};
+    concertPiecesList.forEach(function(cp){ addedIds[cp.id] = true; });
+    repertoireList.forEach(function(p){ if (!addedIds[p.id]) piecePickerDraftSet[p.id] = true; });
+    renderPiecePickerChecklist();
+  });
+  document.getElementById('piecePickerClearAllBtn').addEventListener('click', function(){
+    piecePickerDraftSet = {};
+    renderPiecePickerChecklist();
+  });
+
+  document.getElementById('piecePickerChecklist').addEventListener('click', function(e){
+    var btn = e.target.closest('[data-piece-pick]');
+    if (!btn) return;
+    var pieceId = btn.getAttribute('data-piece-pick');
+    if (piecePickerDraftSet[pieceId]) delete piecePickerDraftSet[pieceId]; else piecePickerDraftSet[pieceId] = true;
+    var row = btn.closest('.check-row');
+    var checkboxEl = row.querySelector('.checkbox');
+    var on = !!piecePickerDraftSet[pieceId];
+    checkboxEl.classList.toggle('on', on);
+    checkboxEl.textContent = on ? '✓' : '';
+    document.getElementById('piecePickerConfirmBtn').disabled = Object.keys(piecePickerDraftSet).length === 0;
+  });
+
+  document.getElementById('piecePickerConfirmBtn').addEventListener('click', function(){
+    if (!openConcertId) return;
+    var concertId = openConcertId;
+    var pieceIds = Object.keys(piecePickerDraftSet);
+    if (pieceIds.length === 0) return;
+    var confirmBtn = document.getElementById('piecePickerConfirmBtn');
+    confirmBtn.disabled = true;
+    var baseOrder = concertPiecesList.length;
+    Promise.all(pieceIds.map(function(pieceId, idx){
+      return setDoc(doc(db, 'concerts', concertId, 'pieces', pieceId), {
+        order: baseOrder + idx,
+        addedAt: serverTimestamp()
+      });
+    })).then(function(){
+      document.getElementById('piecePickerPanel').classList.add('hidden');
+      refreshConcertPieces(concertId);
+    }).catch(function(err){
+      alert('加入失敗：' + err.code);
+      confirmBtn.disabled = false;
+    });
+  });
+
+  document.getElementById('concertPiecesSlot').addEventListener('click', function(e){
+    var removeBtn = e.target.closest('[data-remove-concert-piece]');
+    if (!removeBtn) return;
+    var pieceId = removeBtn.getAttribute('data-remove-concert-piece');
+    var piece = repertoireById[pieceId];
+    var ok = confirm(
+      '確定要把「' + (piece ? piece.title : '這首曲子') + '」從這場音樂會移除嗎？\n' +
+      '已經指派過的分部資料不會被清掉，只是沒有入口存取。'
+    );
+    if (!ok) return;
+    removeBtn.disabled = true;
+    deleteDoc(doc(db, 'concerts', openConcertId, 'pieces', pieceId)).then(function(){
+      refreshConcertPieces(openConcertId);
+    }).catch(function(err){
+      alert('移除失敗：' + err.code);
+      removeBtn.disabled = false;
+    });
   });
 
   eventCancelBtn.addEventListener('click', function(){
@@ -2686,6 +2856,15 @@
       });
       renderConcertList();
     }, function(err){ console.error('concerts 監聽失敗', err); });
+
+    // 曲目資料庫只影響「曲目管理」分頁的加入曲目清單，不用加進 maybeRender() 的載入旗標比對
+    subscribeRepertoire(db, function(pieces){
+      repertoireById = {};
+      repertoireList = pieces.slice();
+      pieces.forEach(function(p){ repertoireById[p.id] = p; });
+      repertoireList.sort(function(a, b){ return (a.title || '').localeCompare(b.title || '', 'zh-Hant'); });
+      renderConcertPiecesList(); // 曲目資料庫異動可能影響已加入曲目列表的標題/分部數顯示
+    }, function(err){ console.error('repertoire 監聽失敗', err); });
 
     onSnapshot(collection(db, 'eventRosters'), function(snap){
       rostersById = {};
