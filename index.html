@@ -194,6 +194,18 @@
     color:var(--ink-soft); font-size:13px;
     border:1px dashed var(--line); border-radius:var(--radius-md);
   }
+  .my-concert-card{
+    margin:0 20px 14px; background:var(--paper-raised); border:1px solid var(--line);
+    border-radius:var(--radius-lg); box-shadow:var(--shadow-card); padding:14px 16px;
+  }
+  .my-concert-title{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:14.5px; color:var(--ink); }
+  .my-concert-instrument{ margin-top:2px; font-size:11.5px; color:var(--ink-soft); }
+  .my-concert-piece-row{
+    display:flex; justify-content:space-between; align-items:baseline; gap:10px;
+    padding:8px 0; font-size:12.5px; border-top:1px solid var(--line);
+  }
+  .my-concert-piece-row .k{ color:var(--ink); }
+  .my-concert-piece-row .v{ color:var(--ink-soft); text-align:right; flex:none; }
 
   /* ---------- 回報狀態小標籤（貼著日期，跟現有 status-chip-btn 同一套配色：出席=sage／請假=burgundy） ---------- */
   .rsvp-status-chip{
@@ -795,10 +807,14 @@
 
   </div>
 
-  <!-- 團務總覽：非急迫的參考資訊，目前只有公告（已經常駐顯示在分頁外），
-       之後如果有團費繳交紀錄、行事曆檢視等功能會放在這裡 -->
+  <!-- 團務總覽：非急迫的參考資訊，目前有「我的音樂會」，之後如果有團費繳交紀錄、
+       行事曆檢視等功能也會放在這裡 -->
   <div class="seg-panel hidden" id="segPanelOverview">
-    <div class="overview-empty">目前沒有其他團務資訊</div>
+    <div class="overview-empty" id="overviewEmptyMsg">目前沒有其他團務資訊</div>
+    <div id="myConcertsWrap" class="hidden">
+      <div class="section-label" style="margin:8px 20px 4px;"><span class="tw">我的音樂會</span></div>
+      <div id="myConcertsSlot"></div>
+    </div>
   </div>
 
   <!-- Bottom tab bar -->
@@ -900,7 +916,7 @@
   import { VAPID_PUBLIC_KEY } from './push-config.js';
   import {
     collection, query, where, orderBy, limit, onSnapshot, Timestamp,
-    doc, getDoc, setDoc, serverTimestamp
+    doc, getDoc, getDocs, setDoc, serverTimestamp
   } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
   // 還沒做的分頁（行事曆/譜夾）：反灰 + 點擊顯示提示，不依賴登入驗證結果，
@@ -1615,6 +1631,89 @@
       if (e.target === scanOverlay) stopScan();
     });
 
+    // ---------- 團務總覽：我的音樂會（唯讀） ----------
+    // concertRosters.members 是 array<{uid, instrument}>，沒辦法用 array-contains 查詢直接
+    // 篩出「包含我」的文件，這裡整份撈回來前端過濾（跟 checkin-stats-admin.html 撈整份
+    // collection 再篩選同一種模式，資料量小，全團音樂會數量不會多）
+    async function loadMyConcerts(uid){
+      var rosterSnap = await getDocs(collection(db, 'concertRosters'));
+      var repertoireSnap = await getDocs(collection(db, 'repertoire'));
+
+      var repertoireById = {};
+      repertoireSnap.forEach(function(d){ repertoireById[d.id] = Object.assign({ id: d.id }, d.data()); });
+
+      var myEntries = [];
+      rosterSnap.forEach(function(docSnap){
+        var members = docSnap.data().members || [];
+        var mine = members.filter(function(m){ return m.uid === uid; })[0];
+        if (mine) myEntries.push({ concertId: docSnap.id, instrument: mine.instrument });
+      });
+      if (myEntries.length === 0) return [];
+
+      var concerts = await Promise.all(myEntries.map(async function(entry){
+        var concertSnap = await getDoc(doc(db, 'concerts', entry.concertId));
+        if (!concertSnap.exists()) return null;
+
+        var piecesSnap = await getDocs(collection(db, 'concerts', entry.concertId, 'pieces'));
+        var pieceRefs = piecesSnap.docs.map(function(d){ return { id: d.id, order: d.data().order || 0 }; });
+        pieceRefs.sort(function(a, b){ return a.order - b.order; });
+
+        var pieces = await Promise.all(pieceRefs.map(async function(ref){
+          var piece = repertoireById[ref.id];
+          if (!piece) return { title: '（曲目已刪除）', assignedLabel: null };
+          var sectionSnap = await getDoc(doc(db, 'concerts', entry.concertId, 'pieces', ref.id, 'sections', entry.instrument));
+          var assignedLabel = null;
+          if (sectionSnap.exists()){
+            (sectionSnap.data().parts || []).some(function(part){
+              if ((part.members || []).indexOf(uid) !== -1){
+                var def = (piece.parts || []).filter(function(p){ return p.partId === part.partId; })[0];
+                assignedLabel = def ? def.label : part.partId;
+                return true;
+              }
+              return false;
+            });
+          }
+          return { title: piece.title, assignedLabel: assignedLabel };
+        }));
+
+        return { concertId: entry.concertId, title: concertSnap.data().title, instrument: entry.instrument, pieces: pieces };
+      }));
+
+      return concerts.filter(function(c){ return c; });
+    }
+
+    function escapeHtmlForOverview(s){
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+        return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+      });
+    }
+
+    function renderMyConcerts(concerts){
+      if (concerts.length === 0) return; // 保持預設的「目前沒有其他團務資訊」
+      document.getElementById('overviewEmptyMsg').classList.add('hidden');
+      var wrap = document.getElementById('myConcertsWrap');
+      wrap.classList.remove('hidden');
+      document.getElementById('myConcertsSlot').innerHTML = concerts.map(function(c){
+        var piecesHtml = c.pieces.length === 0
+          ? '<div class="my-concert-piece-row"><span class="k">（尚未加入曲目）</span></div>'
+          : c.pieces.map(function(p){
+              return (
+                '<div class="my-concert-piece-row">' +
+                  '<span class="k">' + escapeHtmlForOverview(p.title) + '</span>' +
+                  '<span class="v">' + (p.assignedLabel ? escapeHtmlForOverview(p.assignedLabel) : '尚未指派') + '</span>' +
+                '</div>'
+              );
+            }).join('');
+        return (
+          '<div class="my-concert-card">' +
+            '<div class="my-concert-title">' + escapeHtmlForOverview(c.title) + '</div>' +
+            '<div class="my-concert-instrument">你的樂器身分：' + escapeHtmlForOverview(c.instrument) + '</div>' +
+            piecesHtml +
+          '</div>'
+        );
+      }).join('');
+    }
+
     // ---------- 身分驗證：訪客（未登入）／審核中／已核准，決定要不要打開個人化功能 ----------
     resolveMemberAccess().then(function(access){
       if (!access) return; // 未通過驗證（被拒絕/停用等），resolveMemberAccess 已經處理導轉
@@ -1674,6 +1773,11 @@
       renderRsvpBanner();
       renderNotifDot();
       renderNotifSheet();
+
+      // 審核中也算真團員（讀取權限跟已核准一樣），一併載入，跟團務總覽分頁對審核中開放的既有原則一致
+      loadMyConcerts(viewerUid).then(renderMyConcerts).catch(function(err){
+        console.error('我的音樂會 載入失敗', err);
+      });
 
       // ---------- 通知開關推廣提示：只給已核准會員看，審核中的人已經可以在個人中心自行開通知，
       // 這個首頁主動彈窗留給已核准會員，避免審核中的人一進來就被兩層提示轟炸 ----------
