@@ -676,6 +676,10 @@
             <label>地點</label>
             <input type="text" id="eventLocation" placeholder="例如：體育館一樓-舞台">
           </div>
+          <div class="field">
+            <label>屬於哪場音樂會（選填）</label>
+            <select id="eventConcertId"><option value="">（不屬於任何音樂會）</option></select>
+          </div>
           <p class="form-error" id="eventFormError"></p>
           <div class="form-buttons">
             <button type="submit" class="cta-btn" id="eventSubmitBtn">建立活動</button>
@@ -1048,6 +1052,7 @@
     document.getElementById('eventStartTime').value = evt.date && !evt.allDay ? toTimeValue(evt.date) : '';
     document.getElementById('eventEndTime').value = evt.endTime ? toTimeValue(evt.endTime) : '';
     document.getElementById('eventLocation').value = evt.location || '';
+    document.getElementById('eventConcertId').value = evt.concertId || '';
     updateTimeFieldsVisibility();
     eventSubmitBtn.disabled = false;
     eventSubmitBtn.textContent = '儲存變更';
@@ -1095,6 +1100,18 @@
         '</div>'
       );
     }).join('');
+  }
+
+  // 活動表單「屬於哪場音樂會」下拉選單，音樂會清單一有異動就重繪，保留使用者目前選取的值
+  // （比照 renderRosterTemplateSelects 保留選取狀態的做法）
+  function renderEventConcertSelect(){
+    var select = document.getElementById('eventConcertId');
+    var current = select.value;
+    var optsHtml = concertsList.map(function(c){
+      return '<option value="' + c.id + '">' + escapeHtml(c.title) + '</option>';
+    }).join('');
+    select.innerHTML = '<option value="">（不屬於任何音樂會）</option>' + optsHtml;
+    if (current && concertsById[current]) select.value = current;
   }
 
   var editingConcertId = null; // null = 新增模式，比照 editingId 對 #eventForm 的作用
@@ -1931,7 +1948,8 @@
       date: Timestamp.fromDate(new Date(dateVal + 'T' + (allDay ? '00:00' : startTimeVal))),
       allDay: allDay,
       endTime: (!allDay && endTimeVal) ? Timestamp.fromDate(new Date(dateVal + 'T' + endTimeVal)) : null,
-      location: location
+      location: location,
+      concertId: document.getElementById('eventConcertId').value || null
     };
 
     var task = wasEditing
@@ -3345,7 +3363,8 @@
           date: data.date && data.date.toDate ? data.date.toDate() : null,
           allDay: !!data.allDay,
           endTime: data.endTime && data.endTime.toDate ? data.endTime.toDate() : null,
-          location: data.location
+          location: data.location,
+          concertId: data.concertId || null
         };
       });
       eventsLoaded = true;
@@ -3373,6 +3392,7 @@
         return tb - ta;
       });
       renderConcertList();
+      renderEventConcertSelect();
     }, function(err){ console.error('concerts 監聽失敗', err); });
 
     // 曲目資料庫只影響「曲目管理」分頁的加入曲目清單，不用加進 maybeRender() 的載入旗標比對
