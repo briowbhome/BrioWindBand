@@ -1720,6 +1720,12 @@
       var optionsHtml = instrumentsList.map(function(inst){
         return '<option value="' + escapeHtml(inst.name) + '"' + (inst.name === instrument ? ' selected' : '') + '>' + escapeHtml(inst.name) + '</option>';
       }).join('');
+      // 若目前草稿中的樂器已不在現行樂器清單內（例如已於樂器管理頁被改名或刪除），
+      // 額外補一個代表舊值的 option 並標記為 selected，讓下拉選單如實呈現實際會被存檔的值，
+      // 避免瀏覽器預設選中第一個選項、造成畫面與 concertRosterDraftMap 不一致。
+      if (instrument && !instrumentsList.some(function(inst){ return inst.name === instrument; })){
+        optionsHtml += '<option value="' + escapeHtml(instrument) + '" selected>' + escapeHtml(instrument) + '</option>';
+      }
       return (
         '<div class="check-row">' +
           '<button type="button" class="checkbox' + (on ? ' on' : '') + '" data-concert-roster-toggle="' + m.uid + '">' + (on ? '✓' : '') + '</button>' +
