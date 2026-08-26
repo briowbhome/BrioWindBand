@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>布利歐管樂團｜曲目資料庫</title>
+<title>布利歐管樂團｜藏譜管理</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -194,6 +194,7 @@
   .part-row{ display:flex; align-items:center; gap:10px; padding:8px 2px; border-bottom:1px solid var(--line); }
   .part-row:last-child{ border-bottom:none; }
   .part-label{ flex:1; font-size:12.5px; color:var(--ink); }
+  .part-view-meta{ margin-top:3px; font-size:11px; color:var(--ink-soft); font-weight:400; }
   .part-remove{
     flex:none; width:22px; height:22px; border-radius:50%; border:none; background:none;
     color:var(--ink-soft); cursor:pointer; font-size:15px; line-height:1;
@@ -255,11 +256,11 @@
   <div class="staff"></div>
 
   <div class="section-label">
-    <span class="tw">曲目資料庫</span>
+    <span class="tw">藏譜管理</span>
     <span class="en">Repertoire</span>
     <button type="button" class="add-btn" id="createPieceBtn">＋ 新增曲目</button>
   </div>
-  <p class="lede">全團共用的曲目清單，音樂會可以直接引用這裡的曲目與分部設定，不用每場重複建立。</p>
+  <p class="lede">藏譜資料庫，可以直接在這裡設定曲目與分部資訊。</p>
 
   <div class="list" id="pieceList"></div>
 
@@ -275,6 +276,8 @@
     <div class="sheet-body">
       <div id="pieceViewMode" class="hidden">
         <div class="info-row"><span class="k">作曲/編曲</span><span class="v" id="pieceViewComposer">—</span></div>
+        <div class="survey-section-label">分部欄位</div>
+        <div id="pieceViewParts"></div>
         <div class="info-edit-row">
           <button type="button" class="info-edit-btn" id="pieceEditBtn">✎ 編輯</button>
           <button type="button" class="info-edit-btn" id="pieceDeleteBtn">刪除</button>
@@ -355,27 +358,33 @@
     }
   }
 
-  // 分部欄位依樂器分組顯示（比照 roles-admin.html 樂器清單依 family 分組的做法，這裡是依
-  // instrumentName 分組），組內維持新增順序，不提供排序按鈕——這輪範圍不需要
-  function renderPartGroups(){
-    var container = document.getElementById('partGroups');
-    if (draftParts.length === 0){
-      container.innerHTML = '<div class="part-empty">還沒有任何分部欄位，用下面的表單新增</div>';
-      return;
-    }
+  // 分部欄位依樂器分組（建立/編輯表單跟唯讀摘要共用同一套分組邏輯）
+  function groupPartsByInstrument(parts){
     var byInstrument = {};
     var order = [];
-    draftParts.forEach(function(part){
+    parts.forEach(function(part){
       if (!byInstrument[part.instrumentName]){
         byInstrument[part.instrumentName] = [];
         order.push(part.instrumentName);
       }
       byInstrument[part.instrumentName].push(part);
     });
-    container.innerHTML = order.map(function(instrumentName){
+    return { byInstrument: byInstrument, order: order };
+  }
+
+  // 分部欄位依樂器分組顯示（比照 roles-admin.html 樂器清單依 family 分組的做法，這裡是依
+  // instrumentName 分組），組內維持新增順序，不提供排序按鈕——這輪範圍不需要
+  function renderPartGroups(){
+    var container = document.getElementById('partGroups');
+    if (draftParts.length === 0){
+      container.innerHTML = '<div class="part-empty">還沒有任何分部欄位</div>';
+      return;
+    }
+    var grouped = groupPartsByInstrument(draftParts);
+    container.innerHTML = grouped.order.map(function(instrumentName){
       return (
         '<div class="part-group-label">' + escapeHtml(instrumentName) + '</div>' +
-        byInstrument[instrumentName].map(function(part){
+        grouped.byInstrument[instrumentName].map(function(part){
           return (
             '<div class="part-row">' +
               '<span class="part-label">' + escapeHtml(part.label) + '</span>' +
@@ -386,6 +395,55 @@
       );
     }).join('');
   }
+
+  // 唯讀摘要（點清單裡的曲目、還沒進編輯表單時）也直接列出所有分部，不用先點「✎ 編輯」才看得到。
+  // 一個樂器一列，分部只是標示「這個樂器拆成幾份」，不需要每個分部各自佔一行——只有 1 個分部
+  // （沒拆分）的樂器只顯示樂器名稱，拆了 2 份以上才在下面補一行小字列出各分部標籤（比照
+  // event-admin.html 音樂會分頁「曲目→樂器清單」同一種 event-title/event-meta 呈現方式）
+  function renderPieceViewParts(parts){
+    var container = document.getElementById('pieceViewParts');
+    if (!parts || parts.length === 0){
+      container.innerHTML = '<div class="part-empty">尚未設定分部欄位</div>';
+      return;
+    }
+    var grouped = groupPartsByInstrument(parts);
+    container.innerHTML = grouped.order.map(function(instrumentName){
+      var partsForInstrument = grouped.byInstrument[instrumentName];
+      var meta = partsForInstrument.length > 1
+        ? partsForInstrument.map(function(p){ return p.label; }).join('、')
+        : '';
+      return (
+        '<div class="part-row part-row-view">' +
+          '<div class="part-label">' + escapeHtml(instrumentName) +
+          (meta ? '<div class="part-view-meta">' + escapeHtml(meta) + '</div>' : '') +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  // 大部分樂器同一份譜只有 1 個分部，不需要手動打標籤——選樂器後自動把標籤帶入樂器名稱，
+  // 直接按「＋ 新增」即可；只有分部（1st/2nd）時才需要手動改標籤文字。
+  // partLabelAutoFilled 記錄「目前標籤欄位是不是還維持著自動帶入、沒被手動改過的值」，
+  // 判斷切換樂器時要不要跟著更新自動帶入的文字，或是尊重使用者已經手動輸入的內容
+  var partLabelAutoFilled = '';
+
+  function syncPartLabelAutoFill(){
+    var select = document.getElementById('partInstrumentSelect');
+    var labelInput = document.getElementById('partLabelInput');
+    if (labelInput.value === '' || labelInput.value === partLabelAutoFilled){
+      partLabelAutoFilled = select.value;
+      labelInput.value = select.value;
+    }
+  }
+
+  function resetPartAddRow(){
+    document.getElementById('partLabelInput').value = '';
+    partLabelAutoFilled = '';
+    syncPartLabelAutoFill();
+  }
+
+  document.getElementById('partInstrumentSelect').addEventListener('change', syncPartLabelAutoFill);
 
   document.getElementById('partAddBtn').addEventListener('click', function(){
     var instrumentName = document.getElementById('partInstrumentSelect').value;
@@ -400,7 +458,7 @@
     }
     showFormError('');
     draftParts.push({ partId: randomPartId(), instrumentName: instrumentName, label: label });
-    document.getElementById('partLabelInput').value = '';
+    resetPartAddRow();
     renderPartGroups();
   });
 
@@ -460,6 +518,7 @@
     pieceFormFooter.classList.add('hidden');
     document.getElementById('pieceSheetTitle').textContent = p.title || '—';
     pieceViewComposer.textContent = p.composer || '未填寫';
+    renderPieceViewParts(p.parts || []);
   }
 
   function showPieceEditForm(){
@@ -477,6 +536,7 @@
     pieceSaveBtn.textContent = '建立曲目';
     pieceCancelBtn.classList.add('hidden'); // 新增沒有「唯讀」畫面可以取消回去，只有關閉整個 sheet
     showFormError('');
+    resetPartAddRow();
     renderPartGroups();
     showPieceEditForm();
     pieceSheetOverlay.classList.add('active');
@@ -501,6 +561,7 @@
     pieceTitleInput.value = p.title || '';
     pieceComposerInput.value = p.composer || '';
     draftParts = (p.parts || []).slice();
+    resetPartAddRow();
     renderPartGroups();
     showPieceEditForm();
   });

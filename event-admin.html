@@ -292,7 +292,7 @@
   .info-edit-btn:active{ background:var(--sage-bg); }
   .info-edit-row{ display:flex; gap:8px; margin-top:14px; }
   .info-edit-row .info-edit-btn{ margin-top:0; }
-  #rosterTemplateSelect{
+  .template-select{
     width:100%; border:1px solid var(--line); background:var(--paper);
     border-radius:var(--radius-sm); padding:9px 11px; font-size:13px; color:var(--ink); margin-bottom:8px;
   }
@@ -363,6 +363,12 @@
   .survey-edit-btn:active{ color:var(--brass-deep); }
   .survey-subhead{ margin-top:12px; font-size:11.5px; font-weight:700; color:var(--ink-soft); }
   .survey-namelist{ margin-top:4px; font-size:12px; color:var(--ink); line-height:1.7; }
+  .roster-group-label{
+    font-family:'Roboto Mono',monospace; font-size:10px; font-weight:700;
+    letter-spacing:.06em; text-transform:uppercase; color:var(--ink-soft); margin-top:10px;
+  }
+  .roster-group-label:first-child{ margin-top:0; }
+  .roster-group-members{ margin-top:2px; }
 
   .survey-edit-form{ margin-top:8px; padding-top:8px; border-top:1px dashed var(--line); }
   .status-picker{ display:flex; gap:8px; }
@@ -678,7 +684,7 @@
           </div>
           <div class="field">
             <label>屬於哪場音樂會（選填）</label>
-            <select id="eventConcertId"><option value="">（不屬於任何音樂會）</option></select>
+            <select id="eventConcertId"><option value="">（無）</option></select>
           </div>
           <p class="form-error" id="eventFormError"></p>
           <div class="form-buttons">
@@ -730,7 +736,7 @@
         </div>
         <div id="rosterTemplatePicker" class="hidden">
           <div class="survey-section-label">選擇名單範本</div>
-          <select id="rosterTemplateSelect"><option value="">請選擇…</option></select>
+          <select id="rosterTemplateSelect" class="template-select"><option value="">請選擇…</option></select>
           <div class="survey-edit-actions">
             <button type="button" id="rosterTemplateCancelBtn">取消</button>
             <button type="button" class="btn-save" id="rosterTemplateConfirmBtn" disabled>套用</button>
@@ -870,7 +876,7 @@
         </div>
         <div id="concertRosterTemplatePicker" class="hidden">
           <div class="survey-section-label">選擇名單範本</div>
-          <select id="concertRosterTemplateSelect"><option value="">請選擇…</option></select>
+          <select id="concertRosterTemplateSelect" class="template-select"><option value="">請選擇…</option></select>
           <div class="survey-edit-actions">
             <button type="button" id="concertRosterTemplateCancelBtn">取消</button>
             <button type="button" class="btn-save" id="concertRosterTemplateConfirmBtn" disabled>套用</button>
@@ -1111,7 +1117,7 @@
     var optsHtml = concertsList.map(function(c){
       return '<option value="' + c.id + '">' + escapeHtml(c.title) + '</option>';
     }).join('');
-    select.innerHTML = '<option value="">（不屬於任何音樂會）</option>' + optsHtml;
+    select.innerHTML = '<option value="">（無）</option>' + optsHtml;
     setEventConcertSelectValue(select, current);
   }
 
@@ -1194,10 +1200,13 @@
     concertSubmitBtn.disabled = true;
     concertSubmitBtn.textContent = wasEditing ? '儲存中…' : '建立中…';
 
+    var startDateObj = new Date(startDateVal + 'T00:00');
+    var endDateObj = endDateVal ? new Date(endDateVal + 'T00:00') : null;
+
     var payload = {
       title: title,
-      startDate: Timestamp.fromDate(new Date(startDateVal + 'T00:00')),
-      endDate: endDateVal ? Timestamp.fromDate(new Date(endDateVal + 'T00:00')) : null,
+      startDate: Timestamp.fromDate(startDateObj),
+      endDate: endDateObj ? Timestamp.fromDate(endDateObj) : null,
       description: description
     };
 
@@ -1208,14 +1217,29 @@
           createdAt: serverTimestamp()
         }));
 
-    task.then(function(){
+    task.then(function(result){
       if (wasEditing){
         enterConcertCreateMode();
         showConcertInfoView(); // 編輯是在音樂會明細 sheet 裡做的，存完回到唯讀摘要，不關閉整個 sheet
       } else {
         enterConcertCreateMode();
-        document.getElementById('concertCreateSuccessMsg').textContent = '已建立「' + title + '」，可以繼續新增';
-        document.getElementById('concertCreateSuccessMsg').classList.remove('hidden');
+        // 建立後直接跳進這場音樂會的明細 sheet、停在「曲目管理」分頁，不用使用者自己去列表點開。
+        // 先手動塞一筆進 concertsById 再開 sheet，避免全域 onSnapshot 監聽還沒回來就開不了 sheet；
+        // 監聽稍後回來時會用真正的資料覆蓋，不影響正確性
+        var newConcertId = result.id;
+        // 注意：concertsById 其他地方（onSnapshot、formatConcertPeriod）一律存轉換過的 JS Date，
+        // 不是 payload 裡的 Firestore Timestamp——塞錯型別會讓 formatConcertPeriod 呼叫
+        // c.startDate.getMonth() 噴錯，導致這整個 then 區塊被 catch 吃掉、sheet 開不出來
+        concertsById[newConcertId] = {
+          id: newConcertId,
+          title: title,
+          startDate: startDateObj,
+          endDate: endDateObj,
+          description: description
+        };
+        closeCreateConcertSheet();
+        openConcertSheet(newConcertId);
+        document.getElementById('tabConcertPieces').click();
       }
     }).catch(function(err){
       concertSubmitBtn.disabled = false;
@@ -1356,7 +1380,7 @@
   function renderConcertPiecesList(){
     var slot = document.getElementById('concertPiecesSlot');
     if (concertPiecesList.length === 0){
-      slot.innerHTML = '<div class="survey-empty">這場音樂會還沒有加入任何曲目</div>';
+      slot.innerHTML = '<div class="survey-empty">尚未加入任何曲目</div>';
       return;
     }
     slot.innerHTML = concertPiecesList.map(function(cp){
@@ -1398,7 +1422,7 @@
     var checklist = document.getElementById('piecePickerChecklist');
     var confirmBtn = document.getElementById('piecePickerConfirmBtn');
     if (available.length === 0){
-      checklist.innerHTML = '<div class="survey-empty">曲目資料庫裡的曲子都已經加入這場音樂會了</div>';
+      checklist.innerHTML = '<div class="survey-empty">無可用曲目</div>';
       confirmBtn.disabled = true;
       return;
     }
@@ -1537,7 +1561,7 @@
     var instruments = instrumentsForPiece(piece);
     var slot = document.getElementById('pieceDetailInstrumentsSlot');
     if (instruments.length === 0){
-      slot.innerHTML = '<div class="survey-empty">這首曲子在曲目資料庫裡還沒有設定任何分部欄位，請先到「曲目資料庫」補上</div>';
+      slot.innerHTML = '<div class="survey-empty">尚未設定分部欄位，請先到「藏譜管理」補上</div>';
       return;
     }
     // 8/25 調整：分部數 >1 的樂器直接在卡片上標示分部名稱（例如「單簧管 1st、單簧管 2nd」），
@@ -1713,6 +1737,24 @@
   var concertRosterSourceTemplateCache = {}; // concertId -> sourceTemplateId|null
   var concertRosterDraftMap = {}; // {uid: instrumentName}，編輯中的草稿
 
+  // 參與名單已經有「這場音樂會負責的樂器」身分，唯讀摘要依樂器分組列出，同樂器的人列在一起，
+  // 不用逐一看每個人名字後面括號的樂器才知道誰跟誰同一組。分組順序沿用 instrumentsList（樂器
+  // 管理頁）的既有順序，樂器已被刪除/改名等找不到對應順序的舊值放最後（比照 renderConcertRosterChecklist
+  // 對已刪除樂器值的處理方式，不會讓資料憑空消失）
+  function groupRosterMembersByInstrument(members){
+    var byInstrument = {};
+    members.forEach(function(m){
+      var key = m.instrument || '（未設定樂器）';
+      if (!byInstrument[key]) byInstrument[key] = [];
+      byInstrument[key].push(m);
+    });
+    var order = instrumentsList.map(function(inst){ return inst.name; }).filter(function(name){ return byInstrument.hasOwnProperty(name); });
+    Object.keys(byInstrument).forEach(function(key){
+      if (order.indexOf(key) === -1) order.push(key);
+    });
+    return { byInstrument: byInstrument, order: order };
+  }
+
   function showConcertRosterView(){
     document.getElementById('concertRosterViewMode').classList.remove('hidden');
     document.getElementById('concertRosterEditMode').classList.add('hidden');
@@ -1721,9 +1763,18 @@
     var members = concertRosterMembersCache[openConcertId] || [];
     var namesByUid = namesByUidFromApprovedMembers();
     document.getElementById('concertRosterViewCount').textContent = members.length + ' 人';
-    document.getElementById('concertRosterViewNames').textContent = members.length === 0
-      ? '（無）'
-      : members.map(function(m){ return (namesByUid[m.uid] || m.uid) + '（' + m.instrument + '）'; }).join('、');
+    if (members.length === 0){
+      document.getElementById('concertRosterViewNames').textContent = '（無）';
+    } else {
+      var grouped = groupRosterMembersByInstrument(members);
+      document.getElementById('concertRosterViewNames').innerHTML = grouped.order.map(function(instrumentName){
+        var namesText = grouped.byInstrument[instrumentName].map(function(m){ return namesByUid[m.uid] || m.uid; }).join('、');
+        return (
+          '<div class="roster-group-label">' + escapeHtml(instrumentName) + '</div>' +
+          '<div class="roster-group-members">' + escapeHtml(namesText) + '</div>'
+        );
+      }).join('');
+    }
     document.getElementById('concertRosterEditBtn').textContent = members.length > 0 ? '✎ 編輯名單' : '✎ 建立名單';
 
     var sourceTemplateId = concertRosterSourceTemplateCache[openConcertId];
@@ -2350,6 +2401,17 @@
       rosterTemplateSelect.value = pickCurrent;
     } else {
       rosterTemplateConfirmBtn.disabled = true;
+    }
+
+    // 音樂會參與名單的「套用範本」下拉選單——之前漏掉這段，選單一直只有預設的「請選擇…」，
+    // 找不到 roster-admin.html 建立的任何範本
+    var concertSel = document.getElementById('concertRosterTemplateSelect');
+    var concertCurrent = concertSel.value;
+    concertSel.innerHTML = '<option value="">請選擇…</option>' + optsHtml;
+    if (rosterTemplatesById[concertCurrent]){
+      concertSel.value = concertCurrent;
+    } else {
+      document.getElementById('concertRosterTemplateConfirmBtn').disabled = true;
     }
   }
 
