@@ -326,6 +326,9 @@
   var membersInstrumentsByUid = null;
   // settings/instruments 的清單（樂器名稱+分類），決定分區的順序，第一次點開明細才抓、抓過快取
   var instrumentsList = null;
+  var eventConcertIdById = {}; // eventId -> concertId|null
+  var concertRosterInstrumentsCache = {}; // concertId -> {uid: instruments[]}
+  var currentDetailOverrideByUid = {}; // 目前開啟中的分區明細 sheet 適用的樂器身分覆蓋表
 
   // 沒有建立過應到名單的活動回傳 null（畫面顯示「未設定名單」，不硬算比例）；
   // 有名單的話用 attendanceReports 算出席/請假，「未回報」＝名單裡但沒有對應回報的人
@@ -425,6 +428,7 @@
         var t = d.getTime();
         if (t > now || t < cutoffMs) return; // 只看範圍內、已經發生的活動
         eventTitleById[docSnap.id] = data.title;
+        eventConcertIdById[docSnap.id] = data.concertId || null;
         rows.push({
           id: docSnap.id,
           title: data.title,
@@ -464,6 +468,20 @@
     }
   }
 
+  // 這場活動如果掛了 concertId，優先用音樂會參與名單登記的樂器身分分組（可能不只一個），
+  // 名單裡查不到的人（沒同步、臨時代簽）退回個人資料樂器，不讓人從統計裡消失
+  async function ensureConcertRosterInstruments(concertId){
+    if (!concertId) return {};
+    if (concertRosterInstrumentsCache[concertId]) return concertRosterInstrumentsCache[concertId];
+    var snap = await getDoc(doc(db, 'concertRosters', concertId));
+    var map = {};
+    if (snap.exists()){
+      (snap.data().members || []).forEach(function(m){ map[m.uid] = m.instruments || []; });
+    }
+    concertRosterInstrumentsCache[concertId] = map;
+    return map;
+  }
+
   function groupCheckinsByInstrument(checkins){
     var byName = {};
     instrumentsList.forEach(function(inst){
@@ -471,7 +489,9 @@
     });
 
     checkins.forEach(function(c){
-      var instruments = membersInstrumentsByUid[c.uid] || [];
+      var instruments = (currentDetailOverrideByUid[c.uid] && currentDetailOverrideByUid[c.uid].length > 0)
+        ? currentDetailOverrideByUid[c.uid]
+        : (membersInstrumentsByUid[c.uid] || []);
       if (instruments.length === 0){
         if (!byName['未設定樂器']) byName['未設定樂器'] = { family: null, people: [] };
         byName['未設定樂器'].people.push(c);
@@ -542,6 +562,9 @@
   function openDetailSheet(eventId){
     detailSheetOverlay.classList.add('active');
     ensureInstrumentsData().then(function(){
+      return ensureConcertRosterInstruments(eventConcertIdById[eventId]);
+    }).then(function(overrideByUid){
+      currentDetailOverrideByUid = overrideByUid;
       renderDetailSheet(eventId);
     }).catch(function(){
       document.getElementById('detailSheetBody').innerHTML = '<div class="empty">讀取失敗，請重新整理再試一次</div>';

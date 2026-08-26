@@ -323,6 +323,11 @@
     border-radius:999px; padding:5px 12px; font-size:11px; font-weight:700; cursor:pointer;
   }
   .survey-bulk-row button:active{ background:var(--sage-bg); color:var(--sage); }
+  .survey-bulk-row button.on{ background:var(--sage-bg); color:var(--sage); border-color:var(--sage); }
+  .concert-roster-search{
+    width:100%; border:1px solid var(--line); background:var(--paper);
+    border-radius:var(--radius-sm); padding:9px 11px; font-size:13px; color:var(--ink); margin-bottom:8px;
+  }
 
   .check-list{ display:flex; flex-direction:column; gap:2px; max-height:240px; overflow-y:auto; background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm); padding:4px 10px; }
   .check-row{ display:flex; align-items:center; gap:10px; padding:7px 2px; }
@@ -510,6 +515,19 @@
   .concert-roster-instrument{
     flex:none; border:1px solid var(--line); background:var(--paper);
     border-radius:6px; padding:4px 8px; font-size:11.5px; color:var(--ink);
+  }
+  .concert-roster-tags{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; width:100%; margin-top:6px; }
+  .concert-roster-tag{
+    display:inline-flex; align-items:center; gap:4px; background:var(--sage-bg); color:var(--sage);
+    border-radius:999px; padding:3px 4px 3px 10px; font-size:11px; font-weight:600;
+  }
+  .concert-roster-tag-remove{
+    flex:none; width:16px; height:16px; border-radius:50%; border:none; background:none;
+    color:inherit; cursor:pointer; font-size:12px; line-height:1; padding:0;
+  }
+  .concert-roster-add-instrument{
+    flex:none; border:1px solid var(--line); background:var(--paper);
+    border-radius:6px; padding:3px 6px; font-size:11px; color:var(--ink-soft);
   }
 </style>
 </head>
@@ -720,6 +738,7 @@
           <div class="info-row"><span class="k">日期</span><span class="v" id="infoDate">—</span></div>
           <div class="info-row"><span class="k">時間</span><span class="v" id="infoTime">—</span></div>
           <div class="info-row"><span class="k">地點</span><span class="v" id="infoLocation">—</span></div>
+          <div class="info-row hidden" id="infoConcertRow"><span class="k">所屬音樂會</span><span class="v" id="infoConcertTitle">—</span></div>
           <button type="button" class="info-edit-btn" id="infoEditBtn">✎ 編輯</button>
         </div>
         <div id="infoEditMode" class="hidden"></div>
@@ -884,9 +903,11 @@
         </div>
         <div id="concertRosterEditMode" class="hidden">
           <div class="survey-section-label" id="concertRosterCounterLabel">參與名單</div>
+          <input type="text" class="concert-roster-search" id="concertRosterSearchInput" placeholder="搜尋姓名或帳號">
           <div class="survey-bulk-row">
             <button type="button" id="concertRosterSelectAllBtn">全選</button>
             <button type="button" id="concertRosterClearAllBtn">全部取消</button>
+            <button type="button" id="concertRosterOnlySelectedBtn">只看已加入</button>
           </div>
           <div class="check-list" id="concertRosterChecklist"></div>
           <div class="survey-edit-actions">
@@ -1648,7 +1669,7 @@
     if (!piece || !openInstrumentName) return;
     var parts = (piece.parts || []).filter(function(p){ return p.instrumentName === openInstrumentName; });
     var members = concertRosterMembersCache[openConcertId] || [];
-    var eligibleMembers = members.filter(function(m){ return m.instrument === openInstrumentName; });
+    var eligibleMembers = members.filter(function(m){ return (m.instruments || []).indexOf(openInstrumentName) !== -1; });
     renderAssignmentPanel(parts, eligibleMembers);
   }
 
@@ -1679,7 +1700,7 @@
         });
       }
 
-      var eligibleMembers = members.filter(function(m){ return m.instrument === instrumentName; });
+      var eligibleMembers = members.filter(function(m){ return (m.instruments || []).indexOf(instrumentName) !== -1; });
       renderAssignmentPanel(parts, eligibleMembers);
     } catch (err) {
       if (openConcertId !== concertId || openPieceId !== pieceId || openInstrumentName !== instrumentName) return;
@@ -1735,7 +1756,9 @@
   // ---------- 參與名單分頁 ----------
   var instrumentsList = [];
   var concertRosterSourceTemplateCache = {}; // concertId -> sourceTemplateId|null
-  var concertRosterDraftMap = {}; // {uid: instrumentName}，編輯中的草稿
+  var concertRosterDraftMap = {}; // {uid: instrumentName[]}，編輯中的草稿，第一筆是主要樂器
+  var concertRosterSearchTerm = ''; // 依姓名/帳號篩選清單用，只影響畫面顯示，不影響草稿內容
+  var concertRosterOnlySelected = false; // 只顯示已勾選（已加入名單）的人，方便微調已選人員的樂器
 
   // 參與名單已經有「這場音樂會負責的樂器」身分，唯讀摘要依樂器分組列出，同樂器的人列在一起，
   // 不用逐一看每個人名字後面括號的樂器才知道誰跟誰同一組。分組順序沿用 instrumentsList（樂器
@@ -1744,9 +1767,11 @@
   function groupRosterMembersByInstrument(members){
     var byInstrument = {};
     members.forEach(function(m){
-      var key = m.instrument || '（未設定樂器）';
-      if (!byInstrument[key]) byInstrument[key] = [];
-      byInstrument[key].push(m);
+      var instruments = (m.instruments && m.instruments.length) ? m.instruments : ['（未設定樂器）'];
+      instruments.forEach(function(key){
+        if (!byInstrument[key]) byInstrument[key] = [];
+        byInstrument[key].push(m);
+      });
     });
     var order = instrumentsList.map(function(inst){ return inst.name; }).filter(function(name){ return byInstrument.hasOwnProperty(name); });
     Object.keys(byInstrument).forEach(function(key){
@@ -1802,25 +1827,62 @@
     }
   }
 
+  // approvedMembers 本身是 Firestore 查詢回傳的原始順序（不是姓名排序），人數一多不好找人，
+  // 這裡依姓名排序 + 搜尋框（姓名/帳號比對）+「只看已加入」三個條件一起篩過，只影響顯示順序，
+  // 不影響 concertRosterDraftMap 草稿本身
+  function visibleConcertRosterMembers(){
+    var term = concertRosterSearchTerm.trim().toLowerCase();
+    return (approvedMembers || []).filter(function(m){
+      if (concertRosterOnlySelected && !concertRosterDraftMap.hasOwnProperty(m.uid)) return false;
+      if (!term) return true;
+      return (m.name || '').toLowerCase().indexOf(term) !== -1 || (m.account || '').toLowerCase().indexOf(term) !== -1;
+    }).sort(function(a, b){ return (a.name || '').localeCompare(b.name || '', 'zh-Hant'); });
+  }
+
   function renderConcertRosterChecklist(){
     var checklist = document.getElementById('concertRosterChecklist');
-    checklist.innerHTML = (approvedMembers || []).map(function(m){
+    var visibleMembers = visibleConcertRosterMembers();
+    checklist.innerHTML = visibleMembers.length === 0
+      ? '<div class="part-empty">找不到符合條件的團員</div>'
+      : visibleMembers.map(function(m){
       var on = concertRosterDraftMap.hasOwnProperty(m.uid);
-      var instrument = on ? concertRosterDraftMap[m.uid] : '';
-      var optionsHtml = instrumentsList.map(function(inst){
-        return '<option value="' + escapeHtml(inst.name) + '"' + (inst.name === instrument ? ' selected' : '') + '>' + escapeHtml(inst.name) + '</option>';
+      var selected = on ? concertRosterDraftMap[m.uid] : [];
+      var primary = selected[0] || '';
+
+      var primaryOptionsHtml = instrumentsList.map(function(inst){
+        return '<option value="' + escapeHtml(inst.name) + '"' + (inst.name === primary ? ' selected' : '') + '>' + escapeHtml(inst.name) + '</option>';
       }).join('');
-      // 若目前草稿中的樂器已不在現行樂器清單內（例如已於樂器管理頁被改名或刪除），
+      // 若目前草稿中的主要樂器已不在現行樂器清單內（例如已於樂器管理頁被改名或刪除），
       // 額外補一個代表舊值的 option 並標記為 selected，讓下拉選單如實呈現實際會被存檔的值，
       // 避免瀏覽器預設選中第一個選項、造成畫面與 concertRosterDraftMap 不一致。
-      if (instrument && !instrumentsList.some(function(inst){ return inst.name === instrument; })){
-        optionsHtml += '<option value="' + escapeHtml(instrument) + '" selected>' + escapeHtml(instrument) + '</option>';
+      if (primary && !instrumentsList.some(function(inst){ return inst.name === primary; })){
+        primaryOptionsHtml += '<option value="' + escapeHtml(primary) + '" selected>' + escapeHtml(primary) + '</option>';
       }
+
+      // 第 2 筆以後的樂器（同時負責多種樂器的少數情形）顯示成可移除的 tag，
+      // 旁邊一顆「＋ 新增樂器」選單只列出這個人還沒選過的樂器
+      var tagsHtml = selected.slice(1).map(function(name){
+        return (
+          '<span class="concert-roster-tag">' + escapeHtml(name) +
+            '<button type="button" class="concert-roster-tag-remove" data-concert-roster-remove="' + m.uid + '|' + escapeHtml(name) + '" aria-label="移除樂器">×</button>' +
+          '</span>'
+        );
+      }).join('');
+
+      var remainingInstruments = instrumentsList.filter(function(inst){ return selected.indexOf(inst.name) === -1; });
+      var addSelectHtml = (on && remainingInstruments.length > 0)
+        ? '<select class="concert-roster-add-instrument" data-concert-roster-add="' + m.uid + '">' +
+            '<option value="">＋ 新增樂器</option>' +
+            remainingInstruments.map(function(inst){ return '<option value="' + escapeHtml(inst.name) + '">' + escapeHtml(inst.name) + '</option>'; }).join('') +
+          '</select>'
+        : '';
+
       return (
-        '<div class="check-row">' +
+        '<div class="check-row' + (on ? ' assign-row-wrap' : '') + '">' +
           '<button type="button" class="checkbox' + (on ? ' on' : '') + '" data-concert-roster-toggle="' + m.uid + '">' + (on ? '✓' : '') + '</button>' +
           '<span class="assign-name">' + escapeHtml(m.name) + '（' + escapeHtml(m.account) + '）</span>' +
-          (on ? '<select class="concert-roster-instrument" data-concert-roster-instrument="' + m.uid + '">' + optionsHtml + '</select>' : '') +
+          (on ? '<select class="concert-roster-instrument" data-concert-roster-instrument="' + m.uid + '">' + primaryOptionsHtml + '</select>' : '') +
+          (on ? '<div class="concert-roster-tags">' + tagsHtml + addSelectHtml + '</div>' : '') +
         '</div>'
       );
     }).join('');
@@ -1835,12 +1897,27 @@
     if (!openConcertId) return;
     var members = concertRosterMembersCache[openConcertId] || [];
     concertRosterDraftMap = {};
-    members.forEach(function(m){ concertRosterDraftMap[m.uid] = m.instrument; });
+    members.forEach(function(m){ concertRosterDraftMap[m.uid] = (m.instruments || []).slice(); });
+    concertRosterSearchTerm = '';
+    concertRosterOnlySelected = false;
+    document.getElementById('concertRosterSearchInput').value = '';
+    document.getElementById('concertRosterOnlySelectedBtn').classList.remove('on');
     document.getElementById('concertRosterTemplatePicker').classList.add('hidden');
     document.getElementById('concertRosterViewMode').classList.add('hidden');
     document.getElementById('concertRosterEditMode').classList.remove('hidden');
     renderConcertRosterChecklist();
     updateConcertRosterCounter();
+  });
+
+  document.getElementById('concertRosterSearchInput').addEventListener('input', function(e){
+    concertRosterSearchTerm = e.target.value;
+    renderConcertRosterChecklist();
+  });
+
+  document.getElementById('concertRosterOnlySelectedBtn').addEventListener('click', function(){
+    concertRosterOnlySelected = !concertRosterOnlySelected;
+    this.classList.toggle('on', concertRosterOnlySelected);
+    renderConcertRosterChecklist();
   });
 
   document.getElementById('concertRosterChecklist').addEventListener('click', function(e){
@@ -1851,29 +1928,58 @@
       delete concertRosterDraftMap[uid];
     } else {
       var member = (approvedMembers || []).filter(function(m){ return m.uid === uid; })[0];
-      concertRosterDraftMap[uid] = (member && member.instruments && member.instruments[0]) || (instrumentsList[0] ? instrumentsList[0].name : '');
+      concertRosterDraftMap[uid] = (member && member.instruments && member.instruments[0])
+        ? [member.instruments[0]]
+        : (instrumentsList[0] ? [instrumentsList[0].name] : []);
     }
     renderConcertRosterChecklist();
     updateConcertRosterCounter();
   });
 
-  document.getElementById('concertRosterChecklist').addEventListener('change', function(e){
-    var select = e.target.closest('[data-concert-roster-instrument]');
-    if (!select) return;
-    concertRosterDraftMap[select.getAttribute('data-concert-roster-instrument')] = select.value;
+  document.getElementById('concertRosterChecklist').addEventListener('click', function(e){
+    var removeBtn = e.target.closest('[data-concert-roster-remove]');
+    if (!removeBtn) return;
+    var parts = removeBtn.getAttribute('data-concert-roster-remove').split('|');
+    concertRosterDraftMap[parts[0]] = concertRosterDraftMap[parts[0]].filter(function(name){ return name !== parts[1]; });
+    renderConcertRosterChecklist();
   });
 
+  document.getElementById('concertRosterChecklist').addEventListener('change', function(e){
+    var primarySelect = e.target.closest('[data-concert-roster-instrument]');
+    if (primarySelect){
+      var uid = primarySelect.getAttribute('data-concert-roster-instrument');
+      var rest = concertRosterDraftMap[uid].slice(1).filter(function(name){ return name !== primarySelect.value; });
+      concertRosterDraftMap[uid] = [primarySelect.value].concat(rest);
+      renderConcertRosterChecklist();
+      return;
+    }
+    var addSelect = e.target.closest('[data-concert-roster-add]');
+    if (addSelect && addSelect.value){
+      var addUid = addSelect.getAttribute('data-concert-roster-add');
+      concertRosterDraftMap[addUid].push(addSelect.value);
+      renderConcertRosterChecklist();
+    }
+  });
+
+  // 全選/全部取消只作用在目前搜尋/篩選後看得到的人，不是整個團——有下搜尋條件時
+  // 「全選」還去動沒被搜到的人會很意外
   document.getElementById('concertRosterSelectAllBtn').addEventListener('click', function(){
-    (approvedMembers || []).forEach(function(m){
+    visibleConcertRosterMembers().forEach(function(m){
       if (!concertRosterDraftMap.hasOwnProperty(m.uid)){
-        concertRosterDraftMap[m.uid] = (m.instruments && m.instruments[0]) || (instrumentsList[0] ? instrumentsList[0].name : '');
+        concertRosterDraftMap[m.uid] = (m.instruments && m.instruments[0])
+          ? [m.instruments[0]]
+          : (instrumentsList[0] ? [instrumentsList[0].name] : []);
       }
     });
     renderConcertRosterChecklist();
     updateConcertRosterCounter();
   });
   document.getElementById('concertRosterClearAllBtn').addEventListener('click', function(){
-    concertRosterDraftMap = {};
+    var visibleUids = {};
+    visibleConcertRosterMembers().forEach(function(m){ visibleUids[m.uid] = true; });
+    Object.keys(concertRosterDraftMap).forEach(function(uid){
+      if (visibleUids[uid]) delete concertRosterDraftMap[uid];
+    });
     renderConcertRosterChecklist();
     updateConcertRosterCounter();
   });
@@ -1889,7 +1995,7 @@
     // section-admin.html 只能靠這裡存下來的 name/account 顯示人名，不能自己去讀 users
     var members = Object.keys(concertRosterDraftMap).map(function(uid){
       var m = (approvedMembers || []).filter(function(x){ return x.uid === uid; })[0];
-      return { uid: uid, instrument: concertRosterDraftMap[uid], name: m ? m.name : uid, account: m ? m.account : '' };
+      return { uid: uid, instruments: concertRosterDraftMap[uid], name: m ? m.name : uid, account: m ? m.account : '' };
     });
     var saveBtn = document.getElementById('concertRosterSaveBtn');
     saveBtn.disabled = true;
@@ -1919,14 +2025,14 @@
     var isNew = !existingSnap.exists();
     var existingMembers = existingSnap.exists() ? (existingSnap.data().members || []) : [];
     var existingByUid = {};
-    existingMembers.forEach(function(m){ existingByUid[m.uid] = m.instrument; });
+    existingMembers.forEach(function(m){ existingByUid[m.uid] = m.instruments || []; });
     var newMembers = template.members.map(function(uid){
       var member = (approvedMembers || []).filter(function(m){ return m.uid === uid; })[0];
-      var instrument = existingByUid.hasOwnProperty(uid)
+      var instruments = existingByUid.hasOwnProperty(uid)
         ? existingByUid[uid]
-        : ((member && member.instruments && member.instruments[0]) || (instrumentsList[0] ? instrumentsList[0].name : ''));
+        : ((member && member.instruments && member.instruments[0]) ? [member.instruments[0]] : (instrumentsList[0] ? [instrumentsList[0].name] : []));
       // name/account 跟手動編輯名單同一套反正規化欄位（見 concertRosterSaveBtn 的說明）
-      return { uid: uid, instrument: instrument, name: member ? member.name : uid, account: member ? member.account : '' };
+      return { uid: uid, instruments: instruments, name: member ? member.name : uid, account: member ? member.account : '' };
     });
     var payload = {
       members: newMembers,
@@ -2243,6 +2349,11 @@
     document.getElementById('infoDate').textContent = infoDateText(evt);
     document.getElementById('infoTime').textContent = formatEventTime(evt) || '未定';
     document.getElementById('infoLocation').textContent = evt.location || '未填寫';
+    document.getElementById('infoConcertRow').classList.toggle('hidden', !evt.concertId);
+    if (evt.concertId){
+      var concert = concertsById[evt.concertId];
+      document.getElementById('infoConcertTitle').textContent = concert ? concert.title : '（找不到這場音樂會）';
+    }
   }
 
   document.getElementById('tabInfo').addEventListener('click', function(){

@@ -334,6 +334,22 @@
   var seatingSectionsList = DEFAULT_SECTIONS;
   var membersInstrumentsByUid = {}; // uid -> instruments[]，approved 團員，roster 名單內才需要
   var membersNameByUid = {}; // uid -> {name, account}
+  var concertRosterInstrumentsCache = {}; // concertId -> {uid: instruments[]}
+  var concertInstrumentsByUid = {}; // 目前這場活動適用的音樂會樂器覆蓋表，沒有掛 concertId 時是空物件
+
+  // 這場活動如果掛了 concertId，優先用音樂會參與名單登記的樂器身分分組（可能不只一個），
+  // 名單裡查不到的人退回個人資料樂器，不讓人從統計裡消失（跟 checkin-stats-admin.html 同一套邏輯）
+  async function ensureConcertRosterInstruments(concertId){
+    if (!concertId) return {};
+    if (concertRosterInstrumentsCache[concertId]) return concertRosterInstrumentsCache[concertId];
+    var snap = await getDoc(doc(db, 'concertRosters', concertId));
+    var map = {};
+    if (snap.exists()){
+      (snap.data().members || []).forEach(function(m){ map[m.uid] = m.instruments || []; });
+    }
+    concertRosterInstrumentsCache[concertId] = map;
+    return map;
+  }
 
   // ---------- 找可切換的團練清單（跟首頁「下一次◯◯」同一套判斷：homeHighlight 類型），
   // 範圍只到未來（含現在），不含過去——8/24 討論定案，指揮只需要往後看已排定的場次，
@@ -358,14 +374,15 @@
         title: data.title,
         type: data.type,
         date: data.date && data.date.toDate ? data.date.toDate() : null,
-        location: data.location
+        location: data.location,
+        concertId: data.concertId || null
       });
     });
     return list;
   }
 
   // ---------- 應到/回報/簽到資料 ----------
-  async function loadEventData(eventId){
+  async function loadEventData(eventId, concertId){
     // reports 查詢只需要 eventId，不需要等 roster 讀完才開始——這兩個彼此互不相依，
     // 平行發出去；只有下面的 users 查詢真的需要先知道 roster 是否非空才能決定要不要查
     var rosterAndReports = await Promise.all([
@@ -381,6 +398,8 @@
       var data = docSnap.data();
       reports.push({ uid: data.uid, name: data.name, account: data.account, status: data.status });
     });
+
+    concertInstrumentsByUid = await ensureConcertRosterInstruments(concertId);
 
     if (rosterMembers && rosterMembers.length > 0){
       var usersSnap = await getDocs(query(collection(db, 'users'), where('status', '==', 'approved')));
@@ -412,7 +431,9 @@
     var byName = {};
     instrumentsList.forEach(function(inst){ byName[inst.name] = []; });
     uids.forEach(function(uid){
-      var insts = membersInstrumentsByUid[uid] || [];
+      var insts = (concertInstrumentsByUid[uid] && concertInstrumentsByUid[uid].length > 0)
+        ? concertInstrumentsByUid[uid]
+        : (membersInstrumentsByUid[uid] || []);
       if (insts.length === 0){
         if (!byName['未設定樂器']) byName['未設定樂器'] = [];
         byName['未設定樂器'].push(uid);
@@ -895,7 +916,7 @@
       (nextEvent.location ? ' · ' + nextEvent.location : '');
 
     try {
-      await withRetry(function(){ return loadEventData(nextEvent.id); });
+      await withRetry(function(){ return loadEventData(nextEvent.id, nextEvent.concertId); });
     } catch (e) {
       document.getElementById('nextEventMeta').textContent = '讀取失敗，請重新整理再試一次';
       return;

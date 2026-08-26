@@ -462,7 +462,7 @@
       if (openConcertId !== concertId || openPieceId !== pieceId || openInstrumentName !== instrumentName) return;
 
       var members = rosterSnap.exists() ? (rosterSnap.data().members || []) : [];
-      currentEligibleMembers = members.filter(function(m){ return m.instrument === instrumentName; });
+      currentEligibleMembers = members.filter(function(m){ return (m.instruments || []).indexOf(instrumentName) !== -1; });
 
       assignmentDraft = {};
       currentParts.forEach(function(part){ assignmentDraft[part.partId] = []; });

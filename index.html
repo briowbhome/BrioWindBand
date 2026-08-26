@@ -1666,7 +1666,7 @@
       rosterSnap.forEach(function(docSnap){
         var members = docSnap.data().members || [];
         var mine = members.filter(function(m){ return m.uid === uid; })[0];
-        if (mine) myEntries.push({ concertId: docSnap.id, instrument: mine.instrument });
+        if (mine) myEntries.push({ concertId: docSnap.id, instruments: mine.instruments || [] });
       });
       if (myEntries.length === 0) return [];
 
@@ -1681,22 +1681,23 @@
         var pieces = await Promise.all(pieceRefs.map(async function(ref){
           var piece = repertoireById[ref.id];
           if (!piece) return { title: '（曲目已刪除）', assignedLabel: null };
-          var sectionSnap = await getDoc(doc(db, 'concerts', entry.concertId, 'pieces', ref.id, 'sections', entry.instrument));
-          var assignedLabel = null;
-          if (sectionSnap.exists()){
-            (sectionSnap.data().parts || []).some(function(part){
+          // 同時負責多種樂器時，這首曲子可能只在其中某個樂器的分部文件裡有指派到這個人，
+          // 逐一查每個樂器的分部文件，把找到的分部標籤都收集起來
+          var labels = [];
+          await Promise.all(entry.instruments.map(async function(instrumentName){
+            var sectionSnap = await getDoc(doc(db, 'concerts', entry.concertId, 'pieces', ref.id, 'sections', instrumentName));
+            if (!sectionSnap.exists()) return;
+            (sectionSnap.data().parts || []).forEach(function(part){
               if ((part.members || []).indexOf(uid) !== -1){
                 var def = (piece.parts || []).filter(function(p){ return p.partId === part.partId; })[0];
-                assignedLabel = def ? def.label : part.partId;
-                return true;
+                labels.push(def ? def.label : part.partId);
               }
-              return false;
             });
-          }
-          return { title: piece.title, assignedLabel: assignedLabel };
+          }));
+          return { title: piece.title, assignedLabel: labels.length ? labels.join('、') : null };
         }));
 
-        return { concertId: entry.concertId, title: concertSnap.data().title, instrument: entry.instrument, pieces: pieces };
+        return { concertId: entry.concertId, title: concertSnap.data().title, instruments: entry.instruments, pieces: pieces };
       }));
 
       return concerts.filter(function(c){ return c; });
@@ -1727,7 +1728,7 @@
         return (
           '<div class="my-concert-card">' +
             '<div class="my-concert-title">' + escapeHtmlForOverview(c.title) + '</div>' +
-            '<div class="my-concert-instrument">你的分部：' + escapeHtmlForOverview(c.instrument) + '</div>' +
+            '<div class="my-concert-instrument">你負責的樂器：' + escapeHtmlForOverview(c.instruments.join('、') || '未設定') + '</div>' +
             piecesHtml +
           '</div>'
         );
