@@ -91,6 +91,7 @@ var eligibleMembers = members.filter(function(m){ return (m.instruments || []).i
 
 - `event-admin.html`：`concertRosterDraftMap` 型別、`renderConcertRosterChecklist()`、`applyTemplateToConcertRoster()`、`reRenderCurrentAssignment()`/`openAssignmentPanel()`、`groupRosterMembersByInstrument()`
 - `section-admin.html`：分部指派可選名單的篩選邏輯
+- `index.html`：**寫計畫時才發現漏掉的一處**——「團務總覽」的「我的音樂會」（`loadMyConcerts()`/`renderMyConcerts()`）也讀 `concertRosters.members[].instrument`，同人多樂器時要逐一查每個樂器的分部文件、把找到的分部標籤都列出來
 - `checkin-stats-admin.html`：`loadStats()`、`groupCheckinsByInstrument()`、`attendingCountsByInstrument()`、`openDetailSheet()`/`renderDetailSheet()`
 - `conductor-admin.html`：`groupUidsByInstrument()` 與呼叫端
 - `firestore.rules`：不需要改——`concertRosters` 的讀寫權限維持現況，只是欄位形狀變了
