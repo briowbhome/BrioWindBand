@@ -1728,7 +1728,7 @@
         return (
           '<div class="my-concert-card">' +
             '<div class="my-concert-title">' + escapeHtmlForOverview(c.title) + '</div>' +
-            '<div class="my-concert-instrument">你負責的樂器：' + escapeHtmlForOverview(c.instruments.join('、') || '未設定') + '</div>' +
+            '<div class="my-concert-instrument">分部：' + escapeHtmlForOverview(c.instruments.join('、') || '未設定') + '</div>' +
             piecesHtml +
           '</div>'
         );
