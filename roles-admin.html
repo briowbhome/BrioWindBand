@@ -195,6 +195,16 @@
     font-size:14px; color:var(--ink); width:100%;
   }
   .field-row{ display:flex; gap:10px; }
+  .part-add-row{ display:flex; gap:8px; }
+  .part-add-row select{
+    flex:1; border:1px solid var(--line); background:var(--paper);
+    border-radius:var(--radius-sm); padding:9px 10px; font-size:13px; color:var(--ink);
+  }
+  .part-add-btn{
+    flex:none; border:1px solid var(--line); background:var(--paper); color:var(--brass-deep);
+    border-radius:var(--radius-sm); padding:9px 14px; font-size:12px; font-weight:700; cursor:pointer;
+  }
+  .part-add-btn:active{ background:var(--sage-bg); }
   .field-row .field{ flex:1; min-width:0; margin-top:12px; }
   .field-checkbox{ margin-top:12px; display:flex; align-items:center; gap:8px; }
   .field-checkbox input{ width:16px; height:16px; accent-color:var(--brass-deep); }
@@ -486,6 +496,15 @@
     { key: 'canManageEventTypes', label: '可管理活動類型' }
   ];
 
+  // 職位範本：交接時負責轉移的人不用記得「這個職位要打勾哪幾個旗標」，選職位名稱
+  // 直接把對應的權限旗標打勾好。套用只影響本地草稿（跟這個 sheet 既有的「先勾選、
+  // 按儲存變更才真的送出」互動模式一致），不會自動反選沒列在這個職位裡的其他旗標。
+  // 財務等其他職位要等對應功能/旗標真的做出來才會加進這份清單，不先加一個沒有東西
+  // 可以管的職位進來
+  var POSITION_PRESETS = [
+    { key: 'repertoire', label: '譜務', permissions: { canManageSheetMusic: true } }
+  ];
+
   var membersById = {};
   var membersLoaded = false;
   var instrumentsList = [];
@@ -498,6 +517,7 @@
   var draftPermissions = {};
   var draftSections = [];
   var draftInstruments = [];
+  var draftPositionPresets = []; // 純顯示/追蹤用，記錄套用過哪些職位範本，不參與任何權限判斷
   var initialRole = null;
   var initialPermKey = '';
   var initialSectionsKey = '';
@@ -681,6 +701,26 @@
           );
         }).join('');
 
+    var presetOptionsHtml = '<option value="">選擇職位套用權限…</option>' +
+      POSITION_PRESETS.map(function(preset){
+        return '<option value="' + preset.key + '">' + preset.label + '</option>';
+      }).join('');
+    var appliedPresetLabels = draftPositionPresets.map(function(key){
+      var preset = POSITION_PRESETS.filter(function(p){ return p.key === key; })[0];
+      return preset ? preset.label : key;
+    });
+    var positionPresetField =
+      '<div class="field">' +
+        '<label>職位範本（選填，快速套用對應權限）</label>' +
+        '<div class="part-add-row">' +
+          '<select id="positionPresetSelect">' + presetOptionsHtml + '</select>' +
+          '<button type="button" class="part-add-btn" id="positionPresetApplyBtn">套用</button>' +
+        '</div>' +
+        (appliedPresetLabels.length
+          ? '<p class="lede" style="margin:6px 0 0;">目前掛著：' + appliedPresetLabels.join('、') + '</p>'
+          : '') +
+      '</div>';
+
     var roleAndPermFields = sheetRestrictedSelf
       ? '<p class="lede" style="margin:0 0 4px;">只能調整自己的樂器/聲部與分部長，角色與權限無法透過這裡調整。</p>'
       : (
@@ -691,7 +731,8 @@
           '<div class="field">' +
             '<label>額外權限</label>' +
             '<div class="check-list">' + permRows + '</div>' +
-          '</div>'
+          '</div>' +
+          positionPresetField
         );
 
     memberSheetBody.innerHTML =
@@ -718,6 +759,7 @@
     draftPermissions = Object.assign({}, m.permissions || {});
     draftSections = (m.sectionLeaderFor || []).slice();
     draftInstruments = (m.instruments || []).slice();
+    draftPositionPresets = (m.positionPresets || []).slice();
     initialRole = draftRole;
     initialPermKey = permissionsKey(draftPermissions);
     initialSectionsKey = sectionsKey(draftSections);
@@ -775,6 +817,18 @@
       renderMemberSheetBody();
       return;
     }
+    if (e.target.closest('#positionPresetApplyBtn')){
+      var presetKey = document.getElementById('positionPresetSelect').value;
+      if (!presetKey) return;
+      var preset = POSITION_PRESETS.filter(function(p){ return p.key === presetKey; })[0];
+      if (!preset) return;
+      Object.keys(preset.permissions).forEach(function(permKey){
+        draftPermissions[permKey] = preset.permissions[permKey];
+      });
+      if (draftPositionPresets.indexOf(presetKey) === -1) draftPositionPresets.push(presetKey);
+      renderMemberSheetBody();
+      return;
+    }
   });
 
   document.getElementById('memberSheetClose').addEventListener('click', closeMemberSheet);
@@ -797,7 +851,8 @@
             draftPermissions
           ),
           sectionLeaderFor: draftSections,
-          instruments: draftInstruments
+          instruments: draftInstruments,
+          positionPresets: draftPositionPresets
         };
     updateDoc(doc(db, 'users', saveUid), payload).then(function(){
       closeMemberSheet();

@@ -226,6 +226,51 @@ export async function requireAdminOrConductor() {
   return { uid: user.uid, profile: profile };
 }
 
+// 藏譜管理頁面（repertoire-admin.html）用：必須登入、審核通過，且「role 是 admin/owner」或
+// 「被個別授予 canManageSheetMusic 權限」（例如譜務）。刻意跟 requireAdmin() 分開——這個放寬
+// 只給這一個頁面用，不影響其餘 8 個 admin-only 後台頁面的守門邏輯
+export async function requireAdminOrSheetMusicManager() {
+  var user = await waitForAuthUser();
+  if (!user) {
+    clearProfileCache();
+    goToLogin();
+    return null;
+  }
+
+  function isAllowed(p) {
+    return !!p && (p.role === "admin" || p.role === "owner" ||
+      (p.permissions && p.permissions.canManageSheetMusic === true));
+  }
+
+  var profile;
+  try {
+    profile = await resolveProfile(user.uid, function (fresh) {
+      if (!fresh || fresh.status !== "approved") {
+        clearProfileCache();
+        signOut(auth).then(goToLogin);
+      } else if (!isAllowed(fresh)) {
+        clearProfileCache();
+        location.href = "index.html";
+      }
+    });
+  } catch (e) {
+    showConnectionError();
+    return null;
+  }
+
+  if (!profile || profile.status !== "approved") {
+    clearProfileCache();
+    await signOut(auth);
+    goToLogin();
+    return null;
+  }
+  if (!isAllowed(profile)) {
+    location.href = "index.html";
+    return null;
+  }
+  return { uid: user.uid, profile: profile };
+}
+
 // 分部長專屬頁面（section-admin.html）用：必須登入、審核通過，且「role 是 admin/owner」或
 // 「sectionLeaderFor 陣列不是空的」。刻意跟 requireAdminOrConductor() 分開——這裡放行的
 // 判斷依據是陣列欄位有沒有值，不是角色列舉，跟其他守門函式的角色判斷邏輯不同

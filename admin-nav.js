@@ -40,13 +40,17 @@ function ensureStyle() {
     '.admin-nav-overlay.show{opacity:1;pointer-events:auto;}' +
     '.admin-nav-drawer{' +
       'position:fixed;top:0;bottom:0;left:0;width:264px;max-width:82vw;z-index:91;' +
-      'background:var(--paper-raised);box-shadow:12px 0 30px rgba(32,36,47,.3);' +
+      'background:var(--paper-raised);' +
       'transform:translateX(-100%);transition:transform .25s cubic-bezier(.32,.72,0,1);' +
       'display:flex;flex-direction:column;' +
       'padding-top:env(safe-area-inset-top);' +
       'font-family:"Noto Sans TC","Noto Sans",sans-serif;color:var(--ink);' +
     '}' +
-    '.admin-nav-drawer.show{transform:translateX(0);}' +
+    // box-shadow 只在展開時才加：off-screen 的抽屜雖然整個框被 translateX(-100%) 推出視窗，
+    // box-shadow 本身還是會照原本的框位置畫（往右偏移 12px、模糊 30px），框的右邊界剛好
+    // 貼齊視窗左緣，陰影的模糊範圍就會往右暈進畫面，變成側邊選單頁面左側一條突兀的黑色漸層——
+    // 收合狀態不需要陰影（反正看不到抽屜本體），乾脆展開時才加這個樣式最乾淨
+    '.admin-nav-drawer.show{transform:translateX(0);box-shadow:12px 0 30px rgba(32,36,47,.3);}' +
     '.admin-nav-head{padding:18px 18px 14px;border-bottom:1px solid var(--line);}' +
     '.admin-nav-home{' +
       'display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;' +

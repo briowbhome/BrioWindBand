@@ -270,10 +270,10 @@
 <div class="app" id="appRoot">
 
   <div class="appbar">
-    <button class="admin-nav-btn" id="adminNavBtn" type="button" aria-label="開啟後台導覽選單">
+    <button class="admin-nav-btn hidden" id="adminNavBtn" type="button" aria-label="開啟後台導覽選單">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
     </button>
-    <a class="back-btn" href="admin-index.html" aria-label="回控制台首頁">
+    <a class="back-btn" id="backBtn" href="admin-index.html" aria-label="回控制台首頁">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="m15 5-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </a>
     <a class="brand-link" href="index.html">
@@ -355,7 +355,7 @@
 <script type="module">
   import { initAdminNav } from './admin-nav.js';
   import { showToast } from './toast.js';
-  import { requireAdmin, peekCachedProfile } from './auth-guard.js';
+  import { requireAdminOrSheetMusicManager, peekCachedProfile } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { subscribeRepertoire, addPiece, updatePiece, deletePiece, randomPartId } from './repertoire.js';
@@ -512,6 +512,14 @@
     syncPartLabelAutoFill();
   }
 
+  // 新增分部欄位後，標籤只清空、不重新帶入樂器名稱——連續新增同一個樂器的多個分部
+  // （1st/2nd/3rd）時，如果每次新增完都自動帶回樂器名稱，看起來會像是準備重複新增
+  // 一筆一樣的分部。重新帶入的時機只保留在「切換樂器」跟「開啟表單」這兩種情境
+  function clearPartLabelAfterAdd(){
+    document.getElementById('partLabelInput').value = '';
+    partLabelAutoFilled = '';
+  }
+
   document.getElementById('partInstrumentSelect').addEventListener('change', syncPartLabelAutoFill);
 
   document.getElementById('partAddBtn').addEventListener('click', function(){
@@ -527,7 +535,7 @@
     }
     showFormError('');
     draftParts.push({ partId: randomPartId(), instrumentName: instrumentName, label: label });
-    resetPartAddRow();
+    clearPartLabelAfterAdd();
     renderPartGroups();
   });
 
@@ -709,15 +717,27 @@
     });
   });
 
-  requireAdmin().then(function(result){
+  requireAdminOrSheetMusicManager().then(function(result){
     if (!result) return;
     currentAdminUid = result.uid;
 
     var avatarBtn = document.getElementById('avatarBtn');
     avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
     avatarBtn.classList.remove('skel');
-    initAccountMenu(result.profile.name);
-    initAdminNav('repertoire');
+
+    // 非 admin-tier（例如純譜務身分的一般團員）沒有其他 8 個後台頁面的權限：
+    // 側滑選單顯示了也大部分點不動，返回箭頭也不能連去 admin-index.html
+    // （會被那頁的 requireAdmin() 擋下），比照 conductor-admin.html 既有的雙模式寫法
+    var isAdmin = result.profile.role === 'admin' || result.profile.role === 'owner';
+    initAccountMenu(result.profile.name, isAdmin ? 'admin-index.html' : null, null);
+    if (isAdmin) {
+      document.getElementById('adminNavBtn').classList.remove('hidden');
+      initAdminNav('repertoire');
+    } else {
+      var backBtn = document.getElementById('backBtn');
+      backBtn.setAttribute('href', 'index.html');
+      backBtn.setAttribute('aria-label', '回團員首頁');
+    }
 
     subscribeRepertoire(db, function(pieces){
       piecesById = {};

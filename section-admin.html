@@ -429,13 +429,16 @@
           );
         }).join('');
 
-    // 分部長這輪還不能真的存檔（Firestore 規則細節見 schema.md「已知限制」），與其讓他們按下去
-    // 才收到生硬的權限錯誤代碼，直接反灰按鈕＋說明原因
-    var canSave = isViewerAdminTier;
+    // 規則現在放行「admin-tier 或這個樂器在自己 sectionLeaderFor 範圍內」（見
+    // firestore.rules 的 canManageSection()），這裡的反灰判斷要跟著放寬一致，
+    // 不然規則已經允許、畫面上按鈕還是灰的。openInstrumentName 理論上一定在
+    // viewerSectionLeaderFor 範圍內（filterInstrumentsForViewer() 已經先篩過一輪，
+    // 分部長打從一開始就看不到範圍外的樂器），這裡再判斷一次是保險，不是唯一防線
+    var canSave = isViewerAdminTier || viewerSectionLeaderFor.indexOf(openInstrumentName) !== -1;
     document.getElementById('assignmentSlot').innerHTML =
       partsHtml +
       '<div class="survey-section-label">尚未指派（參與名單中此樂器的成員）</div><div class="check-list">' + unassignedHtml + '</div>' +
-      (canSave ? '' : '<div class="part-empty">分部長這輪暫時還不能存檔，指派調整請先請管理員協助儲存</div>') +
+      (canSave ? '' : '<div class="part-empty">這個樂器分部不在你的管理範圍內，無法儲存</div>') +
       '<div class="survey-edit-actions">' +
         '<button type="button" id="assignmentCancelBtn">取消</button>' +
         '<button type="button" class="btn-save" id="assignmentSaveBtn"' + (canSave ? '' : ' disabled') + '>儲存指派</button>' +

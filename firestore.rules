@@ -40,6 +40,22 @@ service cloud.firestore {
           selfProfile().permissions.canManageEventTypes == true);
     }
 
+    // Owner，或被個別授予 canManageSheetMusic 的人（藏譜管理，例如譜務）
+    function canManageSheetMusic() {
+      return isOwner() ||
+        (hasProfile() &&
+          selfProfile().permissions != null &&
+          selfProfile().permissions.canManageSheetMusic == true);
+    }
+
+    // 分部長只能寫自己 sectionLeaderFor 範圍內的樂器分部（concerts/*/pieces/*/sections/{instrumentName}
+    // 文件 ID 本身就是樂器名稱，不用讀文件內容就能判斷範圍）
+    function canManageSection(instrumentName) {
+      return hasProfile() &&
+        selfProfile().sectionLeaderFor != null &&
+        instrumentName in selfProfile().sectionLeaderFor;
+    }
+
     // 一般 Admin 審核用：role 是 admin 或 owner 就算「幹部層級」
     function isAdminTier() {
       return hasProfile() && selfProfile().role in ['admin', 'owner'];
@@ -262,7 +278,7 @@ service cloud.firestore {
     // 寫入這輪範圍內收在 isAdminTier()
     match /repertoire/{pieceId} {
       allow get, list: if hasProfile();
-      allow create, update, delete: if isAdminTier();
+      allow create, update, delete: if isAdminTier() || canManageSheetMusic();
     }
 
     // 音樂會（event-admin.html「音樂會」區塊管理）。讀取開放給所有登入者，讓團員能在
@@ -277,13 +293,13 @@ service cloud.firestore {
         allow get, list: if hasProfile();
         allow create, update, delete: if isAdminTier();
 
-        // 每曲 × 每樂器分部指派，文件 ID = 樂器名稱。分部長（一般團員身分）要能寫入自己
-        // sectionLeaderFor 範圍內的文件，是刻意留到下一輪權限篇的已知限制——這輪寫入
-        // 一律收在 isAdminTier()，section-admin.html 頁面本身照樣做出來，但非 admin-tier
-        // 的分部長點「儲存指派」目前會被這裡擋下，收到權限不足的錯誤
+        // 每曲 × 每樂器分部指派，文件 ID = 樂器名稱。分部長（一般團員身分）能寫入自己
+        // sectionLeaderFor 範圍內的文件（canManageSection()），不檢查 parts[].members
+        // 內容的正確性——名單/樂器資格由 section-admin.html 前端的可選名單篩選把關，
+        // 規則只負責「誰能碰這份文件」
         match /sections/{instrumentName} {
           allow get, list: if hasProfile();
-          allow create, update, delete: if isAdminTier();
+          allow create, update, delete: if isAdminTier() || canManageSection(instrumentName);
         }
       }
     }
