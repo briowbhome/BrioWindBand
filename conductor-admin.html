@@ -227,6 +227,9 @@
 <div class="app" id="appRoot">
 
   <div class="appbar">
+    <button class="admin-nav-btn hidden" id="adminNavBtn" type="button" aria-label="開啟後台導覽選單">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
     <a class="back-btn" href="index.html" aria-label="回團員首頁">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 11 12 4l8 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10v9h12v-9" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
     </a>
@@ -306,6 +309,8 @@
 </div>
 
 <script type="module">
+  import { showToast } from './toast.js';
+  import { initAdminNav } from './admin-nav.js';
   import { requireAdminOrConductor, peekCachedProfile } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
@@ -819,7 +824,7 @@
         editingNoteId = null;
         return loadNotes();
       }).catch(function(err){
-        alert('儲存失敗：' + err.code);
+        showToast('儲存失敗：' + err.code, 'error');
       });
       return;
     }
@@ -831,7 +836,7 @@
       deleteDoc(doc(db, 'conductorNotes', delId)).then(function(){
         return loadNotes();
       }).catch(function(err){
-        alert('刪除失敗：' + err.code);
+        showToast('刪除失敗：' + err.code, 'error');
       });
     }
   });
@@ -965,6 +970,12 @@
     avatarBtn.classList.remove('skel');
     var isAdmin = result.profile.role === 'admin' || result.profile.role === 'owner';
     initAccountMenu(result.profile.name, isAdmin ? 'admin-index.html' : null, null);
+    // 純 conductor 角色沒有其他 8 個後台頁面的權限，顯示一個大部分項目都點不動的
+    // 導覽選單沒有意義，只有 admin-tier 才顯示漢堡圖示、掛上 initAdminNav()
+    if (isAdmin) {
+      document.getElementById('adminNavBtn').classList.remove('hidden');
+      initAdminNav('conductor');
+    }
 
     // 這兩個請求跟 eventTypes 監聽無關，身分驗證一通過就直接發出去，不用等 eventTypes
     // 的第一次快照回來才開始——boot() 會接手 await 這兩個 promise，不會重複發起請求

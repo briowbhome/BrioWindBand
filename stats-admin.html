@@ -142,6 +142,9 @@
 <div class="app" id="appRoot">
 
   <div class="appbar">
+    <button class="admin-nav-btn" id="adminNavBtn" type="button" aria-label="開啟後台導覽選單">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
     <a class="back-btn" href="admin-index.html" aria-label="回控制台首頁">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="m15 5-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </a>
@@ -199,6 +202,7 @@
 <div class="soon-toast" id="soonToast">即將推出</div>
 
 <script type="module">
+  import { initAdminNav } from './admin-nav.js';
   import { requireAdmin, peekCachedProfile } from './auth-guard.js';
   import { initAccountMenu } from './account-menu.js';
 
@@ -226,6 +230,7 @@
     avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
     avatarBtn.classList.remove('skel');
     initAccountMenu(result.profile.name);
+    initAdminNav('stats');
   });
 </script>
 </body>

@@ -203,6 +203,7 @@
 </div>
 
 <script type="module">
+  import { showToast } from './toast.js';
   import { requireSectionLeader, peekCachedProfile } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
@@ -428,12 +429,16 @@
           );
         }).join('');
 
+    // 分部長這輪還不能真的存檔（Firestore 規則細節見 schema.md「已知限制」），與其讓他們按下去
+    // 才收到生硬的權限錯誤代碼，直接反灰按鈕＋說明原因
+    var canSave = isViewerAdminTier;
     document.getElementById('assignmentSlot').innerHTML =
       partsHtml +
       '<div class="survey-section-label">尚未指派（參與名單中此樂器的成員）</div><div class="check-list">' + unassignedHtml + '</div>' +
+      (canSave ? '' : '<div class="part-empty">分部長這輪暫時還不能存檔，指派調整請先請管理員協助儲存</div>') +
       '<div class="survey-edit-actions">' +
         '<button type="button" id="assignmentCancelBtn">取消</button>' +
-        '<button type="button" class="btn-save" id="assignmentSaveBtn">儲存指派</button>' +
+        '<button type="button" class="btn-save" id="assignmentSaveBtn"' + (canSave ? '' : ' disabled') + '>儲存指派</button>' +
       '</div>';
   }
 
@@ -499,9 +504,10 @@
     }).then(function(){
       if (openPieceId) openInstrumentListView(openPieceId);
     }).catch(function(err){
-      // 已知限制：非 admin-tier 的分部長這輪會在這裡收到 permission-denied（見這個任務開頭說明），
-      // 錯誤處理沿用專案既有的 alert 慣例，不特別針對這個情境客製文案
-      alert('儲存失敗：' + err.code);
+      // 按鈕已經反灰擋掉已知會失敗的情況（見 renderAssignmentPanel），這裡是防呆：
+      // 萬一還是送出到 permission-denied（例如規則另有調整），給清楚的「無權限」訊息，
+      // 不要讓使用者看到 Firebase 原始錯誤代碼
+      showToast(err.code === 'permission-denied' ? '無權限：這個帳號目前不能儲存分部指派' : '儲存失敗：' + err.code, 'error');
       saveBtn.disabled = false;
     });
   }

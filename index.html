@@ -495,6 +495,7 @@
     border-radius:12px; margin-bottom:8px; cursor:pointer; text-align:left; width:100%;
   }
   .notif-row .dot{ flex:none; width:7px; height:7px; border-radius:50%; background:var(--burgundy); }
+  .notif-row .dot.dot-read{ background:var(--line); }
   .notif-row .body{ flex:1; min-width:0; }
   .notif-row .title{ font-size:12.5px; color:var(--ink); font-weight:700; }
   .notif-row .meta{ font-size:11px; color:var(--ink-soft); margin-top:2px; }
@@ -627,17 +628,6 @@
   .tab.active{ color:var(--burgundy); }
   .tab .ico{ width:20px; height:20px; }
   .tab.tab-soon{ opacity:.42; }
-
-  .soon-toast{
-    position:fixed; left:50%; bottom:calc(72px + env(safe-area-inset-bottom));
-    transform:translate(-50%,8px);
-    background:var(--ink); color:var(--paper);
-    font-family:'Noto Sans TC',sans-serif; font-size:12px; font-weight:600;
-    padding:8px 16px; border-radius:999px;
-    opacity:0; pointer-events:none; z-index:60;
-    transition:opacity .2s ease, transform .2s ease;
-  }
-  .soon-toast.show{ opacity:1; transform:translate(-50%,0); }
 
   @media (prefers-reduced-motion: reduce){
     .checkin-btn{ transition:none; }
@@ -837,7 +827,6 @@
     </a>
   </div>
 
-  <div class="soon-toast" id="soonToast">即將推出</div>
 
 </div>
 
@@ -910,6 +899,7 @@
 </div>
 
 <script type="module">
+  import { showToast } from './toast.js';
   import { resolveMemberAccess, peekCachedProfile } from './auth-guard.js';
   import { subscribeEventTypes } from './event-types.js';
   import { db } from './firebase-init.js';
@@ -921,15 +911,8 @@
 
   // 還沒做的分頁（行事曆/譜夾）：反灰 + 點擊顯示提示，不依賴登入驗證結果，
   // 跟下面的骨架畫面一樣頁面一開始就能動作。同一顆 toast 也給下面的「鎖定」提示共用，
-  // 只是文案不同（訪客/審核中點到鎖住的功能）
-  var soonToast = document.getElementById('soonToast');
-  var soonTimer = null;
-  function showToast(text){
-    soonToast.textContent = text;
-    if (soonTimer) clearTimeout(soonTimer);
-    soonToast.classList.add('show');
-    soonTimer = setTimeout(function(){ soonToast.classList.remove('show'); }, 1500);
-  }
+  // 只是文案不同（訪客/審核中點到鎖住的功能）。改用共用的 toast.js 之後，
+  // 這裡原本自己的 showToast()/#soonToast 元件整個拿掉，call site 不用改
   document.querySelectorAll('.tab-soon').forEach(function(btn){
     btn.addEventListener('click', function(){ showToast('即將推出'); });
   });
@@ -1280,10 +1263,25 @@
     var notificationsReadAt = null;
     var NOTIF_ANNOUNCE_LIMIT = 3;
 
+    // 公告清單每一列的紅點：跟鈴鐺數字徽章（renderNotifDot）不同，這裡要凍結成「這次打開
+    // 通知中心當下」的未讀快照，而不是每次重繪都重新比對即時的 notificationsReadAt——
+    // 開啟通知中心會立刻把 notificationsReadAt 更新成現在，如果紅點也跟著即時比對，
+    // 停留期間清單一旦因為監聽觸發重繪（例如剛好有新公告進來），已經看到的紅點會忽然消失，
+    // 觀感很奇怪。openNotifSheet() 開啟當下才重新算一次這份快照，關閉前都不會再變
+    function computeUnreadAnnounceIds(){
+      var set = {};
+      latestAnnouncements.forEach(function(item){
+        if (!notificationsReadAt || item.createdAt > notificationsReadAt) set[item.id] = true;
+      });
+      return set;
+    }
+    var unreadAnnounceIdsAtOpen = computeUnreadAnnounceIds();
+
     onSnapshot(query(collection(db, 'announcements'), orderBy('createdAt', 'desc'), limit(5)), function(snap){
       var items = snap.docs.map(function(docSnap){
         var data = docSnap.data();
         return {
+          id: docSnap.id,
           content: data.content,
           createdAt: data.createdAt && data.createdAt.toDate ? data.createdAt.toDate() : new Date()
         };
@@ -1452,9 +1450,10 @@
       } else {
         var shown = latestAnnouncements.slice(0, NOTIF_ANNOUNCE_LIMIT);
         var rowsHtml = shown.map(function(item){
+          var isUnread = !!unreadAnnounceIdsAtOpen[item.id];
           return (
             '<div class="notif-row" style="cursor:default;">' +
-              '<span class="dot"></span>' +
+              '<span class="dot' + (isUnread ? '' : ' dot-read') + '"></span>' +
               '<span class="body">' +
                 '<div class="title">' + item.content + '</div>' +
                 '<div class="meta">' + formatRelativeTime(item.createdAt) + '</div>' +
@@ -1487,6 +1486,7 @@
     }
 
     function openNotifSheet(){
+      unreadAnnounceIdsAtOpen = computeUnreadAnnounceIds();
       renderNotifSheet();
       notifSheetOverlay.classList.add('active');
       markNotificationsRead();
@@ -1627,7 +1627,7 @@
 
     async function startScan(){
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-        alert('這個瀏覽器不支援相機掃描，請改用其他瀏覽器');
+        showToast('這個瀏覽器不支援相機掃描，請改用其他瀏覽器');
         return;
       }
       scanHint.textContent = '將 QR Code 對準框內';

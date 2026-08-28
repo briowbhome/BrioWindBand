@@ -149,6 +149,12 @@
     font-family:'Roboto Mono',monospace; font-size:10.5px; font-weight:600;
     letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft);
   }
+  .field textarea{
+    border:1px solid var(--line); background:var(--paper);
+    border-radius:var(--radius-sm); padding:11px 13px;
+    font-size:14px; color:var(--ink); width:100%; font-family:inherit;
+    resize:vertical; min-height:70px;
+  }
   .field input, .field select{
     border:1px solid var(--line); background:var(--paper);
     border-radius:var(--radius-sm); padding:11px 13px;
@@ -254,7 +260,7 @@
   }
   .sheet-overlay.active{ display:flex; }
   .sheet{
-    width:100%; max-width:460px; max-height:85vh;
+    width:100%; max-width:460px; max-height:85vh; min-height:50vh;
     background:var(--paper-raised);
     border-radius:20px 20px 0 0;
     display:flex; flex-direction:column;
@@ -535,6 +541,9 @@
 <div class="app" id="appRoot">
 
   <div class="appbar">
+    <button class="admin-nav-btn" id="adminNavBtn" type="button" aria-label="開啟後台導覽選單">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
     <a class="back-btn" href="admin-index.html" aria-label="回控制台首頁">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="m15 5-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </a>
@@ -699,6 +708,10 @@
           <div class="field">
             <label>地點</label>
             <input type="text" id="eventLocation" placeholder="例如：體育館一樓-舞台">
+          </div>
+          <div class="field">
+            <label>練習曲目（選填）</label>
+            <textarea id="eventRepertoire" placeholder="一行一首"></textarea>
           </div>
           <div class="field">
             <label>屬於哪場音樂會（選填）</label>
@@ -925,6 +938,8 @@
 </div>
 
 <script type="module">
+  import { initAdminNav } from './admin-nav.js';
+  import { showToast } from './toast.js';
   import { requireAdmin, peekCachedProfile } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
@@ -1080,6 +1095,7 @@
     document.getElementById('eventStartTime').value = evt.date && !evt.allDay ? toTimeValue(evt.date) : '';
     document.getElementById('eventEndTime').value = evt.endTime ? toTimeValue(evt.endTime) : '';
     document.getElementById('eventLocation').value = evt.location || '';
+    document.getElementById('eventRepertoire').value = (evt.repertoire || []).join('\n');
     setEventConcertSelectValue(document.getElementById('eventConcertId'), evt.concertId || '');
     updateTimeFieldsVisibility();
     eventSubmitBtn.disabled = false;
@@ -1292,7 +1308,7 @@
     deleteDoc(doc(db, 'concerts', concertId)).then(function(){
       return deleteDoc(doc(db, 'concertRosters', concertId)).catch(function(){});
     }).catch(function(err){
-      alert('刪除失敗：' + err.code);
+      showToast('刪除失敗：' + err.code, 'error');
       deleteBtn.disabled = false;
     });
   });
@@ -1510,7 +1526,7 @@
       document.getElementById('piecePickerPanel').classList.add('hidden');
       refreshConcertPieces(concertId);
     }).catch(function(err){
-      alert('加入失敗：' + err.code);
+      showToast('加入失敗：' + err.code, 'error');
       confirmBtn.disabled = false;
     });
   });
@@ -1534,7 +1550,7 @@
     deleteDoc(doc(db, 'concerts', openConcertId, 'pieces', pieceId)).then(function(){
       refreshConcertPieces(openConcertId);
     }).catch(function(err){
-      alert('移除失敗：' + err.code);
+      showToast('移除失敗：' + err.code, 'error');
       removeBtn.disabled = false;
     });
   });
@@ -1723,7 +1739,7 @@
     }).then(function(){
       if (openPieceId) showPieceDetailView(openPieceId); // 存檔後回到分部清單，不留在指派畫面
     }).catch(function(err){
-      alert('儲存失敗：' + err.code);
+      showToast('儲存失敗：' + err.code, 'error');
       saveBtn.disabled = false;
     });
   }
@@ -2009,7 +2025,7 @@
       saveBtn.disabled = false;
       showConcertRosterView();
     }).catch(function(err){
-      alert('儲存失敗：' + err.code);
+      showToast('儲存失敗：' + err.code, 'error');
       saveBtn.disabled = false;
     });
   });
@@ -2049,7 +2065,7 @@
   document.getElementById('concertRosterApplyTemplateBtn').addEventListener('click', function(){
     if (!openConcertId) return;
     if (rosterTemplatesList.length === 0){
-      alert('目前還沒有任何名單範本，請先到「名單管理」建立');
+      showToast('目前還沒有任何名單範本，請先到「名單管理」建立');
       return;
     }
     var currentSourceId = concertRosterSourceTemplateCache[openConcertId];
@@ -2090,7 +2106,7 @@
       document.getElementById('concertRosterTemplatePicker').classList.add('hidden');
       showConcertRosterView();
     }).catch(function(err){
-      alert('套用失敗：' + err.code);
+      showToast('套用失敗：' + err.code, 'error');
       confirmBtn.disabled = false;
     });
   });
@@ -2111,6 +2127,7 @@
     var startTimeVal = document.getElementById('eventStartTime').value;
     var endTimeVal = document.getElementById('eventEndTime').value;
     var location = document.getElementById('eventLocation').value.trim();
+    var repertoire = document.getElementById('eventRepertoire').value.split('\n').map(function(s){ return s.trim(); }).filter(function(s){ return s; });
     // 只有建立活動 sheet 才有這個欄位（不在共用的 #eventForm 節點裡，編輯模式不會看到它），
     // 提前讀出來是因為稍後 enterCreateMode() 會把它重置回「（不套用）」
     var selectedRosterTemplateId = editingId ? '' : document.getElementById('createRosterTemplate').value;
@@ -2132,6 +2149,7 @@
       allDay: allDay,
       endTime: (!allDay && endTimeVal) ? Timestamp.fromDate(new Date(dateVal + 'T' + endTimeVal)) : null,
       location: location,
+      repertoire: repertoire,
       concertId: document.getElementById('eventConcertId').value || null
     };
 
@@ -2285,7 +2303,7 @@
       ]).then(function(){
         if (editingId === eventId) enterCreateMode();
       }).catch(function(err){
-        alert('刪除失敗：' + err.code);
+        showToast('刪除失敗：' + err.code, 'error');
         deleteBtn.disabled = false;
       });
     }
@@ -2529,7 +2547,7 @@
   rosterApplyTemplateBtn.addEventListener('click', function(){
     if (!openRosterEventId) return;
     if (rosterTemplatesList.length === 0){
-      alert('目前還沒有任何名單範本，請先到「名單管理」建立');
+      showToast('目前還沒有任何名單範本，請先到「名單管理」建立');
       return;
     }
     var roster = rostersById[openRosterEventId];
@@ -2569,7 +2587,7 @@
       rosterTemplatePicker.classList.add('hidden');
       showRosterView();
     }).catch(function(err){
-      alert('套用失敗：' + err.code);
+      showToast('套用失敗：' + err.code, 'error');
       rosterTemplateConfirmBtn.disabled = false;
     });
   });
@@ -2659,7 +2677,7 @@
       };
       showRosterView(); // 存檔後回到唯讀摘要，不關閉整個活動明細 sheet，方便接著切去其他分頁
     }).catch(function(err){
-      alert('儲存失敗：' + err.code);
+      showToast('儲存失敗：' + err.code, 'error');
       rosterSaveBtn.disabled = false;
     });
   });
@@ -2820,7 +2838,7 @@
       startCheckinSession(eventId).then(function(){
         if (openRosterEventId === eventId) refreshCheckinSession(eventId);
       }).catch(function(err){
-        alert('產生失敗：' + err.code);
+        showToast('產生失敗：' + err.code, 'error');
         startBtn.disabled = false;
       });
       return;
@@ -2832,7 +2850,7 @@
       reopenCheckinSession(eventId).then(function(){
         if (openRosterEventId === eventId) refreshCheckinSession(eventId);
       }).catch(function(err){
-        alert('操作失敗：' + err.code);
+        showToast('操作失敗：' + err.code, 'error');
         reopenBtn.disabled = false;
       });
       return;
@@ -2844,7 +2862,7 @@
       startCheckinSession(eventId).then(function(){
         if (openRosterEventId === eventId) refreshCheckinSession(eventId);
       }).catch(function(err){
-        alert('操作失敗：' + err.code);
+        showToast('操作失敗：' + err.code, 'error');
         regenBtn.disabled = false;
       });
       return;
@@ -2856,7 +2874,7 @@
       endCheckinSession(eventId).then(function(){
         if (openRosterEventId === eventId) refreshCheckinSession(eventId);
       }).catch(function(err){
-        alert('操作失敗：' + err.code);
+        showToast('操作失敗：' + err.code, 'error');
         endBtn.disabled = false;
       });
       return;
@@ -2951,7 +2969,7 @@
       deleteDoc(doc(db, 'checkins', checkinId)).then(function(){
         if (openRosterEventId === eventId) loadCheckinList(eventId);
       }).catch(function(err){
-        alert('移除失敗：' + err.code);
+        showToast('移除失敗：' + err.code, 'error');
         removeBtn.disabled = false;
       });
       return;
@@ -2985,7 +3003,7 @@
   checkinAddToggleBtn.addEventListener('click', function(){
     if (!openRosterEventId) return;
     if (checkinAvailableMembers.length === 0){
-      alert('目前已經沒有可以手動新增的人了');
+      showToast('目前已經沒有可以手動新增的人了');
       return;
     }
     checkinAddDraftSet = {};
@@ -3031,7 +3049,7 @@
       hideCheckinAddPanel();
       if (openRosterEventId === eventId) loadCheckinList(eventId);
     }).catch(function(err){
-      alert('新增失敗：' + err.code);
+      showToast('新增失敗：' + err.code, 'error');
       checkinAddConfirmBtn.disabled = false;
     });
   });
@@ -3103,7 +3121,7 @@
     if (!eventId) return;
     reportAvailableMembers = computeReportAvailableMembers(eventId);
     if (reportAvailableMembers.length === 0){
-      alert('應到名單內的人都已經回報過了，沒有可以手動新增的對象');
+      showToast('應到名單內的人都已經回報過了，沒有可以手動新增的對象');
       return;
     }
     reportAddDraftSet = {};
@@ -3175,7 +3193,7 @@
       hideReportAddPanel();
       if (openRosterEventId === eventId) loadReports(eventId);
     }).catch(function(err){
-      alert('新增失敗：' + err.code);
+      showToast('新增失敗：' + err.code, 'error');
       reportAddConfirmBtn.disabled = false;
     });
   });
@@ -3212,7 +3230,7 @@
       document.getElementById('surveyCloseBtn').addEventListener('click', function(){
         // 單純的開關，隨時可以再重新發起，不是不可逆動作，不需要 confirm 擋一次
         setDoc(doc(db, 'eventRosters', eventId), { surveyOpenedAt: null }, { merge: true })
-          .catch(function(err){ alert('關閉失敗（' + err.code + '），請再試一次'); });
+          .catch(function(err){ showToast('關閉失敗（' + err.code + '），請再試一次', 'error'); });
       });
     } else {
       slot.innerHTML = '<button type="button" class="add-btn" id="surveyStartBtn">發起調查</button>';
@@ -3220,11 +3238,11 @@
       hint.textContent = '';
       document.getElementById('surveyStartBtn').addEventListener('click', function(){
         if (!roster || !roster.members || roster.members.length === 0){
-          alert('請先到「參與名單」分頁建立名單後再發起調查');
+          showToast('請先到「參與名單」分頁建立名單後再發起調查');
           return;
         }
         setDoc(doc(db, 'eventRosters', eventId), { surveyOpenedAt: serverTimestamp() }, { merge: true })
-          .catch(function(err){ alert('發起失敗（' + err.code + '），請再試一次'); });
+          .catch(function(err){ showToast('發起失敗（' + err.code + '），請再試一次', 'error'); });
       });
     }
   }
@@ -3340,7 +3358,7 @@
         if (editingReportUid === deleteUid) { editingReportUid = null; reportEditDraft = null; }
         loadReports(eventIdForDelete);
       }).catch(function(err){
-        alert('刪除失敗：' + err.code);
+        showToast('刪除失敗：' + err.code, 'error');
         deleteBtn.disabled = false;
       });
       return;
@@ -3369,7 +3387,7 @@
         closeReportEdit();
         loadReports(eventId);
       }).catch(function(err){
-        alert('儲存失敗：' + err.code);
+        showToast('儲存失敗：' + err.code, 'error');
         saveBtn.disabled = false;
       });
     }
@@ -3504,7 +3522,7 @@
       deleteDoc(doc(db, 'eventTypes', delId)).then(function(){
         if (editingTypeId === delId) enterTypeCreateMode();
       }).catch(function(err){
-        alert('刪除失敗：' + err.code);
+        showToast('刪除失敗：' + err.code, 'error');
       });
     }
   });
@@ -3519,6 +3537,7 @@
     avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
     avatarBtn.classList.remove('skel');
     initAccountMenu(result.profile.name);
+    initAdminNav('event');
 
     var canManageTypes = result.profile.role === 'owner' ||
       (result.profile.permissions && result.profile.permissions.canManageEventTypes === true);
@@ -3563,6 +3582,7 @@
           allDay: !!data.allDay,
           endTime: data.endTime && data.endTime.toDate ? data.endTime.toDate() : null,
           location: data.location,
+          repertoire: data.repertoire || [],
           concertId: data.concertId || null
         };
       });
