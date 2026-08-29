@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>布利歐管樂團｜財務管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#F2EFE5">
+<link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+<script src="./pwa-register.js" defer></script>
+<style>
+  :root{
+    --ink:#20242F;
+    --ink-soft:#4A4F5C;
+    --paper:#F2EFE5;
+    --paper-raised:#FBFAF4;
+    --line:#DAD3BE;
+    --brass:#B8863A;
+    --brass-deep:#8F6A2C;
+    --burgundy:#7A2331;
+    --burgundy-deep:#5C1A26;
+    --sage:#5F6E58;
+    --sage-bg:#E7EBDF;
+    --radius-lg:20px;
+    --radius-md:14px;
+    --radius-sm:9px;
+    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% -10%, #EFE9D6 0%, transparent 45%),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Noto Sans TC','Noto Sans',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    min-height:100dvh;
+    display:flex;
+    justify-content:center;
+    padding: 0 0 calc(48px + env(safe-area-inset-bottom));
+  }
+
+  button, a, input, select{ -webkit-tap-highlight-color: transparent; font-family:inherit; }
+  :focus-visible{ outline:2.5px solid var(--brass-deep); outline-offset:2px; border-radius:6px; }
+
+  .app{
+    width:100%;
+    max-width:460px;
+    min-height:100vh;
+    min-height:100dvh;
+    background:var(--paper);
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .hidden{ display:none !important; }
+
+  @keyframes skel-pulse{ 0%,100%{ opacity:.55; } 50%{ opacity:1; } }
+  .skel{ background:var(--line); animation:skel-pulse 1.4s ease-in-out infinite; }
+  .avatar.skel{ animation:skel-pulse 1.4s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce){
+    .skel, .avatar.skel{ animation:none; opacity:.75; }
+  }
+
+  .appbar{ display:flex; align-items:center; gap:12px; padding:18px 20px 14px; }
+  .admin-nav-btn{ width:30px; height:30px; flex:none; border:none; background:none; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--ink); cursor:pointer; padding:0; }
+  .admin-nav-btn:active{ background:rgba(32,36,47,.06); }
+  .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
+  .brandtext{ display:flex; flex-direction:column; line-height:1.1; }
+  .brandtext .name{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:19px; letter-spacing:.02em; }
+  .brandtext .sub{ font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.14em; color:var(--ink-soft); margin-top:3px; text-transform:uppercase; }
+  .appbar .spacer{ flex:1; }
+  .avatar{
+    width:38px; height:38px; border-radius:50%;
+    background:var(--burgundy); color:#F2EFE5;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Noto Serif TC',serif; font-weight:700; font-size:14px;
+    border:2px solid var(--paper-raised); box-shadow:0 0 0 1.5px var(--line);
+    padding:0; cursor:pointer;
+  }
+  .back-btn{
+    width:30px; height:30px; flex:none;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--ink); text-decoration:none;
+  }
+  .brand-link{ display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; }
+
+  h1.page-title{ margin:16px 20px 4px; font-family:'Noto Serif TC',serif; font-size:18px; font-weight:700; }
+
+  .seg-tabs{
+    display:flex; gap:6px; margin:14px 20px 6px;
+    background:var(--sage-bg); padding:4px; border-radius:999px;
+  }
+  .seg-tab{
+    flex:1; text-align:center; padding:8px 4px; border-radius:999px;
+    font-family:'Noto Sans TC',sans-serif; font-size:13px; font-weight:500;
+    color:var(--sage); background:none; border:none; cursor:pointer;
+  }
+  .seg-tab.active{ background:var(--ink); color:var(--paper); }
+  .seg-panel.hidden{ display:none; }
+
+  .add-btn{
+    border:1px solid var(--line); background:var(--paper); color:var(--brass-deep);
+    border-radius:999px; padding:6px 14px; font-size:11.5px; font-weight:700; cursor:pointer;
+  }
+  .add-btn:active{ background:var(--sage-bg); }
+
+  .empty-state{ margin:24px 20px; padding:24px; text-align:center; font-size:13px; color:var(--ink-soft); border:1px dashed var(--line); border-radius:12px; }
+
+  .sheet-overlay{
+    position:fixed; inset:0; z-index:80;
+    background:rgba(32,36,47,.45);
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  .sheet-overlay.active{ display:flex; }
+  .sheet{
+    width:100%; max-width:460px; max-height:85vh;
+    background:var(--paper-raised);
+    border-radius:20px 20px 0 0;
+    display:flex; flex-direction:column;
+    box-shadow:0 -10px 30px rgba(32,36,47,.3);
+  }
+  .sheet-header{ position:relative; display:flex; align-items:center; justify-content:space-between; padding:16px 44px 12px 20px; border-bottom:1px solid var(--line); }
+  .sheet-header span{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:16px; }
+  .sheet-header button{
+    position:absolute; top:8px; right:10px;
+    width:30px; height:30px; border-radius:50%; border:none; background:none;
+    color:var(--ink-soft); font-size:16px; line-height:1; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .sheet-header button:active{ background:var(--paper); }
+  .sheet-body{ overflow-y:auto; padding:14px 20px 8px; }
+
+  .field, .sheet-body > label{ margin-top:12px; display:flex; flex-direction:column; gap:6px; }
+  .sheet-body > label:first-child{ margin-top:0; }
+  .sheet-body > label{
+    font-family:'Roboto Mono',monospace; font-size:10.5px; font-weight:600;
+    letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft);
+  }
+  .sheet-body input, .sheet-body select{
+    border:1px solid var(--line); background:var(--paper);
+    border-radius:var(--radius-sm); padding:11px 13px;
+    font-size:14px; color:var(--ink); width:100%; margin-top:4px;
+  }
+
+  .form-error{
+    margin-top:12px; font-size:12.5px; color:var(--burgundy);
+    background:#FBF3F3; border:1px solid #EFD4D8; border-radius:var(--radius-sm);
+    padding:10px 12px;
+  }
+
+  .check-list{ display:flex; flex-direction:column; gap:2px; max-height:320px; overflow-y:auto; background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm); padding:4px 10px; }
+  .check-row{ display:flex; align-items:center; gap:10px; padding:7px 2px; }
+  .check-row + .check-row{ border-top:1px solid var(--line); }
+  .checkbox{
+    width:18px; height:18px; border-radius:5px; border:1.5px solid var(--line);
+    flex:none; display:flex; align-items:center; justify-content:center;
+    font-size:11px; color:#fff; cursor:pointer; background:none; padding:0;
+  }
+  .checkbox.on{ background:var(--brass); border-color:var(--brass); }
+  .check-text{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12.5px; color:var(--ink); cursor:pointer; background:none; border:none; text-align:left; padding:0; }
+  .check-row input.due-override-input{ flex:none; width:62px; font-size:11.5px; padding:5px 4px; margin-top:0; border:1px solid var(--line); border-radius:6px; background:var(--paper); color:var(--ink); text-align:right; }
+
+  .sheet-footer{
+    display:flex; gap:10px;
+    padding:14px 20px calc(14px + env(safe-area-inset-bottom));
+    border-top:1px solid var(--line);
+  }
+  .cta-btn{
+    flex:1;
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    background:var(--brass); color:var(--ink); border:none;
+    border-radius:var(--radius-md); padding:14px 16px;
+    font-weight:700; font-size:14.5px; cursor:pointer;
+    transition:transform .12s ease, background .12s ease;
+  }
+  .cta-btn:active{ transform:scale(.98); background:var(--brass-deep); }
+  .cta-btn:disabled{ opacity:.55; cursor:default; transform:none; }
+  .cta-btn-secondary{ background:var(--paper); color:var(--ink-soft); border:1px solid var(--line); }
+  .cta-btn-secondary:active{ transform:scale(.98); background:var(--paper); }
+  .cta-btn-danger{ background:var(--paper); color:var(--burgundy-deep); border:1px solid #EFD4D8; }
+
+  .info-edit-btn{
+    border:1px solid var(--line); background:var(--paper); color:var(--brass-deep);
+    border-radius:999px; padding:8px 18px; font-size:12.5px; font-weight:700; cursor:pointer;
+  }
+  .info-edit-btn:active{ background:var(--sage-bg); }
+
+  /* ---------- 財務管理專屬 ---------- */
+  .balance-card{ margin:14px 20px; padding:18px 20px; border-radius:16px; background:var(--ink); color:var(--paper); box-shadow:var(--shadow-card); }
+  .balance-label{ font-size:12px; opacity:.7; margin-bottom:4px; }
+  .balance-amount{ font-size:28px; font-weight:700; font-family:'Roboto Mono',monospace; }
+  .balance-actions{ margin-top:12px; display:flex; gap:8px; }
+  .balance-actions button{ font-size:12px; padding:6px 12px; border-radius:999px; border:1px solid rgba(242,239,229,.35); background:none; color:var(--paper); cursor:pointer; }
+  .balance-actions button:active{ background:rgba(242,239,229,.12); }
+
+  .ledger-toolbar{ display:flex; flex-wrap:wrap; gap:8px; margin:0 20px 10px; align-items:center; }
+  .ledger-toolbar select, .ledger-toolbar input[type="date"]{ font-size:12.5px; padding:6px 8px; border-radius:8px; border:1px solid var(--line); background:var(--paper); color:var(--ink); }
+  .ledger-toolbar label{ font-size:12px; display:flex; align-items:center; gap:4px; color:var(--ink-soft); }
+
+  .toolbar-row{ margin:16px 20px 10px; display:flex; justify-content:flex-end; }
+
+  .ledger-row, .due-card{ margin:0 20px 10px; padding:12px 14px; border-radius:12px; border:1px solid var(--line); background:var(--paper-raised); }
+  .ledger-row{ display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .ledger-row.voided{ opacity:.45; }
+  .ledger-row-main{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .ledger-row-cat{ font-size:12px; color:var(--ink-soft); }
+  .ledger-row-amount{ font-family:'Roboto Mono',monospace; font-weight:600; font-size:15px; flex:none; }
+  .ledger-row-amount.income{ color:var(--sage); }
+  .ledger-row-amount.expense{ color:var(--burgundy); }
+  .ledger-tag{ font-size:10.5px; padding:2px 8px; border-radius:999px; background:var(--sage-bg); color:var(--sage); margin-left:6px; }
+
+  .due-card{ display:flex; flex-direction:column; gap:4px; cursor:pointer; }
+  .due-card.voided{ opacity:.45; }
+  .due-card-title{ font-weight:700; font-size:15px; }
+  .due-card-sub{ font-size:12px; color:var(--ink-soft); }
+
+  .status-pill{ font-size:12px; padding:3px 10px; border-radius:999px; flex:none; }
+  .status-pill.paid{ background:var(--sage-bg); color:var(--sage); }
+  .status-pill.unpaid{ background:#F7E6E6; color:var(--burgundy); }
+</style>
+</head>
+<body>
+<div class="app" id="appRoot">
+
+  <div class="appbar">
+    <button class="admin-nav-btn hidden" id="adminNavBtn" type="button" aria-label="開啟後台導覽選單">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <a class="back-btn" id="backBtn" href="admin-index.html" aria-label="回控制台首頁">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="m15 5-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <a class="brand-link" href="index.html">
+      <img class="mark" src="assets/BrioLogo.jpg" alt="布利歐管樂團 Logo">
+      <div class="brandtext">
+        <div class="name">布利歐管樂團</div>
+        <div class="sub">Brio Wind Band</div>
+      </div>
+    </a>
+    <div class="spacer"></div>
+    <button class="avatar skel" id="avatarBtn" type="button" aria-label="帳號選單"></button>
+  </div>
+
+  <h1 class="page-title">財務管理</h1>
+
+  <div class="seg-tabs" role="tablist">
+    <button type="button" class="seg-tab active" id="segTabLedger" role="tab" aria-selected="true">記帳本</button>
+    <button type="button" class="seg-tab" id="segTabDues" role="tab" aria-selected="false">團費管理</button>
+  </div>
+
+  <div class="seg-panel" id="segPanelLedger">
+    <div class="balance-card">
+      <div class="balance-label">目前結餘</div>
+      <div class="balance-amount" id="balanceAmount">$0</div>
+      <div class="balance-actions">
+        <button type="button" id="openingBalanceBtn">編輯期初餘額</button>
+        <button type="button" id="manageCategoriesBtn">管理分類</button>
+      </div>
+    </div>
+
+    <div class="ledger-toolbar">
+      <select id="ledgerFilterType">
+        <option value="">全部收支</option>
+        <option value="income">只看收入</option>
+        <option value="expense">只看支出</option>
+      </select>
+      <select id="ledgerFilterCategory"><option value="">全部分類</option></select>
+      <input type="date" id="ledgerFilterStart">
+      <input type="date" id="ledgerFilterEnd">
+      <label><input type="checkbox" id="ledgerShowVoidedToggle"> 顯示已作廢</label>
+    </div>
+
+    <div class="toolbar-row">
+      <button type="button" class="add-btn" id="addLedgerEntryBtn">＋ 新增帳目</button>
+    </div>
+
+    <div id="ledgerList"></div>
+  </div>
+
+  <div class="seg-panel hidden" id="segPanelDues">
+    <div class="toolbar-row">
+      <button type="button" class="add-btn" id="addDueBtn">＋ 新增應繳項目</button>
+    </div>
+    <div id="duesList"></div>
+  </div>
+
+</div>
+
+<div class="sheet-overlay" id="dueSheetOverlay">
+  <div class="sheet">
+    <div class="sheet-header">
+      <span id="dueSheetTitle">新增應繳項目</span>
+      <button type="button" id="dueSheetClose" aria-label="關閉">✕</button>
+    </div>
+    <div class="sheet-body">
+      <label>標題</label>
+      <input type="text" id="dueTitleInput" placeholder="例如：2026上學期團費">
+      <label>預設應繳金額</label>
+      <input type="number" id="dueAmountInput" step="1" min="0">
+      <label>套用名單範本（選填）</label>
+      <select id="dueTemplateSelect"><option value="">不套用，手動勾選</option></select>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 6px;">
+        <label style="margin:0;">應繳範圍（<span id="dueChecklistCount">0</span> 人）</label>
+        <div>
+          <button type="button" class="info-edit-btn" id="dueSelectAllBtn" style="padding:4px 10px;font-size:11px;">全選</button>
+          <button type="button" class="info-edit-btn" id="dueClearAllBtn" style="padding:4px 10px;font-size:11px;">清空</button>
+        </div>
+      </div>
+      <p style="margin:0 0 8px;font-size:11.5px;color:var(--ink-soft);">勾選後可以在名字旁邊填個別金額，留空時自動帶入「預設應繳金額」。</p>
+      <div class="check-list" id="dueChecklist"></div>
+      <div class="form-error hidden" id="dueFormError"></div>
+    </div>
+    <div class="sheet-footer">
+      <button type="button" class="cta-btn" id="dueSaveBtn">建立</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="dueDetailOverlay">
+  <div class="sheet">
+    <div class="sheet-header">
+      <span id="dueDetailTitle">應繳項目明細</span>
+      <button type="button" id="dueDetailClose" aria-label="關閉">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div id="dueDetailSub" style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;"></div>
+      <div id="dueDetailMemberList"></div>
+    </div>
+    <div class="sheet-footer">
+      <button type="button" class="cta-btn cta-btn-secondary" id="dueEditBtn">✎ 編輯</button>
+      <button type="button" class="cta-btn cta-btn-danger" id="dueVoidBtn">作廢這個項目</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="paymentSheetOverlay">
+  <div class="sheet">
+    <div class="sheet-header">
+      <span id="paymentSheetTitle">登記繳費</span>
+      <button type="button" id="paymentSheetClose" aria-label="關閉">✕</button>
+    </div>
+    <div class="sheet-body">
+      <label>實際收到金額</label>
+      <input type="number" id="paymentAmountInput" step="1" min="0">
+      <label>日期</label>
+      <input type="date" id="paymentDateInput">
+      <label>繳費方式（選填）</label>
+      <input type="text" id="paymentMethodInput" placeholder="現金／轉帳…">
+      <label>備註（選填）</label>
+      <input type="text" id="paymentNoteInput">
+      <div class="form-error hidden" id="paymentFormError"></div>
+    </div>
+    <div class="sheet-footer">
+      <button type="button" class="cta-btn cta-btn-danger hidden" id="paymentVoidBtn">作廢這筆繳費</button>
+      <button type="button" class="cta-btn" id="paymentSaveBtn">儲存</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="openingBalanceOverlay">
+  <div class="sheet">
+    <div class="sheet-header">
+      <span>編輯起始餘額</span>
+      <button type="button" id="openingBalanceClose" aria-label="關閉">✕</button>
+    </div>
+    <div class="sheet-body">
+      <label>起始餘額</label>
+      <input type="number" id="openingBalanceInput" step="1">
+      <label>備註（選填）</label>
+      <input type="text" id="openingBalanceNoteInput">
+      <div class="form-error hidden" id="openingBalanceFormError"></div>
+    </div>
+    <div class="sheet-footer">
+      <button type="button" class="cta-btn cta-btn-secondary" id="openingBalanceCancelBtn">取消</button>
+      <button type="button" class="cta-btn" id="openingBalanceSaveBtn">儲存</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="categoriesOverlay">
+  <div class="sheet">
+    <div class="sheet-header">
+      <span>管理分類</span>
+      <button type="button" id="categoriesClose" aria-label="關閉">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div id="categoriesList"></div>
+      <label style="margin-top:16px;">新增分類名稱</label>
+      <input type="text" id="categoryLabelInput">
+      <label>類型</label>
+      <select id="categoryTypeSelect">
+        <option value="income">收入</option>
+        <option value="expense">支出</option>
+      </select>
+      <div class="toolbar-row" style="margin:14px 0 0;">
+        <button type="button" class="add-btn" id="categoryAddBtn">新增分類</button>
+      </div>
+      <div class="form-error hidden" id="categoryFormError"></div>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="ledgerSheetOverlay">
+  <div class="sheet">
+    <div class="sheet-header">
+      <span id="ledgerSheetTitle">新增帳目</span>
+      <button type="button" id="ledgerSheetClose" aria-label="關閉">✕</button>
+    </div>
+    <div class="sheet-body">
+      <label>類型</label>
+      <select id="ledgerTypeSelect">
+        <option value="income">收入</option>
+        <option value="expense">支出</option>
+      </select>
+      <label>分類</label>
+      <select id="ledgerCategorySelect"></select>
+      <label>金額</label>
+      <input type="number" id="ledgerAmountInput" step="1" min="0">
+      <label>日期</label>
+      <input type="date" id="ledgerDateInput">
+      <label>備註（選填）</label>
+      <input type="text" id="ledgerNoteInput">
+      <div class="form-error hidden" id="ledgerFormError"></div>
+    </div>
+    <div class="sheet-footer">
+      <button type="button" class="cta-btn cta-btn-danger hidden" id="ledgerVoidBtn">作廢這筆帳目</button>
+      <button type="button" class="cta-btn" id="ledgerSaveBtn">儲存</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { initAdminNav } from './admin-nav.js';
+  import { showToast } from './toast.js';
+  import { requireAdminOrFinanceManager, peekCachedProfile } from './auth-guard.js';
+  import { db } from './firebase-init.js';
+  import { initAccountMenu } from './account-menu.js';
+  import {
+    ensureDefaultFeeCategory, subscribeFinanceCategories, addFinanceCategory, updateFinanceCategory, deleteFinanceCategory,
+    subscribeFinanceSettings, updateOpeningBalance,
+    subscribeLedgerEntries, addLedgerEntry, updateLedgerEntry, voidLedgerEntry, computeBalance,
+    subscribeFeeDues, addFeeDue, updateFeeDue, voidFeeDue, subscribeFeePayments, recordFeePayment, updateFeePayment, voidFeePayment
+  } from './finance.js';
+  import { collection, getDocs, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+
+  var currentAdminUid = null;
+  var categoriesList = [];
+  var categoriesById = {};
+  var currentOpeningBalance = 0;
+  var allLedgerEntries = [];
+  var editingLedgerEntryId = null;
+
+  var feeDuesList = [];
+  var feePaymentsList = [];
+  var rosterTemplatesList = [];
+  var approvedMembers = null;
+  var dueDraftSet = {};
+  var dueDraftOverrides = {};
+  var openDueDetailId = null;
+  var editingDueId = null;
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function formatMoney(n) {
+    var sign = n < 0 ? '-' : '';
+    return sign + '$' + Math.abs(Math.round(n)).toLocaleString('zh-Hant');
+  }
+
+  function timestampToDateInputValue(ts) {
+    if (!ts || !ts.toDate) return '';
+    var d = ts.toDate();
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+
+  function dateInputValueToTimestampArg(value) {
+    var parts = value.split('-');
+    return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  }
+
+  function renderBalance() {
+    document.getElementById('balanceAmount').textContent = formatMoney(computeBalance(currentOpeningBalance, allLedgerEntries));
+  }
+
+  function renderCategoryFilterOptions() {
+    var select = document.getElementById('ledgerFilterCategory');
+    var current = select.value;
+    select.innerHTML = '<option value="">全部分類</option>' + categoriesList.map(function (c) {
+      return '<option value="' + c.id + '">' + escapeHtml(c.label) + '</option>';
+    }).join('');
+    select.value = current;
+  }
+
+  function renderLedgerCategorySelect() {
+    var select = document.getElementById('ledgerCategorySelect');
+    var typeSelect = document.getElementById('ledgerTypeSelect');
+    var wantType = typeSelect.value;
+    var filtered = categoriesList.filter(function (c) { return c.type === wantType; });
+    select.innerHTML = filtered.map(function (c) {
+      return '<option value="' + c.id + '">' + escapeHtml(c.label) + '</option>';
+    }).join('');
+  }
+
+  function renderCategoriesManageList() {
+    var container = document.getElementById('categoriesList');
+    container.innerHTML = categoriesList.map(function (c) {
+      var typeLabel = c.type === 'income' ? '收入' : '支出';
+      var protectedTag = c.protected ? '<span class="ledger-tag">保留</span>' : '';
+      var deleteBtn = c.protected ? '' : '<button type="button" class="info-edit-btn" data-del-cat="' + c.id + '">刪除</button>';
+      return (
+        '<div class="ledger-row">' +
+          '<div class="ledger-row-main"><button type="button" data-rename-cat="' + c.id + '" style="background:none;border:none;padding:0;font:inherit;text-align:left;cursor:pointer;color:var(--ink);">' + escapeHtml(c.label) + '</button>' + protectedTag + '<span class="ledger-row-cat">' + typeLabel + '</span></div>' +
+          deleteBtn +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  document.getElementById('categoriesList').addEventListener('click', function (e) {
+    var renameBtn = e.target.closest('[data-rename-cat]');
+    if (renameBtn) {
+      var renameId = renameBtn.getAttribute('data-rename-cat');
+      var cat = categoriesById[renameId];
+      if (!cat) return;
+      var next = prompt('修改分類名稱', cat.label);
+      if (next == null) return;
+      next = next.trim();
+      if (!next || next === cat.label) return;
+      updateFinanceCategory(db, renameId, { label: next }).catch(function (err) {
+        showToast('更新失敗：' + err.message, 'error');
+      });
+      return;
+    }
+    var delBtn = e.target.closest('[data-del-cat]');
+    if (delBtn) {
+      var delId = delBtn.getAttribute('data-del-cat');
+      var delCat = categoriesById[delId];
+      var ok = confirm('確定要刪除分類「' + (delCat ? delCat.label : '') + '」嗎？已經用這個分類的帳目不會被清掉，只是分類名稱之後會顯示「（分類已刪除）」。此動作無法復原。');
+      if (!ok) return;
+      deleteFinanceCategory(db, delId).catch(function (err) {
+        showToast('刪除失敗：' + err.message, 'error');
+      });
+    }
+  });
+
+  async function ensureApprovedMembers() {
+    if (approvedMembers) return approvedMembers;
+    var snap = await getDocs(query(collection(db, 'users'), where('status', '==', 'approved')));
+    approvedMembers = snap.docs.map(function (docSnap) {
+      var data = docSnap.data();
+      return { uid: docSnap.id, name: data.name, account: data.account };
+    });
+    return approvedMembers;
+  }
+
+  function paidCountForDue(dueId) {
+    return feePaymentsList.filter(function (p) { return p.dueId === dueId && !p.voided; }).length;
+  }
+
+  function dueAggregates(due) {
+    var totalExpected = (due.memberIds || []).reduce(function (sum, uid) { return sum + overrideAmountFor(due, uid); }, 0);
+    var totalCollected = feePaymentsList
+      .filter(function (p) { return p.dueId === due.id && !p.voided; })
+      .reduce(function (sum, p) { return sum + p.amountPaid; }, 0);
+    return { totalExpected: totalExpected, totalCollected: totalCollected };
+  }
+
+  function renderDuesList() {
+    var container = document.getElementById('duesList');
+    if (feeDuesList.length === 0) {
+      container.innerHTML = '<div class="empty-state">還沒有任何應繳項目</div>';
+      return;
+    }
+    container.innerHTML = feeDuesList.map(function (due) {
+      var paid = paidCountForDue(due.id);
+      var total = (due.memberIds || []).length;
+      var agg = dueAggregates(due);
+      return (
+        '<div class="due-card' + (due.voided ? ' voided' : '') + '" data-open-due="' + due.id + '">' +
+          '<div class="due-card-title">' + escapeHtml(due.title) + (due.voided ? '<span class="ledger-tag">已作廢</span>' : '') + '</div>' +
+          '<div class="due-card-sub">已收 $' + agg.totalCollected.toLocaleString('zh-Hant') + ' ／ 應收 $' + agg.totalExpected.toLocaleString('zh-Hant') + '・已繳 ' + paid + ' ／ 應繳 ' + total + ' 人</div>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function renderDueTemplateSelect() {
+    var select = document.getElementById('dueTemplateSelect');
+    select.innerHTML = '<option value="">不套用，手動勾選</option>' + rosterTemplatesList.map(function (t) {
+      return '<option value="' + t.id + '">' + escapeHtml(t.name) + '</option>';
+    }).join('');
+  }
+
+  function renderDueChecklist() {
+    var defaultAmountVal = document.getElementById('dueAmountInput').value;
+    var checklist = document.getElementById('dueChecklist');
+    checklist.innerHTML = (approvedMembers || []).map(function (m) {
+      var on = !!dueDraftSet[m.uid];
+      var overrideVal = dueDraftOverrides[m.uid];
+      var overrideInput = on
+        ? '<input type="number" step="1" min="0" class="due-override-input" data-override-uid="' + m.uid + '" placeholder="' + escapeHtml(defaultAmountVal || '金額') + '" value="' + (overrideVal != null ? overrideVal : '') + '">'
+        : '';
+      return (
+        '<div class="check-row">' +
+          '<button type="button" class="checkbox' + (on ? ' on' : '') + '" data-due-uid="' + m.uid + '">' + (on ? '✓' : '') + '</button>' +
+          '<button type="button" class="check-text" data-due-uid="' + m.uid + '">' + escapeHtml(m.name) + '（' + escapeHtml(m.account) + '）</button>' +
+          overrideInput +
+        '</div>'
+      );
+    }).join('');
+    document.getElementById('dueChecklistCount').textContent = Object.keys(dueDraftSet).length;
+  }
+
+  document.getElementById('dueChecklist').addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-due-uid]');
+    if (!btn) return;
+    var uid = btn.getAttribute('data-due-uid');
+    if (dueDraftSet[uid]) {
+      delete dueDraftSet[uid];
+      delete dueDraftOverrides[uid];
+    } else {
+      dueDraftSet[uid] = true;
+    }
+    renderDueChecklist();
+  });
+
+  document.getElementById('dueChecklist').addEventListener('input', function (e) {
+    var input = e.target.closest('[data-override-uid]');
+    if (!input) return;
+    var uid = input.getAttribute('data-override-uid');
+    var val = input.value.trim();
+    if (val === '') {
+      delete dueDraftOverrides[uid];
+    } else {
+      dueDraftOverrides[uid] = Number(val);
+    }
+  });
+
+  document.getElementById('dueSelectAllBtn').addEventListener('click', function () {
+    (approvedMembers || []).forEach(function (m) { dueDraftSet[m.uid] = true; });
+    renderDueChecklist();
+  });
+  document.getElementById('dueClearAllBtn').addEventListener('click', function () {
+    dueDraftSet = {};
+    dueDraftOverrides = {};
+    renderDueChecklist();
+  });
+
+  document.getElementById('dueTemplateSelect').addEventListener('change', function () {
+    var templateId = this.value;
+    if (!templateId) return;
+    var template = rosterTemplatesList.filter(function (t) { return t.id === templateId; })[0];
+    if (!template) return;
+    dueDraftSet = {};
+    dueDraftOverrides = {};
+    (template.members || []).forEach(function (uid) { dueDraftSet[uid] = true; });
+    renderDueChecklist();
+  });
+
+  document.getElementById('addDueBtn').addEventListener('click', function () {
+    editingDueId = null;
+    dueDraftSet = {};
+    dueDraftOverrides = {};
+    document.getElementById('dueSheetTitle').textContent = '新增應繳項目';
+    document.getElementById('dueSaveBtn').textContent = '建立';
+    document.getElementById('dueTitleInput').value = '';
+    document.getElementById('dueAmountInput').value = '';
+    document.getElementById('dueTemplateSelect').value = '';
+    document.getElementById('dueFormError').classList.add('hidden');
+    ensureApprovedMembers().then(function () {
+      renderDueChecklist();
+      document.getElementById('dueSheetOverlay').classList.add('active');
+    });
+  });
+
+  function openEditDueSheet(due) {
+    editingDueId = due.id;
+    dueDraftSet = {};
+    (due.memberIds || []).forEach(function (uid) { dueDraftSet[uid] = true; });
+    dueDraftOverrides = Object.assign({}, due.memberOverrides || {});
+    document.getElementById('dueSheetTitle').textContent = '編輯應繳項目';
+    document.getElementById('dueSaveBtn').textContent = '儲存變更';
+    document.getElementById('dueTitleInput').value = due.title;
+    document.getElementById('dueAmountInput').value = due.amount;
+    document.getElementById('dueTemplateSelect').value = '';
+    document.getElementById('dueFormError').classList.add('hidden');
+    document.getElementById('dueDetailOverlay').classList.remove('active');
+    ensureApprovedMembers().then(function () {
+      renderDueChecklist();
+      document.getElementById('dueSheetOverlay').classList.add('active');
+    });
+  }
+  document.getElementById('dueSheetClose').addEventListener('click', function () {
+    document.getElementById('dueSheetOverlay').classList.remove('active');
+  });
+  document.getElementById('dueSheetOverlay').addEventListener('click', function (e) {
+    if (e.target === document.getElementById('dueSheetOverlay')) document.getElementById('dueSheetOverlay').classList.remove('active');
+  });
+
+  document.getElementById('dueSaveBtn').addEventListener('click', function () {
+    var title = document.getElementById('dueTitleInput').value.trim();
+    var amount = Number(document.getElementById('dueAmountInput').value);
+    var memberIds = Object.keys(dueDraftSet);
+    var templateId = document.getElementById('dueTemplateSelect').value || null;
+    var errEl = document.getElementById('dueFormError');
+    errEl.classList.add('hidden');
+    if (!title || !amount || amount <= 0 || memberIds.length === 0) {
+      errEl.textContent = '請填寫標題、金額（大於 0），並至少勾選一位團員';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    var cleanOverrides = {};
+    memberIds.forEach(function (uid) {
+      var v = dueDraftOverrides[uid];
+      if (v != null && !isNaN(v) && v >= 0 && v !== amount) cleanOverrides[uid] = v;
+    });
+    var btn = document.getElementById('dueSaveBtn');
+    btn.disabled = true;
+    var task = editingDueId
+      ? updateFeeDue(db, editingDueId, currentAdminUid, { title: title, amount: amount, memberIds: memberIds, memberOverrides: cleanOverrides })
+      : addFeeDue(db, currentAdminUid, { title: title, amount: amount, memberIds: memberIds, memberOverrides: cleanOverrides, sourceTemplateId: templateId });
+    task.then(function () {
+      btn.disabled = false;
+      document.getElementById('dueSheetOverlay').classList.remove('active');
+    }).catch(function (err) {
+      btn.disabled = false;
+      errEl.textContent = (editingDueId ? '儲存' : '建立') + '失敗：' + err.code;
+      errEl.classList.remove('hidden');
+    });
+  });
+
+  document.getElementById('duesList').addEventListener('click', function (e) {
+    var card = e.target.closest('[data-open-due]');
+    if (!card) return;
+    openFeeDueDetail(card.getAttribute('data-open-due'));
+  });
+
+  var currentPaymentTargetUid = null;
+
+  function openFeeDueDetail(dueId) {
+    openDueDetailId = dueId;
+    ensureApprovedMembers().then(function () {
+      renderDueDetail();
+      document.getElementById('dueDetailOverlay').classList.add('active');
+    });
+  }
+
+  function refreshOpenDueDetail() {
+    if (!document.getElementById('dueDetailOverlay').classList.contains('active')) return;
+    renderDueDetail();
+  }
+
+  function renderDueDetail() {
+    var due = feeDuesList.filter(function (d) { return d.id === openDueDetailId; })[0];
+    if (!due) return;
+    document.getElementById('dueDetailTitle').textContent = due.title;
+    document.getElementById('dueDetailSub').textContent = '預設應繳 $' + due.amount.toLocaleString('zh-Hant') + (due.voided ? '（已作廢）' : '');
+    document.getElementById('dueVoidBtn').classList.toggle('hidden', !!due.voided);
+    document.getElementById('dueEditBtn').classList.toggle('hidden', !!due.voided);
+
+    var paymentsByUid = {};
+    feePaymentsList.filter(function (p) { return p.dueId === due.id && !p.voided; }).forEach(function (p) {
+      paymentsByUid[p.uid] = p;
+    });
+    var membersByUid = {};
+    (approvedMembers || []).forEach(function (m) { membersByUid[m.uid] = m; });
+    var memberIdSet = {};
+    (due.memberIds || []).forEach(function (uid) { memberIdSet[uid] = true; });
+
+    var rowsHtml = (due.memberIds || []).map(function (uid) {
+      var member = membersByUid[uid];
+      var name = member ? member.name : uid;
+      var payment = paymentsByUid[uid];
+      if (payment) {
+        return (
+          '<div class="ledger-row" data-payment-uid="' + uid + '" style="cursor:pointer;">' +
+            '<div class="ledger-row-main"><span>' + escapeHtml(name) + '</span><span class="ledger-row-cat">' + timestampToDateInputValue(payment.paidAt) + (payment.method ? '・' + escapeHtml(payment.method) : '') + '</span></div>' +
+            '<span class="status-pill paid">已繳 $' + payment.amountPaid.toLocaleString('zh-Hant') + '</span>' +
+          '</div>'
+        );
+      }
+      var owedAmount = overrideAmountFor(due, uid);
+      var overrideTag = owedAmount !== due.amount ? ('<span class="ledger-row-cat">應繳 $' + owedAmount.toLocaleString('zh-Hant') + '（已調整）</span>') : '';
+      return (
+        '<div class="ledger-row" data-record-uid="' + uid + '" style="cursor:pointer;">' +
+          '<div class="ledger-row-main"><span>' + escapeHtml(name) + '</span>' + overrideTag + '</div>' +
+          '<span class="status-pill unpaid">未繳</span>' +
+        '</div>'
+      );
+    }).join('');
+
+    // 已經繳過費、但後來被從名單移除的人——繳費紀錄是真實發生過的事，不會因為名單異動消失，
+    // 只是標示「已不在名單內」，比照 event-admin.html 名單移除但保留出缺席回報紀錄的既有慣例
+    var strayHtml = Object.keys(paymentsByUid).filter(function (uid) { return !memberIdSet[uid]; }).map(function (uid) {
+      var member = membersByUid[uid];
+      var name = member ? member.name : uid;
+      var payment = paymentsByUid[uid];
+      return (
+        '<div class="ledger-row" data-payment-uid="' + uid + '" style="cursor:pointer;">' +
+          '<div class="ledger-row-main"><span>' + escapeHtml(name) + '<span class="ledger-tag">已不在名單內</span></span><span class="ledger-row-cat">' + timestampToDateInputValue(payment.paidAt) + '</span></div>' +
+          '<span class="status-pill paid">已繳 $' + payment.amountPaid.toLocaleString('zh-Hant') + '</span>' +
+        '</div>'
+      );
+    }).join('');
+
+    document.getElementById('dueDetailMemberList').innerHTML = (rowsHtml + strayHtml) || '<div class="empty-state">這個項目沒有應繳範圍名單</div>';
+  }
+
+  document.getElementById('dueEditBtn').addEventListener('click', function () {
+    var due = feeDuesList.filter(function (d) { return d.id === openDueDetailId; })[0];
+    if (due) openEditDueSheet(due);
+  });
+
+  document.getElementById('dueDetailClose').addEventListener('click', function () {
+    document.getElementById('dueDetailOverlay').classList.remove('active');
+    openDueDetailId = null;
+  });
+  document.getElementById('dueDetailOverlay').addEventListener('click', function (e) {
+    if (e.target === document.getElementById('dueDetailOverlay')) {
+      document.getElementById('dueDetailOverlay').classList.remove('active');
+      openDueDetailId = null;
+    }
+  });
+
+  document.getElementById('dueVoidBtn').addEventListener('click', function () {
+    if (!openDueDetailId) return;
+    var due = feeDuesList.filter(function (d) { return d.id === openDueDetailId; })[0];
+    var ok = confirm('確定要作廢「' + (due ? due.title : '') + '」這個應繳項目嗎？\n已經繳過的紀錄不會被清掉，只是這批不再視為應繳項目。\n此動作無法復原。');
+    if (!ok) return;
+    voidFeeDue(db, openDueDetailId, currentAdminUid).catch(function (err) {
+      showToast('作廢失敗：' + err.code, 'error');
+    });
+  });
+
+  document.getElementById('dueDetailMemberList').addEventListener('click', function (e) {
+    var recordRow = e.target.closest('[data-record-uid]');
+    var paymentRow = e.target.closest('[data-payment-uid]');
+    var due = feeDuesList.filter(function (d) { return d.id === openDueDetailId; })[0];
+    if (!due) return;
+    if (recordRow) {
+      var uid = recordRow.getAttribute('data-record-uid');
+      openPaymentSheet(due, uid, null);
+    } else if (paymentRow) {
+      var uid2 = paymentRow.getAttribute('data-payment-uid');
+      var payment = feePaymentsList.filter(function (p) { return p.dueId === due.id && p.uid === uid2 && !p.voided; })[0];
+      if (payment) openPaymentSheet(due, uid2, payment);
+    }
+  });
+
+  function overrideAmountFor(due, uid) {
+    if (due.memberOverrides && due.memberOverrides[uid] != null) return due.memberOverrides[uid];
+    return due.amount;
+  }
+
+  function openPaymentSheet(due, uid, existingPayment) {
+    currentPaymentTargetUid = uid;
+    openDueDetailId = due.id;
+    document.getElementById('paymentSheetTitle').textContent = existingPayment ? '編輯繳費紀錄' : '登記繳費';
+    document.getElementById('paymentVoidBtn').classList.toggle('hidden', !existingPayment);
+    document.getElementById('paymentFormError').classList.add('hidden');
+    document.getElementById('paymentAmountInput').value = existingPayment ? existingPayment.amountPaid : overrideAmountFor(due, uid);
+    document.getElementById('paymentDateInput').value = existingPayment ? timestampToDateInputValue(existingPayment.paidAt) : timestampToDateInputValue({ toDate: function () { return new Date(); } });
+    document.getElementById('paymentMethodInput').value = existingPayment ? (existingPayment.method || '') : '';
+    document.getElementById('paymentNoteInput').value = existingPayment ? (existingPayment.note || '') : '';
+    document.getElementById('paymentSheetOverlay').classList.add('active');
+  }
+
+  document.getElementById('paymentSheetClose').addEventListener('click', function () {
+    document.getElementById('paymentSheetOverlay').classList.remove('active');
+  });
+  document.getElementById('paymentSheetOverlay').addEventListener('click', function (e) {
+    if (e.target === document.getElementById('paymentSheetOverlay')) document.getElementById('paymentSheetOverlay').classList.remove('active');
+  });
+
+  document.getElementById('paymentSaveBtn').addEventListener('click', function () {
+    var due = feeDuesList.filter(function (d) { return d.id === openDueDetailId; })[0];
+    if (!due || !currentPaymentTargetUid) return;
+    var amountPaid = Number(document.getElementById('paymentAmountInput').value);
+    var dateVal = document.getElementById('paymentDateInput').value;
+    var method = document.getElementById('paymentMethodInput').value.trim();
+    var note = document.getElementById('paymentNoteInput').value.trim();
+    var errEl = document.getElementById('paymentFormError');
+    errEl.classList.add('hidden');
+    if (!amountPaid || amountPaid <= 0 || !dateVal) {
+      errEl.textContent = '請填寫金額（大於 0）跟日期';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    var existingPayment = feePaymentsList.filter(function (p) { return p.dueId === due.id && p.uid === currentPaymentTargetUid && !p.voided; })[0];
+    var btn = document.getElementById('paymentSaveBtn');
+    btn.disabled = true;
+    var task = existingPayment
+      ? updateFeePayment(db, due.id, currentPaymentTargetUid, { amountPaid: amountPaid, paidAt: dateInputValueToTimestampArg(dateVal), method: method, note: note })
+      : recordFeePayment(db, {
+          dueId: due.id, uid: currentPaymentTargetUid,
+          amountDue: overrideAmountFor(due, currentPaymentTargetUid),
+          amountPaid: amountPaid, paidAt: dateInputValueToTimestampArg(dateVal),
+          method: method, note: note, recordedBy: currentAdminUid
+        });
+    task.then(function () {
+      btn.disabled = false;
+      document.getElementById('paymentSheetOverlay').classList.remove('active');
+    }).catch(function (err) {
+      btn.disabled = false;
+      errEl.textContent = '儲存失敗：' + (err.message || err.code);
+      errEl.classList.remove('hidden');
+    });
+  });
+
+  document.getElementById('paymentVoidBtn').addEventListener('click', function () {
+    if (!openDueDetailId || !currentPaymentTargetUid) return;
+    var ok = confirm('確定要作廢這筆繳費紀錄嗎？記帳本裡對應的收入明細也會一併作廢。此動作無法復原。');
+    if (!ok) return;
+    var btn = document.getElementById('paymentVoidBtn');
+    btn.disabled = true;
+    voidFeePayment(db, openDueDetailId, currentPaymentTargetUid, currentAdminUid).then(function () {
+      btn.disabled = false;
+      document.getElementById('paymentSheetOverlay').classList.remove('active');
+    }).catch(function (err) {
+      btn.disabled = false;
+      showToast('作廢失敗：' + err.message, 'error');
+    });
+  });
+
+  function ledgerFilteredEntries() {
+    var typeFilter = document.getElementById('ledgerFilterType').value;
+    var catFilter = document.getElementById('ledgerFilterCategory').value;
+    var startVal = document.getElementById('ledgerFilterStart').value;
+    var endVal = document.getElementById('ledgerFilterEnd').value;
+    var showVoided = document.getElementById('ledgerShowVoidedToggle').checked;
+    var startMs = startVal ? dateInputValueToTimestampArg(startVal).getTime() : null;
+    var endMs = endVal ? dateInputValueToTimestampArg(endVal).getTime() + 86400000 : null;
+    return allLedgerEntries.filter(function (e) {
+      if (!showVoided && e.voided) return false;
+      if (typeFilter && e.type !== typeFilter) return false;
+      if (catFilter && e.categoryId !== catFilter) return false;
+      var ms = e.date && e.date.toMillis ? e.date.toMillis() : 0;
+      if (startMs != null && ms < startMs) return false;
+      if (endMs != null && ms >= endMs) return false;
+      return true;
+    });
+  }
+
+  function renderLedgerList() {
+    var container = document.getElementById('ledgerList');
+    var entries = ledgerFilteredEntries();
+    if (entries.length === 0) {
+      container.innerHTML = '<div class="empty-state">沒有符合條件的帳目</div>';
+      return;
+    }
+    container.innerHTML = entries.map(function (e) {
+      var cat = categoriesById[e.categoryId];
+      var catLabel = cat ? cat.label : '（分類已刪除）';
+      var dateStr = timestampToDateInputValue(e.date);
+      var fromFeeTag = e.linkedFeePaymentId ? '<span class="ledger-tag">來自團費</span>' : '';
+      var editAttr = e.linkedFeePaymentId ? '' : ' data-edit-ledger="' + e.id + '"';
+      return (
+        '<div class="ledger-row' + (e.voided ? ' voided' : '') + '"' + editAttr + (e.linkedFeePaymentId ? '' : ' style="cursor:pointer;"') + '>' +
+          '<div class="ledger-row-main">' +
+            '<span>' + dateStr + fromFeeTag + '</span>' +
+            '<span class="ledger-row-cat">' + escapeHtml(catLabel) + (e.note ? '・' + escapeHtml(e.note) : '') + '</span>' +
+          '</div>' +
+          '<span class="ledger-row-amount ' + e.type + '">' + (e.type === 'income' ? '+' : '-') + formatMoney(e.amount) + '</span>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function openLedgerSheet(entry) {
+    editingLedgerEntryId = entry ? entry.id : null;
+    document.getElementById('ledgerSheetTitle').textContent = entry ? '編輯帳目' : '新增帳目';
+    document.getElementById('ledgerVoidBtn').classList.toggle('hidden', !entry);
+    document.getElementById('ledgerFormError').classList.add('hidden');
+    document.getElementById('ledgerTypeSelect').value = entry ? entry.type : 'income';
+    renderLedgerCategorySelect();
+    document.getElementById('ledgerCategorySelect').value = entry ? entry.categoryId : ((categoriesList.filter(function (c) { return c.type === 'income'; })[0] || {}).id || '');
+    document.getElementById('ledgerAmountInput').value = entry ? entry.amount : '';
+    document.getElementById('ledgerDateInput').value = entry ? timestampToDateInputValue(entry.date) : timestampToDateInputValue({ toDate: function () { return new Date(); } });
+    document.getElementById('ledgerNoteInput').value = entry ? (entry.note || '') : '';
+    document.getElementById('ledgerSheetOverlay').classList.add('active');
+  }
+
+  function closeLedgerSheet() {
+    document.getElementById('ledgerSheetOverlay').classList.remove('active');
+  }
+
+  document.getElementById('addLedgerEntryBtn').addEventListener('click', function () { openLedgerSheet(null); });
+  document.getElementById('ledgerSheetClose').addEventListener('click', closeLedgerSheet);
+  document.getElementById('ledgerSheetOverlay').addEventListener('click', function (e) {
+    if (e.target === document.getElementById('ledgerSheetOverlay')) closeLedgerSheet();
+  });
+  document.getElementById('ledgerTypeSelect').addEventListener('change', renderLedgerCategorySelect);
+
+  document.getElementById('ledgerList').addEventListener('click', function (e) {
+    var row = e.target.closest('[data-edit-ledger]');
+    if (!row) return;
+    var id = row.getAttribute('data-edit-ledger');
+    var entry = allLedgerEntries.filter(function (x) { return x.id === id; })[0];
+    if (entry) openLedgerSheet(entry);
+  });
+
+  ['ledgerFilterType', 'ledgerFilterCategory', 'ledgerFilterStart', 'ledgerFilterEnd', 'ledgerShowVoidedToggle'].forEach(function (id) {
+    document.getElementById(id).addEventListener('change', renderLedgerList);
+  });
+
+  document.getElementById('ledgerSaveBtn').addEventListener('click', function () {
+    var type = document.getElementById('ledgerTypeSelect').value;
+    var categoryId = document.getElementById('ledgerCategorySelect').value;
+    var amount = Number(document.getElementById('ledgerAmountInput').value);
+    var dateVal = document.getElementById('ledgerDateInput').value;
+    var note = document.getElementById('ledgerNoteInput').value.trim();
+    var errEl = document.getElementById('ledgerFormError');
+    errEl.classList.add('hidden');
+    if (!categoryId || !amount || amount <= 0 || !dateVal) {
+      errEl.textContent = '請填寫分類、金額（大於 0）跟日期';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    var fields = { type: type, categoryId: categoryId, amount: amount, date: dateInputValueToTimestampArg(dateVal), note: note };
+    var saveBtn = document.getElementById('ledgerSaveBtn');
+    saveBtn.disabled = true;
+    var task = editingLedgerEntryId ? updateLedgerEntry(db, editingLedgerEntryId, fields) : addLedgerEntry(db, currentAdminUid, fields);
+    task.then(function () {
+      saveBtn.disabled = false;
+      closeLedgerSheet();
+    }).catch(function (err) {
+      saveBtn.disabled = false;
+      errEl.textContent = '儲存失敗：' + (err.message || err.code);
+      errEl.classList.remove('hidden');
+    });
+  });
+
+  document.getElementById('ledgerVoidBtn').addEventListener('click', function () {
+    if (!editingLedgerEntryId) return;
+    var ok = confirm('確定要作廢這筆帳目嗎？作廢後不會從清單消失，但不再計入結餘。此動作無法復原。');
+    if (!ok) return;
+    var btn = document.getElementById('ledgerVoidBtn');
+    btn.disabled = true;
+    voidLedgerEntry(db, editingLedgerEntryId, currentAdminUid).then(function () {
+      btn.disabled = false;
+      closeLedgerSheet();
+    }).catch(function (err) {
+      btn.disabled = false;
+      showToast('作廢失敗：' + err.code, 'error');
+    });
+  });
+
+  document.getElementById('openingBalanceBtn').addEventListener('click', function () {
+    document.getElementById('openingBalanceInput').value = currentOpeningBalance;
+    document.getElementById('openingBalanceNoteInput').value = '';
+    document.getElementById('openingBalanceFormError').classList.add('hidden');
+    document.getElementById('openingBalanceOverlay').classList.add('active');
+  });
+  document.getElementById('openingBalanceClose').addEventListener('click', function () {
+    document.getElementById('openingBalanceOverlay').classList.remove('active');
+  });
+  document.getElementById('openingBalanceCancelBtn').addEventListener('click', function () {
+    document.getElementById('openingBalanceOverlay').classList.remove('active');
+  });
+  document.getElementById('openingBalanceSaveBtn').addEventListener('click', function () {
+    var amount = Number(document.getElementById('openingBalanceInput').value);
+    var errEl = document.getElementById('openingBalanceFormError');
+    if (isNaN(amount)) {
+      errEl.textContent = '請輸入有效數字';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    var btn = document.getElementById('openingBalanceSaveBtn');
+    btn.disabled = true;
+    updateOpeningBalance(db, currentAdminUid, amount).then(function () {
+      btn.disabled = false;
+      document.getElementById('openingBalanceOverlay').classList.remove('active');
+    }).catch(function (err) {
+      btn.disabled = false;
+      errEl.textContent = '儲存失敗：' + err.code;
+      errEl.classList.remove('hidden');
+    });
+  });
+
+  document.getElementById('manageCategoriesBtn').addEventListener('click', function () {
+    document.getElementById('categoriesOverlay').classList.add('active');
+  });
+  document.getElementById('categoriesClose').addEventListener('click', function () {
+    document.getElementById('categoriesOverlay').classList.remove('active');
+  });
+  document.getElementById('categoryAddBtn').addEventListener('click', function () {
+    var label = document.getElementById('categoryLabelInput').value.trim();
+    var type = document.getElementById('categoryTypeSelect').value;
+    var errEl = document.getElementById('categoryFormError');
+    errEl.classList.add('hidden');
+    if (!label) {
+      errEl.textContent = '請輸入分類名稱';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    addFinanceCategory(db, label, type).then(function () {
+      document.getElementById('categoryLabelInput').value = '';
+    }).catch(function (err) {
+      errEl.textContent = '新增失敗：' + err.code;
+      errEl.classList.remove('hidden');
+    });
+  });
+
+  var segTabLedger = document.getElementById('segTabLedger');
+  var segTabDues = document.getElementById('segTabDues');
+  var segPanelLedger = document.getElementById('segPanelLedger');
+  var segPanelDues = document.getElementById('segPanelDues');
+
+  function selectSegTab(tab) {
+    var isLedger = tab === 'ledger';
+    segTabLedger.classList.toggle('active', isLedger);
+    segTabDues.classList.toggle('active', !isLedger);
+    segTabLedger.setAttribute('aria-selected', String(isLedger));
+    segTabDues.setAttribute('aria-selected', String(!isLedger));
+    segPanelLedger.classList.toggle('hidden', !isLedger);
+    segPanelDues.classList.toggle('hidden', isLedger);
+  }
+  segTabLedger.addEventListener('click', function () { selectSegTab('ledger'); });
+  segTabDues.addEventListener('click', function () { selectSegTab('dues'); });
+
+  var cachedProfile = peekCachedProfile();
+  if (cachedProfile && cachedProfile.name) {
+    var avatarBtnEarly = document.getElementById('avatarBtn');
+    avatarBtnEarly.textContent = cachedProfile.name.charAt(0);
+  }
+
+  requireAdminOrFinanceManager().then(function (result) {
+    if (!result) return;
+    currentAdminUid = result.uid;
+
+    var avatarBtn = document.getElementById('avatarBtn');
+    avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
+    avatarBtn.classList.remove('skel');
+
+    var isAdmin = result.profile.role === 'admin' || result.profile.role === 'owner';
+    initAccountMenu(result.profile.name, isAdmin ? 'admin-index.html' : null, null);
+    if (isAdmin) {
+      document.getElementById('adminNavBtn').classList.remove('hidden');
+      initAdminNav('finance');
+    } else {
+      var backBtn = document.getElementById('backBtn');
+      backBtn.setAttribute('href', 'index.html');
+      backBtn.setAttribute('aria-label', '回團員首頁');
+    }
+
+    ensureDefaultFeeCategory(db).catch(function (err) {
+      console.error('建立預設團費分類失敗', err);
+    });
+
+    subscribeFinanceCategories(db, function (categories) {
+      categoriesList = categories.slice().sort(function (a, b) { return (a.order || 0) - (b.order || 0); });
+      categoriesById = {};
+      categoriesList.forEach(function (c) { categoriesById[c.id] = c; });
+      renderCategoryFilterOptions();
+      renderLedgerCategorySelect();
+      renderCategoriesManageList();
+      renderLedgerList();
+    }, function (err) { console.error('分類監聽失敗', err); });
+
+    subscribeFinanceSettings(db, function (settings) {
+      currentOpeningBalance = settings.openingBalance || 0;
+      renderBalance();
+    }, function (err) { console.error('期初餘額監聽失敗', err); });
+
+    subscribeLedgerEntries(db, function (entries) {
+      allLedgerEntries = entries;
+      renderBalance();
+      renderLedgerList();
+    }, function (err) { console.error('記帳本監聽失敗', err); });
+
+    subscribeFeeDues(db, function (dues) {
+      feeDuesList = dues;
+      renderDuesList();
+      refreshOpenDueDetail();
+    }, function (err) { console.error('應繳項目監聽失敗', err); });
+
+    subscribeFeePayments(db, function (payments) {
+      feePaymentsList = payments;
+      renderDuesList();
+      refreshOpenDueDetail();
+    }, function (err) { console.error('繳費紀錄監聽失敗', err); });
+
+    onSnapshot(collection(db, 'rosterTemplates'), function (snap) {
+      rosterTemplatesList = [];
+      snap.forEach(function (docSnap) {
+        rosterTemplatesList.push(Object.assign({ id: docSnap.id }, docSnap.data()));
+      });
+      rosterTemplatesList.sort(function (a, b) { return (a.name || '').localeCompare(b.name || '', 'zh-Hant'); });
+      renderDueTemplateSelect();
+    }, function (err) { console.error('名單範本監聽失敗', err); });
+  });
+</script>
+</body>
+</html>

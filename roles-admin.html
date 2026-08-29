@@ -493,16 +493,16 @@
     { key: 'canManageRoles', label: '可調整他人角色/權限' },
     { key: 'canDeleteAccounts', label: '可軟刪除現役帳號' },
     { key: 'canManageSheetMusic', label: '可管理樂譜資料夾' },
-    { key: 'canManageEventTypes', label: '可管理活動類型' }
+    { key: 'canManageEventTypes', label: '可管理活動類型' },
+    { key: 'canManageFinance', label: '可管理財務記帳' }
   ];
 
   // 職位範本：交接時負責轉移的人不用記得「這個職位要打勾哪幾個旗標」，選職位名稱
   // 直接把對應的權限旗標打勾好。套用只影響本地草稿（跟這個 sheet 既有的「先勾選、
   // 按儲存變更才真的送出」互動模式一致），不會自動反選沒列在這個職位裡的其他旗標。
-  // 財務等其他職位要等對應功能/旗標真的做出來才會加進這份清單，不先加一個沒有東西
-  // 可以管的職位進來
   var POSITION_PRESETS = [
-    { key: 'repertoire', label: '譜務', permissions: { canManageSheetMusic: true } }
+    { key: 'repertoire', label: '譜務', permissions: { canManageSheetMusic: true } },
+    { key: 'finance', label: '財務', permissions: { canManageFinance: true } }
   ];
 
   var membersById = {};
@@ -847,7 +847,7 @@
       : {
           role: draftRole,
           permissions: Object.assign(
-            { canManageRoles: false, canDeleteAccounts: false, canManageSheetMusic: false, canManageEventTypes: false },
+            { canManageRoles: false, canDeleteAccounts: false, canManageSheetMusic: false, canManageEventTypes: false, canManageFinance: false },
             draftPermissions
           ),
           sectionLeaderFor: draftSections,

@@ -271,6 +271,51 @@ export async function requireAdminOrSheetMusicManager() {
   return { uid: user.uid, profile: profile };
 }
 
+// 財務管理頁面（finance-admin.html）用：必須登入、審核通過，且「role 是 admin/owner」或
+// 「被個別授予 canManageFinance 權限」（例如財務職位）。跟 requireAdminOrSheetMusicManager()
+// 完全同一種骨架，只是換成 canManageFinance 這個旗標
+export async function requireAdminOrFinanceManager() {
+  var user = await waitForAuthUser();
+  if (!user) {
+    clearProfileCache();
+    goToLogin();
+    return null;
+  }
+
+  function isAllowed(p) {
+    return !!p && (p.role === "admin" || p.role === "owner" ||
+      (p.permissions && p.permissions.canManageFinance === true));
+  }
+
+  var profile;
+  try {
+    profile = await resolveProfile(user.uid, function (fresh) {
+      if (!fresh || fresh.status !== "approved") {
+        clearProfileCache();
+        signOut(auth).then(goToLogin);
+      } else if (!isAllowed(fresh)) {
+        clearProfileCache();
+        location.href = "index.html";
+      }
+    });
+  } catch (e) {
+    showConnectionError();
+    return null;
+  }
+
+  if (!profile || profile.status !== "approved") {
+    clearProfileCache();
+    await signOut(auth);
+    goToLogin();
+    return null;
+  }
+  if (!isAllowed(profile)) {
+    location.href = "index.html";
+    return null;
+  }
+  return { uid: user.uid, profile: profile };
+}
+
 // 分部長專屬頁面（section-admin.html）用：必須登入、審核通過，且「role 是 admin/owner」或
 // 「sectionLeaderFor 陣列不是空的」。刻意跟 requireAdminOrConductor() 分開——這裡放行的
 // 判斷依據是陣列欄位有沒有值，不是角色列舉，跟其他守門函式的角色判斷邏輯不同
