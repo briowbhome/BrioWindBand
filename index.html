@@ -715,6 +715,15 @@
     <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </button>
 
+  <!-- 團費待辦橫幅：自己在某筆應繳項目名單內、且還沒有對應繳費紀錄時才顯示，
+       跟出缺席回報橫幅同一套深色語彙（.rsvp-banner），點擊切到「團務總覽」分頁查詳情 -->
+  <button type="button" class="rsvp-banner hidden" id="feeDueBanner">
+    <span class="stripe"></span>
+    <svg class="ico" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v10M15 9h-4.5a1.5 1.5 0 0 0 0 3h3a1.5 1.5 0 0 1 0 3h-4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span class="txt" id="feeDueBannerText"></span>
+    <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+
   <!-- 練習資訊 Hero：卡片本身（深色票券樣式＋大字日期）已經足夠說明這是下一次團練，
        不再另外加一條「下一次團練」標籤，避免每個區塊上面都疊一條小標籤 -->
   <div class="hero">
@@ -804,6 +813,10 @@
     <div id="myConcertsWrap" class="hidden">
       <div class="section-label" style="margin:8px 20px 4px;"><span class="tw">我的音樂會</span></div>
       <div id="myConcertsSlot"></div>
+    </div>
+    <div id="myFeeDuesWrap" class="hidden">
+      <div class="section-label" style="margin:8px 20px 4px;"><span class="tw">我的團費</span></div>
+      <div id="myFeeDuesSlot"></div>
     </div>
   </div>
 
@@ -994,6 +1007,8 @@
   var eventTypesById = {};
   var latestEvents = [];
   var rsvpReportsByEvent = {}; // 只有已核准/審核中會員登入後才會真的有資料，訪客維持空物件、畫面自然不顯示回報標籤
+  var myFeeDuesList = []; // 自己在 memberIds 名單內、且未作廢的應繳項目
+  var myFeePaymentsByDueId = {}; // dueId -> 自己的繳費紀錄（未作廢）
 
   var viewerState = null; // 'guest' | 'pending' | 'approved'，身分驗證完成後才有值
   var viewerUid = null;
@@ -1387,6 +1402,51 @@
       if (id) openRsvpSheet(id);
     });
 
+    // 應繳金額依個別調整（memberOverrides）計算，跟 finance-admin.html 的 overrideAmountFor()
+    // 同一套邏輯，這裡另外複製一份（專案慣例：不共用邏輯檔）
+    function feeDueAmountForMe(due){
+      if (due.memberOverrides && due.memberOverrides[viewerUid] != null) return due.memberOverrides[viewerUid];
+      return due.amount;
+    }
+
+    // 待辦（尚未繳費）的應繳項目 id 清單，橫幅跟通知中心共用同一份計算，不重複寫
+    function computePendingFeeDueIds(){
+      return myFeeDuesList
+        .filter(function(due){ return !myFeePaymentsByDueId[due.id]; })
+        .map(function(due){ return due.id; })
+        .sort(function(a, b){
+          var da = myFeeDuesList.filter(function(d){ return d.id === a; })[0];
+          var db = myFeeDuesList.filter(function(d){ return d.id === b; })[0];
+          return (da.title || '').localeCompare(db.title || '', 'zh-Hant');
+        });
+    }
+
+    // 團費待辦橫幅：只有自己在應繳項目名單內、且還沒繳費時才顯示，訪客沒有個人資料可查、
+    // 結構上也不會出現在任何 memberIds 裡，這裡只是防呆
+    function renderFeeDueBanner(){
+      var banner = document.getElementById('feeDueBanner');
+      if (viewerState !== 'approved' && viewerState !== 'pending'){
+        banner.classList.add('hidden');
+        return;
+      }
+      var pendingIds = computePendingFeeDueIds();
+      if (pendingIds.length === 0){
+        banner.classList.add('hidden');
+        return;
+      }
+      var nearest = myFeeDuesList.filter(function(d){ return d.id === pendingIds[0]; })[0];
+      var text = pendingIds.length === 1
+        ? '你尚未繳納「' + nearest.title + '」的團費'
+        : '你有 ' + pendingIds.length + ' 筆團費尚未繳納';
+      document.getElementById('feeDueBannerText').textContent = text;
+      banner.classList.remove('hidden');
+    }
+
+    document.getElementById('feeDueBanner').addEventListener('click', function(){
+      document.getElementById('segTabOverview').click();
+      document.getElementById('myFeeDuesWrap').scrollIntoView({ behavior: 'smooth' });
+    });
+
     // ---------- 通知中心 ----------
     var notifDot = document.getElementById('notifDot');
     var notifSheetOverlay = document.getElementById('notifSheetOverlay');
@@ -1398,10 +1458,11 @@
         return;
       }
       var pendingCount = computePendingRsvpIds().length;
+      var pendingFeeDueCount = computePendingFeeDueIds().length;
       var unreadAnnounceCount = latestAnnouncements.filter(function(item){
         return !notificationsReadAt || item.createdAt > notificationsReadAt;
       }).length;
-      var total = pendingCount + unreadAnnounceCount + pendingReviewCount;
+      var total = pendingCount + pendingFeeDueCount + unreadAnnounceCount + pendingReviewCount;
       notifDot.textContent = total > 9 ? '9+' : String(total);
       notifDot.classList.toggle('hidden', total === 0);
       document.getElementById('notifBtn').setAttribute('aria-label',
@@ -1435,6 +1496,19 @@
             '<span class="body">' +
               '<div class="title">尚未回報出缺席</div>' +
               '<div class="meta">' + (dateText ? dateText + '（' + info.title + '）' : info.title) + '</div>' +
+            '</span>' +
+            '<span class="chev">›</span>' +
+          '</button>'
+        );
+      }));
+      rowsHtml = rowsHtml.concat(computePendingFeeDueIds().map(function(id){
+        var due = myFeeDuesList.filter(function(d){ return d.id === id; })[0];
+        return (
+          '<button type="button" class="notif-row" data-notif-feedue="' + id + '">' +
+            '<span class="dot"></span>' +
+            '<span class="body">' +
+              '<div class="title">尚未繳費</div>' +
+              '<div class="meta">' + due.title + '（$' + feeDueAmountForMe(due).toLocaleString('zh-Hant') + '）</div>' +
             '</span>' +
             '<span class="chev">›</span>' +
           '</button>'
@@ -1505,6 +1579,12 @@
       if (e.target.closest('[data-notif-review]')){
         closeNotifSheet();
         location.href = 'review-admin.html';
+        return;
+      }
+      if (e.target.closest('[data-notif-feedue]')){
+        closeNotifSheet();
+        document.getElementById('segTabOverview').click();
+        document.getElementById('myFeeDuesWrap').scrollIntoView({ behavior: 'smooth' });
         return;
       }
       var btn = e.target.closest('[data-notif-rsvp]');
@@ -1735,6 +1815,38 @@
       }).join('');
     }
 
+    // ---------- 團務總覽：我的團費（唯讀，即時監聽，不是一次性載入） ----------
+    // 跟「我的音樂會」不同：這裡的資料同時餵給首頁橫幅／通知中心（兩者一進首頁就要看到），
+    // 所以訂閱本身是 eager（身分驗證完成就掛），不走 setOverviewLazyLoad 那套延遲載入，
+    // 這個函式只是把已經在記憶體裡的資料畫出來，不會另外發查詢
+    function renderMyFeeDues(){
+      var wrap = document.getElementById('myFeeDuesWrap');
+      if (myFeeDuesList.length === 0){
+        wrap.classList.add('hidden');
+        // 只有「我的音樂會」也沒資料時，才重新顯示空狀態訊息
+        if (document.getElementById('myConcertsWrap').classList.contains('hidden')){
+          document.getElementById('overviewEmptyMsg').classList.remove('hidden');
+        }
+        return;
+      }
+      document.getElementById('overviewEmptyMsg').classList.add('hidden');
+      wrap.classList.remove('hidden');
+      document.getElementById('myFeeDuesSlot').innerHTML = myFeeDuesList.map(function(due){
+        var payment = myFeePaymentsByDueId[due.id];
+        var dateVal = payment && payment.paidAt && payment.paidAt.toDate ? payment.paidAt.toDate() : null;
+        var dateText = dateVal ? (dateVal.getMonth() + 1) + '/' + dateVal.getDate() : '';
+        var statusText = payment
+          ? '已繳 $' + payment.amountPaid.toLocaleString('zh-Hant') + (dateText ? '・' + dateText : '')
+          : '未繳 $' + feeDueAmountForMe(due).toLocaleString('zh-Hant');
+        return (
+          '<div class="my-concert-piece-row">' +
+            '<span class="k">' + escapeHtmlForOverview(due.title) + '</span>' +
+            '<span class="v">' + statusText + '</span>' +
+          '</div>'
+        );
+      }).join('');
+    }
+
     // ---------- 身分驗證：訪客（未登入）／審核中／已核准，決定要不要打開個人化功能 ----------
     resolveMemberAccess().then(function(access){
       if (!access) return; // 未通過驗證（被拒絕/停用等），resolveMemberAccess 已經處理導轉
@@ -1783,6 +1895,7 @@
       if (viewerState === 'guest'){
         document.getElementById('tabAvatarIcon').classList.remove('skel');
         renderRsvpBanner();
+        renderFeeDueBanner();
         renderNotifDot();
         return; // 訪客到此為止，不掛任何個人資料相關的監聽
       }
@@ -1792,6 +1905,7 @@
       tabAvatarIcon.classList.remove('skel');
 
       renderRsvpBanner();
+      renderFeeDueBanner();
       renderNotifDot();
       renderNotifSheet();
 
@@ -1884,6 +1998,31 @@
         renderNotifSheet();
         renderEventsSection(); // 團練卡片跟活動卡條上的「已回報」標籤也要跟著更新
       }, function(err){ console.error('attendanceReports 監聽失敗', err); });
+
+      // 團費待辦：自己在 memberIds 名單內、且未作廢的應繳項目，跟 eventRosters 同一套
+      // array-contains 查詢寫法。這裡是 eager 訂閱（不走 setOverviewLazyLoad），因為橫幅／
+      // 通知中心一進首頁就要看到，不能等使用者真的切到「團務總覽」才載入
+      onSnapshot(query(collection(db, 'feeDues'), where('memberIds', 'array-contains', viewerUid)), function(snap){
+        myFeeDuesList = snap.docs
+          .map(function(d){ return Object.assign({ id: d.id }, d.data()); })
+          .filter(function(d){ return !d.voided; });
+        renderFeeDueBanner();
+        renderNotifDot();
+        renderNotifSheet();
+        renderMyFeeDues();
+      }, function(err){ console.error('feeDues 監聽失敗', err); });
+
+      onSnapshot(query(collection(db, 'feePayments'), where('uid', '==', viewerUid)), function(snap){
+        myFeePaymentsByDueId = {};
+        snap.forEach(function(d){
+          var data = d.data();
+          if (!data.voided) myFeePaymentsByDueId[data.dueId] = data;
+        });
+        renderFeeDueBanner();
+        renderNotifDot();
+        renderNotifSheet();
+        renderMyFeeDues();
+      }, function(err){ console.error('feePayments 監聽失敗', err); });
 
       // notificationsReadAt 即時監聽（不透過 auth-guard.js 的快取 profile，見上方原因說明）。
       // setDoc 寫入 serverTimestamp() 後，本地端在伺服器確認前會先收到一次 null（Firestore 對

@@ -307,11 +307,17 @@ service cloud.firestore {
     // 完全看不到任何財務頁面或資料
     match /feeDues/{dueId} {
       allow get, list: if isAdminTier() || canManageFinance();
+      // 團員自查：只放行「自己在 memberIds 名單內」的項目，跟 eventRosters 對
+      // members 用 hasAny() 判斷同一套寫法，首頁通知中心/團務總覽用這條查自己的應繳項目
+      allow list: if hasProfile() && resource.data.memberIds.hasAny([request.auth.uid]);
       allow create, update, delete: if isAdminTier() || canManageFinance();
     }
 
     match /feePayments/{paymentId} {
       allow get, list: if isAdminTier() || canManageFinance();
+      // 團員自查自己的繳費紀錄，跟 attendanceReports 對本人開放 list/get 同一套寫法
+      allow list: if hasProfile() && resource.data.uid == request.auth.uid;
+      allow get: if request.auth != null && paymentId.split('_')[1] == request.auth.uid;
       allow create, update, delete: if isAdminTier() || canManageFinance();
     }
 
