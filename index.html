@@ -206,6 +206,10 @@
   }
   .my-concert-piece-row .k{ color:var(--ink); }
   .my-concert-piece-row .v{ color:var(--ink-soft); text-align:right; flex:none; }
+  /* 「我的團費」是扁平清單，不像「我的音樂會」每筆包在 .my-concert-card 裡（那個卡片的
+     padding 順便讓裡面的 piece-row 有左右留白）。這裡直接補上同樣 20px 的水平留白，
+     不動共用的 .my-concert-piece-row 本身，避免影響「我的音樂會」原本的排版 */
+  #myFeeDuesSlot .my-concert-piece-row{ margin:0 20px; }
 
   /* ---------- 回報狀態小標籤（貼著日期，跟現有 status-chip-btn 同一套配色：出席=sage／請假=burgundy） ---------- */
   .rsvp-status-chip{
