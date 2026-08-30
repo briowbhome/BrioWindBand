@@ -73,6 +73,12 @@
   .rp-skel-lines{ flex:1; display:flex; flex-direction:column; gap:7px; padding-top:2px; }
 
   .appbar{ display:flex; align-items:center; gap:12px; padding:18px 20px 14px; }
+  /* 這頁的漢堡按鈕有 .hidden 擋著、理論上等身分驗證完成後跟 initAdminNav() 同一輪同步
+     JS 一起執行，不會有 flash，但為了跟其他 admin-nav 頁面一致（那些頁面沒有 .hidden、
+     初次繪製就會露出這顆按鈕，需要這份樣式先擋著避免看到瀏覽器原生方框），這裡也補上
+     同一份定義，不依賴 admin-nav.js 動態注入的時機 */
+  .admin-nav-btn{ width:30px; height:30px; flex:none; border:none; background:none; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--ink); cursor:pointer; padding:0; }
+  .admin-nav-btn:active{ background:rgba(32,36,47,.06); }
   .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
   .brandtext{ display:flex; flex-direction:column; line-height:1.1; }
   .brandtext .name{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:19px; letter-spacing:.02em; }

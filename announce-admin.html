@@ -73,6 +73,11 @@
   }
 
   .appbar{ display:flex; align-items:center; gap:12px; padding:18px 20px 14px; }
+  /* 原本這顆按鈕的樣式只靠 admin-nav.js 的 initAdminNav() 注入，要等身分驗證的非同步
+     請求回來才會執行，剛進頁面時會先看到瀏覽器原生按鈕外觀（方框）再跳成正確圓形圖示。
+     直接在這裡定義同一份樣式，讓按鈕從第一次畫面繪製就是正確樣式 */
+  .admin-nav-btn{ width:30px; height:30px; flex:none; border:none; background:none; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--ink); cursor:pointer; padding:0; }
+  .admin-nav-btn:active{ background:rgba(32,36,47,.06); }
   .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
   .brandtext{ display:flex; flex-direction:column; line-height:1.1; }
   .brandtext .name{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:19px; letter-spacing:.02em; }
