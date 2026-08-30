@@ -210,6 +210,25 @@
      padding 順便讓裡面的 piece-row 有左右留白）。這裡直接補上同樣 20px 的水平留白，
      不動共用的 .my-concert-piece-row 本身，避免影響「我的音樂會」原本的排版 */
   #myFeeDuesSlot .my-concert-piece-row{ margin:0 20px; }
+  /* 未繳且該筆項目有填匯款資訊時，才在標題/狀態列下方多顯示這塊，同一份水平留白 */
+  #myFeeDuesSlot .fee-remit-info{ margin:0 20px 10px; padding:8px 10px; background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm); font-size:11.5px; line-height:1.6; color:var(--ink-soft); }
+  #myFeeDuesSlot .fee-remit-info b{ color:var(--ink); font-weight:600; }
+  .fee-qr-img{ width:140px; height:140px; object-fit:contain; border:1px solid var(--line); border-radius:8px; background:#fff; cursor:zoom-in; }
+
+  /* ---------- QR Code 放大檢視：比照 event-admin.html 簽到分頁同一套元件，點縮圖放大、
+     點遮罩收合 ---------- */
+  .qr-zoom-overlay{
+    position:fixed; inset:0; z-index:85;
+    background:rgba(32,36,47,.82);
+    display:none; align-items:center; justify-content:center;
+    padding:32px; cursor:zoom-out;
+  }
+  .qr-zoom-overlay.active{ display:flex; }
+  .qr-zoom-overlay img{
+    width:min(84vw, 360px); height:min(84vw, 360px);
+    background:#fff; border-radius:var(--radius-lg); padding:20px;
+    box-shadow:0 20px 60px rgba(0,0,0,.4);
+  }
 
   /* ---------- 回報狀態小標籤（貼著日期，跟現有 status-chip-btn 同一套配色：出席=sage／請假=burgundy） ---------- */
   .rsvp-status-chip{
@@ -915,8 +934,13 @@
   </div>
 </div>
 
+<div class="qr-zoom-overlay" id="qrZoomOverlay">
+  <img id="qrZoomImg" alt="收款 QR Code 放大">
+</div>
+
 <script type="module">
   import { showToast } from './toast.js';
+  import { subscribeRemittanceAccounts } from './finance.js';
   import { resolveMemberAccess, peekCachedProfile } from './auth-guard.js';
   import { subscribeEventTypes } from './event-types.js';
   import { db } from './firebase-init.js';
@@ -1013,6 +1037,7 @@
   var rsvpReportsByEvent = {}; // 只有已核准/審核中會員登入後才會真的有資料，訪客維持空物件、畫面自然不顯示回報標籤
   var myFeeDuesList = []; // 自己在 memberIds 名單內、且未作廢的應繳項目
   var myFeePaymentsByDueId = {}; // dueId -> 自己的繳費紀錄（未作廢）
+  var remittanceAccountsById = {}; // 匯款帳戶庫，只用來即時查 QR Code（銀行/帳號/戶名走 feeDues 自己的欄位快照）
 
   var viewerState = null; // 'guest' | 'pending' | 'approved'，身分驗證完成後才有值
   var viewerUid = null;
@@ -1842,14 +1867,43 @@
         var statusText = payment
           ? '已繳 $' + payment.amountPaid.toLocaleString('zh-Hant') + (dateText ? '・' + dateText : '')
           : '未繳 $' + feeDueAmountForMe(due).toLocaleString('zh-Hant');
-        return (
+        var rowHtml = (
           '<div class="my-concert-piece-row">' +
             '<span class="k">' + escapeHtmlForOverview(due.title) + '</span>' +
             '<span class="v">' + statusText + '</span>' +
           '</div>'
         );
+        // 只有未繳、且這筆項目有填匯款資訊時才顯示，已繳的人不需要再看到匯款方式
+        var hasRemit = !payment && due.remittanceBank && due.remittanceAccount && due.remittanceHolder;
+        // QR Code 刻意不從 due 本身讀（那份文字資訊才是套用當下的快照），而是拿
+        // remittanceAccountId 去帳戶庫即時查目前最新的圖片——這是使用者定案的例外
+        var linkedAccount = due.remittanceAccountId ? remittanceAccountsById[due.remittanceAccountId] : null;
+        var qrHtml = (hasRemit && linkedAccount && linkedAccount.qrCodeDataUrl)
+          ? '<div style="margin-top:8px;text-align:center;"><img class="fee-qr-img" src="' + linkedAccount.qrCodeDataUrl + '" alt="收款 QR Code，點擊放大"></div>'
+          : '';
+        var remitHtml = hasRemit
+          ? '<div class="fee-remit-info">' +
+              '<b>銀行</b>：' + escapeHtmlForOverview(due.remittanceBank) + '　<b>帳號</b>：' + escapeHtmlForOverview(due.remittanceAccount) + '　<b>戶名</b>：' + escapeHtmlForOverview(due.remittanceHolder) +
+              (due.remittanceNote ? '<br><b>備註</b>：' + escapeHtmlForOverview(due.remittanceNote) : '') +
+              qrHtml +
+            '</div>'
+          : '';
+        return rowHtml + remitHtml;
       }).join('');
     }
+
+    // QR Code 放大檢視：比照 event-admin.html 簽到分頁同一套元件，點縮圖放大、點遮罩收合
+    var qrZoomOverlay = document.getElementById('qrZoomOverlay');
+    var qrZoomImg = document.getElementById('qrZoomImg');
+    document.getElementById('myFeeDuesSlot').addEventListener('click', function(e){
+      var img = e.target.closest('.fee-qr-img');
+      if (!img) return;
+      qrZoomImg.src = img.src;
+      qrZoomOverlay.classList.add('active');
+    });
+    qrZoomOverlay.addEventListener('click', function(){
+      qrZoomOverlay.classList.remove('active');
+    });
 
     // ---------- 身分驗證：訪客（未登入）／審核中／已核准，決定要不要打開個人化功能 ----------
     resolveMemberAccess().then(function(access){
@@ -2027,6 +2081,14 @@
         renderNotifSheet();
         renderMyFeeDues();
       }, function(err){ console.error('feePayments 監聽失敗', err); });
+
+      // 匯款帳戶庫：只用來即時查應繳項目連結的帳戶目前最新的 QR Code（不是複製快照，
+      // 帳戶之後換圖不用回頭改每一筆歷史應繳項目，這是使用者定案的刻意例外）
+      subscribeRemittanceAccounts(db, function(accounts){
+        remittanceAccountsById = {};
+        accounts.forEach(function(a){ remittanceAccountsById[a.id] = a; });
+        renderMyFeeDues();
+      }, function(err){ console.error('匯款帳戶監聽失敗', err); });
 
       // notificationsReadAt 即時監聽（不透過 auth-guard.js 的快取 profile，見上方原因說明）。
       // setDoc 寫入 serverTimestamp() 後，本地端在伺服器確認前會先收到一次 null（Firestore 對

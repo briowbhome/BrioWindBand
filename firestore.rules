@@ -194,6 +194,17 @@ service cloud.firestore {
       allow write: if isAdminTier() || canManageFinance();
     }
 
+    // 已存匯款帳戶（校內團/校友團等），純粹是建立應繳項目時的套用範本，不對一般團員
+    // 開放——團員看到的匯款資訊是複製進 feeDues 文件本身的欄位，不需要讀這份帳戶庫
+    // 8/30 讀取放寬：團員「我的團費」畫面要即時查詢應繳項目連結的帳戶目前的 QR Code
+    // （feeDues 只存 remittanceAccountId 參照，不複製 QR 圖片，見「開發路線圖」財務記帳章節），
+    // 銀行/帳號/戶名本來就不是機密（收款帳戶本來就是要公開讓人匯款），比照 settings/instruments
+    // 這類「非敏感共用清單」開放給所有登入者讀取；寫入維持只有幹部/財務能改
+    match /settings/financeRemittanceAccounts {
+      allow get: if hasProfile();
+      allow write: if isAdminTier() || canManageFinance();
+    }
+
     match /settings/financeSettings {
       allow get: if isAdminTier() || canManageFinance();
       allow write: if isAdminTier() || canManageFinance();

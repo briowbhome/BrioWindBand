@@ -286,7 +286,8 @@
   </div>
 
   <div class="seg-panel hidden" id="segPanelDues">
-    <div class="toolbar-row">
+    <div class="toolbar-row" style="justify-content:space-between;">
+      <button type="button" class="info-edit-btn" id="manageAccountsBtn" style="padding:6px 14px;font-size:11.5px;">管理帳戶</button>
       <button type="button" class="add-btn" id="addDueBtn">＋ 新增應繳項目</button>
     </div>
     <div id="duesList"></div>
@@ -316,10 +317,51 @@
       </div>
       <p style="margin:0 0 8px;font-size:11.5px;color:var(--ink-soft);">勾選後可以在名字旁邊填個別金額，留空時自動帶入「預設應繳金額」。</p>
       <div class="check-list" id="dueChecklist"></div>
+
+      <label style="margin-top:20px;">匯款資訊（選填）</label>
+      <select id="dueAccountSelect"><option value="">不套用（自訂輸入）</option></select>
+      <p style="margin:4px 0 0;font-size:11px;color:var(--ink-soft);">選了已存帳戶後，銀行/帳號/戶名會帶入下面欄位可再自行調整；團員畫面上的 QR Code 永遠顯示這個帳戶目前最新的圖片，不受下面文字調整影響。</p>
+      <input type="text" id="dueRemittanceBankInput" placeholder="銀行名稱" style="margin-top:8px;">
+      <input type="text" id="dueRemittanceAccountInput" placeholder="帳號" style="margin-top:8px;">
+      <input type="text" id="dueRemittanceHolderInput" placeholder="戶名" style="margin-top:8px;">
+      <input type="text" id="dueRemittanceNoteInput" placeholder="備註（例如：轉帳後請回報末五碼）" style="margin-top:8px;">
+
       <div class="form-error hidden" id="dueFormError"></div>
     </div>
     <div class="sheet-footer">
       <button type="button" class="cta-btn" id="dueSaveBtn">建立</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="accountsOverlay">
+  <div class="sheet">
+    <div class="sheet-header">
+      <span>管理帳戶</span>
+      <button type="button" id="accountsClose" aria-label="關閉">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div id="accountsList"></div>
+      <div id="accountFormTitle" style="margin-top:16px;font-size:12.5px;font-weight:700;color:var(--ink);">新增帳戶</div>
+      <label>帳戶名稱</label>
+      <input type="text" id="accountLabelInput" placeholder="例如：校內團帳戶">
+      <label>銀行名稱</label>
+      <input type="text" id="accountBankInput">
+      <label>帳號</label>
+      <input type="text" id="accountAccountInput">
+      <label>戶名</label>
+      <input type="text" id="accountHolderInput">
+      <label>收款 QR Code（選填）</label>
+      <input type="file" accept="image/*" id="accountQrInput">
+      <div id="accountQrPreviewWrap" class="hidden" style="margin-top:8px;">
+        <img id="accountQrPreview" style="width:120px;height:120px;object-fit:contain;border:1px solid var(--line);border-radius:var(--radius-sm);">
+        <button type="button" class="info-edit-btn" id="accountQrRemoveBtn" style="margin-left:8px;padding:4px 10px;font-size:11px;">移除圖片</button>
+      </div>
+      <div class="toolbar-row" style="margin:14px 0 0;">
+        <button type="button" class="cta-btn cta-btn-secondary hidden" id="accountCancelEditBtn" style="flex:none;padding:8px 16px;">取消編輯</button>
+        <button type="button" class="add-btn" id="accountAddBtn">新增帳戶</button>
+      </div>
+      <div class="form-error hidden" id="accountFormError"></div>
     </div>
   </div>
 </div>
@@ -447,7 +489,8 @@
     ensureDefaultFeeCategory, subscribeFinanceCategories, addFinanceCategory, updateFinanceCategory, deleteFinanceCategory,
     subscribeFinanceSettings, updateOpeningBalance,
     subscribeLedgerEntries, addLedgerEntry, updateLedgerEntry, voidLedgerEntry, computeBalance,
-    subscribeFeeDues, addFeeDue, updateFeeDue, voidFeeDue, subscribeFeePayments, recordFeePayment, updateFeePayment, voidFeePayment
+    subscribeFeeDues, addFeeDue, updateFeeDue, voidFeeDue, subscribeFeePayments, recordFeePayment, updateFeePayment, voidFeePayment,
+    subscribeRemittanceAccounts, addRemittanceAccount, updateRemittanceAccount, deleteRemittanceAccount
   } from './finance.js';
   import { collection, getDocs, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
@@ -466,6 +509,10 @@
   var dueDraftOverrides = {};
   var openDueDetailId = null;
   var editingDueId = null;
+  var remittanceAccountsList = [];
+  var editingAccountId = null;
+  var draftQrDataUrl = null;
+  var MAX_QR_DATA_URL_LENGTH = 700000; // base64 字串長度上限，約對應原始檔案 500KB 左右，避免帳戶庫文件整包過大
 
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -605,6 +652,166 @@
     }).join('');
   }
 
+  function renderDueAccountSelect() {
+    var select = document.getElementById('dueAccountSelect');
+    var current = select.value; // 重繪會清空選單重建，先記住目前選到哪個帳戶，重建後還原
+    select.innerHTML = '<option value="">不套用（自訂輸入）</option>' + remittanceAccountsList.map(function (a) {
+      return '<option value="' + a.id + '">' + escapeHtml(a.label) + '</option>';
+    }).join('');
+    select.value = current;
+  }
+
+  document.getElementById('dueAccountSelect').addEventListener('change', function () {
+    // 選單選到哪個帳戶就一直停在那裡（不像名單範本選完會重置回空白）——這個選擇本身
+    // 會存成 remittanceAccountId，團員畫面的 QR Code 要靠這個欄位即時查最新圖片，
+    // 所以要看得出「目前連到哪個帳戶」，不是單純的一次性套用。
+    // 注意：filter 的 callback 是另一個 function，裡面的 this 不會自動等於這個事件
+    // 處理函式的 this（select 元素），要先存到外層變數才能在巢狀函式裡正確取用
+    var selectedId = this.value;
+    var account = remittanceAccountsList.filter(function (a) { return a.id === selectedId; })[0];
+    if (!account) return;
+    document.getElementById('dueRemittanceBankInput').value = account.bank;
+    document.getElementById('dueRemittanceAccountInput').value = account.account;
+    document.getElementById('dueRemittanceHolderInput').value = account.holder;
+  });
+
+  function renderAccountsManageList() {
+    var container = document.getElementById('accountsList');
+    if (remittanceAccountsList.length === 0) {
+      container.innerHTML = '<div class="empty-state">還沒有任何已存帳戶</div>';
+      return;
+    }
+    container.innerHTML = remittanceAccountsList.map(function (a) {
+      var qrTag = a.qrCodeDataUrl ? '<span class="ledger-tag">有 QR</span>' : '';
+      return (
+        '<div class="ledger-row" data-edit-account="' + a.id + '" style="cursor:pointer;">' +
+          '<div class="ledger-row-main"><span>' + escapeHtml(a.label) + qrTag + '</span><span class="ledger-row-cat">' + escapeHtml(a.bank) + '・' + escapeHtml(a.account) + '・' + escapeHtml(a.holder) + '</span></div>' +
+          '<button type="button" class="info-edit-btn" data-del-account="' + a.id + '">刪除</button>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  document.getElementById('manageAccountsBtn').addEventListener('click', function () {
+    document.getElementById('accountsOverlay').classList.add('active');
+  });
+  document.getElementById('accountsClose').addEventListener('click', function () {
+    document.getElementById('accountsOverlay').classList.remove('active');
+  });
+  document.getElementById('accountsOverlay').addEventListener('click', function (e) {
+    if (e.target === document.getElementById('accountsOverlay')) document.getElementById('accountsOverlay').classList.remove('active');
+  });
+
+  function resetAccountForm() {
+    editingAccountId = null;
+    draftQrDataUrl = null;
+    document.getElementById('accountFormTitle').textContent = '新增帳戶';
+    document.getElementById('accountAddBtn').textContent = '新增帳戶';
+    document.getElementById('accountCancelEditBtn').classList.add('hidden');
+    document.getElementById('accountLabelInput').value = '';
+    document.getElementById('accountBankInput').value = '';
+    document.getElementById('accountAccountInput').value = '';
+    document.getElementById('accountHolderInput').value = '';
+    document.getElementById('accountQrInput').value = '';
+    document.getElementById('accountQrPreviewWrap').classList.add('hidden');
+    document.getElementById('accountFormError').classList.add('hidden');
+  }
+
+  function openAccountForEdit(account) {
+    editingAccountId = account.id;
+    draftQrDataUrl = account.qrCodeDataUrl || null;
+    document.getElementById('accountFormTitle').textContent = '編輯帳戶「' + account.label + '」';
+    document.getElementById('accountAddBtn').textContent = '儲存變更';
+    document.getElementById('accountCancelEditBtn').classList.remove('hidden');
+    document.getElementById('accountLabelInput').value = account.label;
+    document.getElementById('accountBankInput').value = account.bank;
+    document.getElementById('accountAccountInput').value = account.account;
+    document.getElementById('accountHolderInput').value = account.holder;
+    document.getElementById('accountQrInput').value = '';
+    document.getElementById('accountFormError').classList.add('hidden');
+    var previewWrap = document.getElementById('accountQrPreviewWrap');
+    if (draftQrDataUrl) {
+      document.getElementById('accountQrPreview').src = draftQrDataUrl;
+      previewWrap.classList.remove('hidden');
+    } else {
+      previewWrap.classList.add('hidden');
+    }
+  }
+
+  document.getElementById('accountCancelEditBtn').addEventListener('click', resetAccountForm);
+
+  document.getElementById('accountQrInput').addEventListener('change', function (e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    var errEl = document.getElementById('accountFormError');
+    errEl.classList.add('hidden');
+    var reader = new FileReader();
+    reader.onload = function () {
+      if (reader.result.length > MAX_QR_DATA_URL_LENGTH) {
+        errEl.textContent = '圖片太大，請換一張檔案較小的圖片（建議 500KB 以內）';
+        errEl.classList.remove('hidden');
+        document.getElementById('accountQrInput').value = '';
+        return;
+      }
+      draftQrDataUrl = reader.result;
+      document.getElementById('accountQrPreview').src = draftQrDataUrl;
+      document.getElementById('accountQrPreviewWrap').classList.remove('hidden');
+    };
+    reader.readAsDataURL(file);
+  });
+
+  document.getElementById('accountQrRemoveBtn').addEventListener('click', function () {
+    draftQrDataUrl = null;
+    document.getElementById('accountQrInput').value = '';
+    document.getElementById('accountQrPreviewWrap').classList.add('hidden');
+  });
+
+  document.getElementById('accountAddBtn').addEventListener('click', function () {
+    var label = document.getElementById('accountLabelInput').value.trim();
+    var bank = document.getElementById('accountBankInput').value.trim();
+    var account = document.getElementById('accountAccountInput').value.trim();
+    var holder = document.getElementById('accountHolderInput').value.trim();
+    var errEl = document.getElementById('accountFormError');
+    errEl.classList.add('hidden');
+    if (!label || !bank || !account || !holder) {
+      errEl.textContent = '請填寫帳戶名稱、銀行、帳號、戶名';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    var fields = { label: label, bank: bank, account: account, holder: holder, qrCodeDataUrl: draftQrDataUrl };
+    var task = editingAccountId
+      ? updateRemittanceAccount(db, editingAccountId, fields)
+      : addRemittanceAccount(db, fields);
+    task.then(function () {
+      resetAccountForm();
+    }).catch(function (err) {
+      errEl.textContent = (editingAccountId ? '儲存' : '新增') + '失敗：' + err.code;
+      errEl.classList.remove('hidden');
+    });
+  });
+
+  document.getElementById('accountsList').addEventListener('click', function (e) {
+    var delBtn = e.target.closest('[data-del-account]');
+    if (delBtn) {
+      var delId = delBtn.getAttribute('data-del-account');
+      var acct = remittanceAccountsList.filter(function (a) { return a.id === delId; })[0];
+      var ok = confirm('確定要刪除帳戶「' + (acct ? acct.label : '') + '」嗎？已經套用過這個帳戶的應繳項目不會被清掉，只是這份帳戶庫少一個可以選的選項，套用過的項目也會查不到 QR Code。此動作無法復原。');
+      if (!ok) return;
+      deleteRemittanceAccount(db, delId).then(function () {
+        if (editingAccountId === delId) resetAccountForm();
+      }).catch(function (err) {
+        showToast('刪除失敗：' + err.message, 'error');
+      });
+      return;
+    }
+    var editRow = e.target.closest('[data-edit-account]');
+    if (editRow) {
+      var editId = editRow.getAttribute('data-edit-account');
+      var account = remittanceAccountsList.filter(function (a) { return a.id === editId; })[0];
+      if (account) openAccountForEdit(account);
+    }
+  });
+
   function renderDueChecklist() {
     var defaultAmountVal = document.getElementById('dueAmountInput').value;
     var checklist = document.getElementById('dueChecklist');
@@ -680,6 +887,11 @@
     document.getElementById('dueTitleInput').value = '';
     document.getElementById('dueAmountInput').value = '';
     document.getElementById('dueTemplateSelect').value = '';
+    document.getElementById('dueAccountSelect').value = '';
+    document.getElementById('dueRemittanceBankInput').value = '';
+    document.getElementById('dueRemittanceAccountInput').value = '';
+    document.getElementById('dueRemittanceHolderInput').value = '';
+    document.getElementById('dueRemittanceNoteInput').value = '';
     document.getElementById('dueFormError').classList.add('hidden');
     ensureApprovedMembers().then(function () {
       renderDueChecklist();
@@ -697,6 +909,11 @@
     document.getElementById('dueTitleInput').value = due.title;
     document.getElementById('dueAmountInput').value = due.amount;
     document.getElementById('dueTemplateSelect').value = '';
+    document.getElementById('dueAccountSelect').value = due.remittanceAccountId || '';
+    document.getElementById('dueRemittanceBankInput').value = due.remittanceBank || '';
+    document.getElementById('dueRemittanceAccountInput').value = due.remittanceAccount || '';
+    document.getElementById('dueRemittanceHolderInput').value = due.remittanceHolder || '';
+    document.getElementById('dueRemittanceNoteInput').value = due.remittanceNote || '';
     document.getElementById('dueFormError').classList.add('hidden');
     document.getElementById('dueDetailOverlay').classList.remove('active');
     ensureApprovedMembers().then(function () {
@@ -728,11 +945,18 @@
       var v = dueDraftOverrides[uid];
       if (v != null && !isNaN(v) && v >= 0 && v !== amount) cleanOverrides[uid] = v;
     });
+    var remittanceFields = {
+      remittanceBank: document.getElementById('dueRemittanceBankInput').value.trim(),
+      remittanceAccount: document.getElementById('dueRemittanceAccountInput').value.trim(),
+      remittanceHolder: document.getElementById('dueRemittanceHolderInput').value.trim(),
+      remittanceNote: document.getElementById('dueRemittanceNoteInput').value.trim(),
+      remittanceAccountId: document.getElementById('dueAccountSelect').value || null
+    };
     var btn = document.getElementById('dueSaveBtn');
     btn.disabled = true;
     var task = editingDueId
-      ? updateFeeDue(db, editingDueId, currentAdminUid, { title: title, amount: amount, memberIds: memberIds, memberOverrides: cleanOverrides })
-      : addFeeDue(db, currentAdminUid, { title: title, amount: amount, memberIds: memberIds, memberOverrides: cleanOverrides, sourceTemplateId: templateId });
+      ? updateFeeDue(db, editingDueId, currentAdminUid, Object.assign({ title: title, amount: amount, memberIds: memberIds, memberOverrides: cleanOverrides }, remittanceFields))
+      : addFeeDue(db, currentAdminUid, Object.assign({ title: title, amount: amount, memberIds: memberIds, memberOverrides: cleanOverrides, sourceTemplateId: templateId }, remittanceFields));
     task.then(function () {
       btn.disabled = false;
       document.getElementById('dueSheetOverlay').classList.remove('active');
@@ -1187,6 +1411,12 @@
       renderDuesList();
       refreshOpenDueDetail();
     }, function (err) { console.error('應繳項目監聽失敗', err); });
+
+    subscribeRemittanceAccounts(db, function (accounts) {
+      remittanceAccountsList = accounts;
+      renderDueAccountSelect();
+      renderAccountsManageList();
+    }, function (err) { console.error('匯款帳戶監聽失敗', err); });
 
     subscribeFeePayments(db, function (payments) {
       feePaymentsList = payments;

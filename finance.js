@@ -76,6 +76,53 @@ export async function deleteFinanceCategory(db, categoryId) {
   await setDoc(ref, { categories: next }, { merge: true });
 }
 
+// 已存匯款帳戶（校內團／校友團等可能各自不同帳戶），建立/編輯應繳項目時可以套用。
+// bank/account/holder/note 文字欄位套用當下複製進那筆 feeDues 文件（快照，帳戶庫之後
+// 異動不會回頭影響已經套用過的項目），但 QR Code 圖片刻意不複製——feeDues 只存
+// remittanceAccountId 參照，畫面上永遠即時去帳戶庫查目前最新的 QR Code（使用者定案：
+// 換一張乾淨的 QR 圖不用回頭改所有歷史項目）
+export function subscribeRemittanceAccounts(db, onData, onError) {
+  return onSnapshot(doc(db, 'settings', 'financeRemittanceAccounts'), function (snap) {
+    var accounts = (snap.exists() && Array.isArray(snap.data().accounts)) ? snap.data().accounts : [];
+    onData(accounts);
+  }, onError);
+}
+
+export async function addRemittanceAccount(db, fields) {
+  var ref = doc(db, 'settings', 'financeRemittanceAccounts');
+  var snap = await getDoc(ref);
+  var accounts = (snap.exists() && Array.isArray(snap.data().accounts)) ? snap.data().accounts : [];
+  var newAccount = {
+    id: 'acct_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+    label: fields.label, bank: fields.bank, account: fields.account, holder: fields.holder,
+    qrCodeDataUrl: fields.qrCodeDataUrl || null
+  };
+  await setDoc(ref, { accounts: accounts.concat([newAccount]) }, { merge: true });
+  return newAccount.id;
+}
+
+export async function updateRemittanceAccount(db, accountId, fields) {
+  var ref = doc(db, 'settings', 'financeRemittanceAccounts');
+  var snap = await getDoc(ref);
+  var accounts = (snap.exists() && Array.isArray(snap.data().accounts)) ? snap.data().accounts : [];
+  var next = accounts.map(function (a) {
+    if (a.id !== accountId) return a;
+    return {
+      id: a.id, label: fields.label, bank: fields.bank, account: fields.account, holder: fields.holder,
+      qrCodeDataUrl: fields.qrCodeDataUrl !== undefined ? fields.qrCodeDataUrl : (a.qrCodeDataUrl || null)
+    };
+  });
+  await setDoc(ref, { accounts: next }, { merge: true });
+}
+
+export async function deleteRemittanceAccount(db, accountId) {
+  var ref = doc(db, 'settings', 'financeRemittanceAccounts');
+  var snap = await getDoc(ref);
+  var accounts = (snap.exists() && Array.isArray(snap.data().accounts)) ? snap.data().accounts : [];
+  var next = accounts.filter(function (a) { return a.id !== accountId; });
+  await setDoc(ref, { accounts: next }, { merge: true });
+}
+
 export function subscribeFinanceSettings(db, onData, onError) {
   return onSnapshot(doc(db, 'settings', 'financeSettings'), function (snap) {
     onData(snap.exists() ? snap.data() : { openingBalance: 0 });
@@ -170,6 +217,11 @@ export async function addFeeDue(db, uid, fields) {
     memberIds: fields.memberIds,
     memberOverrides: fields.memberOverrides || {},
     sourceTemplateId: fields.sourceTemplateId || null,
+    remittanceBank: fields.remittanceBank || '',
+    remittanceAccount: fields.remittanceAccount || '',
+    remittanceHolder: fields.remittanceHolder || '',
+    remittanceNote: fields.remittanceNote || '',
+    remittanceAccountId: fields.remittanceAccountId || null,
     createdAt: serverTimestamp(),
     createdBy: uid,
     voided: false
@@ -183,6 +235,11 @@ export async function updateFeeDue(db, dueId, uid, fields) {
     amount: fields.amount,
     memberIds: fields.memberIds,
     memberOverrides: fields.memberOverrides || {},
+    remittanceBank: fields.remittanceBank || '',
+    remittanceAccount: fields.remittanceAccount || '',
+    remittanceHolder: fields.remittanceHolder || '',
+    remittanceNote: fields.remittanceNote || '',
+    remittanceAccountId: fields.remittanceAccountId || null,
     updatedAt: serverTimestamp(),
     updatedBy: uid
   });
