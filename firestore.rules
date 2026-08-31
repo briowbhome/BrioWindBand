@@ -358,6 +358,22 @@ service cloud.firestore {
           allow create, update, delete: if isAdminTier() || canManageSection(instrumentName);
         }
       }
+
+      // 分部筆記：綁在「音樂會」這層（不是巢狀在 pieces 底下），pieceId 是筆記上的一個
+      // 欄位、不是路徑層級，可留空代表不限定曲目的通用提醒——這是使用者在設計討論時
+      // 明確要求的（一次團練可能同時練好幾首曲子，巢狀在曲目底下要多一層點擊）。讀取
+      // 比照 concerts/pieces/sections/concertRosters 既有的「所有登入者可讀」慣例。
+      // 新增只檢查 authorUid 是自己，不深驗證 instrumentName 是否真的對應這場音樂會的
+      // 樂器身分——跟 canManageSection() 對 sections 內容不做正確性檢查同一種取捨，規則
+      // 只負責「誰能碰這份文件」，可選樂器範圍由前端讀 concertRosters 把關
+      match /notes/{noteId} {
+        allow get, list: if hasProfile();
+        allow create: if hasProfile() && request.resource.data.authorUid == request.auth.uid;
+        allow update: if hasProfile() && resource.data.authorUid == request.auth.uid;
+        allow delete: if isAdminTier()
+          || (hasProfile() && resource.data.authorUid == request.auth.uid)
+          || canManageSection(resource.data.instrumentName);
+      }
     }
 
     // 音樂會參與名單，跟 eventRosters 同樣的文件 ID 慣例（= concertId）。讀取開放給所有

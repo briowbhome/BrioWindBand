@@ -215,6 +215,75 @@
   #myFeeDuesSlot .fee-remit-info b{ color:var(--ink); font-weight:600; }
   .fee-qr-img{ width:140px; height:140px; object-fit:contain; border:1px solid var(--line); border-radius:8px; background:#fff; cursor:zoom-in; }
 
+  /* ---------- 分部筆記：卡片上開 bottom sheet，互動樣式比照 conductor-admin.html
+     排練筆記的既有 CSS（.note-item 系列直接複製過來，這個專案不共用邏輯/樣式檔） ---------- */
+  .concert-notes-btn{
+    margin-top:10px; width:100%; background:none; border:1px solid var(--line);
+    border-radius:var(--radius-sm); padding:9px; font-family:'Noto Sans TC',sans-serif;
+    font-size:12.5px; font-weight:500; color:var(--ink); cursor:pointer;
+  }
+  .concert-notes-btn:active{ background:var(--sage-bg); }
+  .note-select{
+    border:1px solid var(--line); background:var(--paper);
+    border-radius:var(--radius-sm); padding:9px 11px;
+    font-size:13px; color:var(--ink); width:100%; margin-top:8px;
+  }
+  .note-textarea{
+    width:100%; min-height:80px; resize:vertical; margin-top:8px;
+    border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--paper);
+    padding:10px; font-size:13px; color:var(--ink); line-height:1.6; font-family:inherit;
+  }
+  .note-save-row{ display:flex; align-items:center; justify-content:flex-end; gap:10px; margin-top:8px; }
+  .note-status{ font-size:11px; color:var(--ink-soft); }
+  .note-save-btn{
+    background:var(--brass); color:var(--ink); border:none; border-radius:var(--radius-sm);
+    padding:9px 18px; font-weight:700; font-size:12.5px; cursor:pointer;
+  }
+  .note-save-btn:disabled{ opacity:.5; cursor:default; }
+  .note-filter-row{
+    display:flex; gap:6px; overflow-x:auto; padding:14px 0 4px; margin-top:4px;
+    border-top:1px solid var(--line);
+  }
+  .note-filter-row::-webkit-scrollbar{ display:none; }
+  .note-filter-chip{
+    flex:none; border:1px solid var(--line); background:var(--paper-raised); color:var(--ink-soft);
+    border-radius:999px; padding:6px 13px; font-size:11.5px; font-weight:600; cursor:pointer;
+    font-family:'Noto Sans TC',sans-serif; white-space:nowrap;
+  }
+  .note-filter-chip.active{ background:var(--brass); border-color:var(--brass); color:var(--ink); }
+  .note-piece-group{ margin-top:18px; }
+  .note-piece-title{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:13.5px; color:var(--ink); margin-bottom:4px; }
+  .note-instrument-group{ margin-top:6px; }
+  .note-instrument-group summary{
+    cursor:pointer; font-size:12px; font-weight:600; color:var(--ink-soft);
+    padding:6px 0; list-style:none;
+  }
+  .note-instrument-group summary::-webkit-details-marker{ display:none; }
+  .note-instrument-group summary::before{ content:'▸ '; }
+  .note-instrument-group[open] summary::before{ content:'▾ '; }
+  .note-item{ padding:10px 0; border-top:1px solid var(--line); }
+  .note-item-text{ font-size:12.5px; color:var(--ink); line-height:1.6; white-space:pre-wrap; }
+  .note-item-meta{ display:flex; align-items:center; justify-content:space-between; margin-top:6px; }
+  .note-item-date{ font-family:'Roboto Mono',monospace; font-size:10px; color:var(--ink-soft); }
+  .note-item-actions{ display:flex; gap:4px; }
+  .note-item-actions button{
+    background:none; border:none; color:var(--ink-soft); cursor:pointer;
+    font-size:13px; width:24px; height:24px; border-radius:50%;
+  }
+  .note-item-actions button:active{ background:var(--sage-bg); }
+  .note-item-edit-textarea{
+    width:100%; min-height:80px; resize:vertical;
+    border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--paper);
+    padding:8px; font-size:12.5px; color:var(--ink); line-height:1.6; margin-top:4px; font-family:inherit;
+  }
+  .note-item-edit-row{ display:flex; justify-content:flex-end; gap:8px; margin-top:6px; }
+  .note-item-edit-row button{
+    border:none; border-radius:var(--radius-sm); padding:6px 14px; font-size:12px; font-weight:700; cursor:pointer;
+  }
+  .note-item-save-btn{ background:var(--brass); color:var(--ink); }
+  .note-item-cancel-btn{ background:none; color:var(--ink-soft); }
+  .empty-note{ font-size:12.5px; color:var(--ink-soft); padding:8px 0; }
+
   /* ---------- QR Code 放大檢視：比照 event-admin.html 簽到分頁同一套元件，點縮圖放大、
      點遮罩收合 ---------- */
   .qr-zoom-overlay{
@@ -923,6 +992,29 @@
   </div>
 </div>
 
+<!-- 分部筆記 Bottom Sheet -->
+<div class="sheet-overlay" id="concertNotesSheetOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button type="button" class="sheet-close" id="concertNotesSheetClose" aria-label="關閉">×</button>
+      <div class="name" id="concertNotesSheetTitle">—</div>
+    </div>
+    <div class="sheet-body">
+      <textarea id="noteNewTextarea" class="note-textarea" placeholder="寫點什麼，選填曲目後新增一則筆記。"></textarea>
+      <select id="noteNewPieceSelect" class="note-select"></select>
+      <select id="noteNewInstrumentSelect" class="note-select hidden"></select>
+      <div class="note-save-row">
+        <span class="note-status" id="noteAddStatus"></span>
+        <button type="button" class="note-save-btn" id="noteAddBtn">新增筆記</button>
+      </div>
+      <div class="note-filter-row" id="noteFilterRow"></div>
+      <div id="concertNotesList"></div>
+      <div id="concertNotesEmpty" class="empty-note hidden">還沒有任何筆記。</div>
+    </div>
+  </div>
+</div>
+
 <!-- 推播通知開關推廣提示：置中 modal，一定要點按鈕才會關閉 -->
 <div class="notif-prompt-overlay" id="notifPromptOverlay">
   <div class="notif-prompt-card">
@@ -947,7 +1039,7 @@
   import { VAPID_PUBLIC_KEY } from './push-config.js';
   import {
     collection, query, where, orderBy, limit, onSnapshot, Timestamp,
-    doc, getDoc, getDocs, setDoc, serverTimestamp
+    doc, getDoc, getDocs, setDoc, deleteDoc, serverTimestamp
   } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
   // 還沒做的分頁（行事曆/譜夾）：反灰 + 點擊顯示提示，不依賴登入驗證結果，
@@ -1623,6 +1715,110 @@
       openRsvpSheet(id);
     });
 
+    // ---------- 分部筆記：事件綁定 ----------
+    document.getElementById('myConcertsSlot').addEventListener('click', function(e){
+      var btn = e.target.closest('[data-concert-notes]');
+      if (btn) openConcertNotesSheet(btn.getAttribute('data-concert-notes'));
+    });
+
+    var concertNotesSheetOverlay = document.getElementById('concertNotesSheetOverlay');
+    document.getElementById('concertNotesSheetClose').addEventListener('click', closeConcertNotesSheet);
+    concertNotesSheetOverlay.addEventListener('click', function(e){
+      if (e.target === concertNotesSheetOverlay) closeConcertNotesSheet();
+    });
+
+    document.getElementById('noteFilterRow').addEventListener('click', function(e){
+      var chip = e.target.closest('[data-note-filter]');
+      if (!chip) return;
+      concertNotesFilter = chip.getAttribute('data-note-filter');
+      renderConcertNotes();
+    });
+
+    document.getElementById('noteAddBtn').addEventListener('click', function(){
+      var text = document.getElementById('noteNewTextarea').value.trim();
+      if (!text || !activeNotesConcertId) return;
+      var myInstruments = myInstrumentsForActiveConcert();
+      var instrumentName = myInstruments.length > 1
+        ? document.getElementById('noteNewInstrumentSelect').value
+        : (myInstruments[0] || '');
+      if (!instrumentName) return;
+      var pieceId = document.getElementById('noteNewPieceSelect').value || null;
+      var concertId = activeNotesConcertId;
+      var addBtn = document.getElementById('noteAddBtn');
+      addBtn.disabled = true;
+      document.getElementById('noteAddStatus').textContent = '新增中…';
+      createConcertNote(concertId, pieceId, instrumentName, text).then(function(){
+        document.getElementById('noteNewTextarea').value = '';
+        document.getElementById('noteAddStatus').textContent = '已新增';
+        setTimeout(function(){ document.getElementById('noteAddStatus').textContent = ''; }, 2000);
+        return loadConcertNotes(concertId);
+      }).then(function(notes){
+        if (activeNotesConcertId !== concertId) return;
+        concertNotesCache = notes;
+        // 新增一定是寫進自己的分部，如果當下篩選的不是自己這個分部，切過去，
+        // 不然使用者會看不到自己剛剛新增的筆記、以為沒存成功
+        concertNotesFilter = instrumentName;
+        renderConcertNotes();
+      }).catch(function(err){
+        document.getElementById('noteAddStatus').textContent = '新增失敗：' + err.code;
+      }).finally(function(){
+        addBtn.disabled = false;
+      });
+    });
+
+    document.getElementById('concertNotesList').addEventListener('click', function(e){
+      var editBtn = e.target.closest('[data-concert-note-edit-btn]');
+      if (editBtn){
+        var editId = editBtn.getAttribute('data-concert-note-edit-btn');
+        var n = concertNotesCache.filter(function(x){ return x.id === editId; })[0];
+        editingConcertNoteId = editId;
+        editingConcertNoteDraft = n ? n.note : '';
+        renderConcertNotes();
+        return;
+      }
+      var cancelBtn = e.target.closest('[data-concert-note-cancel]');
+      if (cancelBtn){
+        editingConcertNoteId = null;
+        renderConcertNotes();
+        return;
+      }
+      var saveBtn = e.target.closest('[data-concert-note-save]');
+      if (saveBtn){
+        var saveId = saveBtn.getAttribute('data-concert-note-save');
+        var input = document.querySelector('[data-concert-note-edit-input="' + saveId + '"]');
+        var newText = input ? input.value.trim() : '';
+        if (!newText) return;
+        var concertId = activeNotesConcertId;
+        updateConcertNote(concertId, saveId, newText).then(function(){
+          editingConcertNoteId = null;
+          return loadConcertNotes(concertId);
+        }).then(function(notes){
+          if (activeNotesConcertId !== concertId) return;
+          concertNotesCache = notes;
+          renderConcertNotes();
+        }).catch(function(err){
+          showToast('儲存失敗：' + err.code, 'error');
+        });
+        return;
+      }
+      var deleteBtn = e.target.closest('[data-concert-note-delete]');
+      if (deleteBtn){
+        var delId = deleteBtn.getAttribute('data-concert-note-delete');
+        var ok = confirm('確定要刪除這則筆記嗎？');
+        if (!ok) return;
+        var concertId = activeNotesConcertId;
+        deleteConcertNote(concertId, delId).then(function(){
+          return loadConcertNotes(concertId);
+        }).then(function(notes){
+          if (activeNotesConcertId !== concertId) return;
+          concertNotesCache = notes;
+          renderConcertNotes();
+        }).catch(function(err){
+          showToast('刪除失敗：' + err.code, 'error');
+        });
+      }
+    });
+
     var rsvpSheetOverlay = document.getElementById('rsvpSheetOverlay');
     var rsvpOpenEventId = null;
     var rsvpSelectedStatus = 'attending';
@@ -1789,7 +1985,7 @@
 
         var pieces = await Promise.all(pieceRefs.map(async function(ref){
           var piece = repertoireById[ref.id];
-          if (!piece) return { title: '（曲目已刪除）', assignedLabel: null };
+          if (!piece) return { pieceId: ref.id, title: '（曲目已刪除）', assignedLabel: null };
           // 同時負責多種樂器時，這首曲子可能只在其中某個樂器的分部文件裡有指派到這個人，
           // 逐一查每個樂器的分部文件，把找到的分部標籤都收集起來
           var labels = [];
@@ -1803,7 +1999,7 @@
               }
             });
           }));
-          return { title: piece.title, assignedLabel: labels.length ? labels.join('、') : null };
+          return { pieceId: ref.id, title: piece.title, assignedLabel: labels.length ? labels.join('、') : null };
         }));
 
         return { concertId: entry.concertId, title: concertSnap.data().title, instruments: entry.instruments, pieces: pieces };
@@ -1816,6 +2012,273 @@
       return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
         return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
       });
+    }
+
+    // ---------- 分部筆記：綁在音樂會層級，pieceId 是筆記上的欄位（可留空＝通用提醒），
+    // 不是巢狀路徑；互動模式比照 conductor-admin.html「排練筆記」CRUD 改寫 ----------
+    var myConcertsData = []; // loadMyConcerts() 的結果快取，開筆記 sheet 時查曲目/樂器身分用
+    var activeNotesConcertId = null;
+    var concertNotesCache = [];
+    var editingConcertNoteId = null;
+    var editingConcertNoteDraft = '';
+
+    async function loadConcertNotes(concertId){
+      var snap = await getDocs(collection(db, 'concerts', concertId, 'notes'));
+      var notes = [];
+      snap.forEach(function(docSnap){
+        var data = docSnap.data();
+        notes.push({
+          id: docSnap.id,
+          pieceId: data.pieceId || null,
+          instrumentName: data.instrumentName || '',
+          note: data.note || '',
+          authorUid: data.authorUid || '',
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt
+        });
+      });
+      notes.sort(function(a, b){
+        var at = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+        var bt = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+        return bt - at;
+      });
+      return notes;
+    }
+
+    function createConcertNote(concertId, pieceId, instrumentName, text){
+      var ref = doc(collection(db, 'concerts', concertId, 'notes'));
+      return setDoc(ref, {
+        pieceId: pieceId || null,
+        instrumentName: instrumentName,
+        note: text,
+        authorUid: viewerUid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    }
+
+    function updateConcertNote(concertId, noteId, text){
+      return setDoc(doc(db, 'concerts', concertId, 'notes', noteId), {
+        note: text,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    }
+
+    function deleteConcertNote(concertId, noteId){
+      return deleteDoc(doc(db, 'concerts', concertId, 'notes', noteId));
+    }
+
+    function formatConcertNoteDate(ts){
+      if (!ts || !ts.toDate) return '';
+      var d = ts.toDate();
+      return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + d.toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit', hour12:false });
+    }
+
+    var concertNotesFilter = 'ALL'; // 'ALL' 或某個樂器名稱，開 sheet 時依名單重設
+
+    function myInstrumentsForActiveConcert(){
+      var c = myConcertsData.filter(function(x){ return x.concertId === activeNotesConcertId; })[0];
+      return c ? (c.instruments || []) : [];
+    }
+
+    // 篩選 chip 的選項：自己的分部（永遠列出，即使還沒有筆記）+ 目前載入的筆記裡出現過的
+    // 其他分部，自己的分部排最前面。不用另外查整份音樂會名單的樂器清單，這場音樂會有
+    // 哪些分部已經在寫筆記，用目前抓回來的筆記資料就能算出來，不需要多一次查詢
+    function concertNoteFilterOptions(){
+      var myInstruments = myInstrumentsForActiveConcert();
+      var names = myInstruments.slice();
+      concertNotesCache.forEach(function(n){
+        if (names.indexOf(n.instrumentName) === -1) names.push(n.instrumentName);
+      });
+      names.sort(function(a, b){
+        var aMine = myInstruments.indexOf(a) !== -1 ? 0 : 1;
+        var bMine = myInstruments.indexOf(b) !== -1 ? 0 : 1;
+        return aMine - bMine || a.localeCompare(b);
+      });
+      return names;
+    }
+
+    function renderConcertNoteFilterChips(){
+      var myInstruments = myInstrumentsForActiveConcert();
+      var chips = ['ALL'].concat(concertNoteFilterOptions());
+      document.getElementById('noteFilterRow').innerHTML = chips.map(function(name){
+        var label = name === 'ALL' ? '全部' : name;
+        var isMine = myInstruments.indexOf(name) !== -1;
+        return (
+          '<button type="button" class="note-filter-chip' + (concertNotesFilter === name ? ' active' : '') + '" data-note-filter="' + escapeHtmlForOverview(name) + '">' +
+            escapeHtmlForOverview(label) + (isMine ? '（我的分部）' : '') +
+          '</button>'
+        );
+      }).join('');
+    }
+
+    // 依 pieceId 分組（含「通用提醒」給 pieceId 為 null 的筆記），照這場音樂會的曲目順序排序，
+    // 通用提醒固定排最後。單一分部篩選模式、「全部」模式都用同一個分組函式，差異只在
+    // 「全部」模式底下還要再依分部分一層
+    function groupConcertNotesByPiece(list, pieceOrder, pieceTitleById){
+      var byPiece = {};
+      list.forEach(function(n){
+        var key = n.pieceId || '';
+        if (!byPiece[key]) byPiece[key] = { title: key ? (pieceTitleById[key] || '（曲目已刪除）') : '通用提醒', notes: [] };
+        byPiece[key].notes.push(n);
+      });
+      var keys = Object.keys(byPiece).filter(function(k){ return k !== ''; });
+      keys.sort(function(a, b){ return pieceOrder.indexOf(a) - pieceOrder.indexOf(b); });
+      if (byPiece['']) keys.push('');
+      return keys.map(function(k){ return byPiece[k]; });
+    }
+
+    function canDeleteConcertNote(n){
+      if (viewerProfile.role === 'admin' || viewerProfile.role === 'owner') return true;
+      if (n.authorUid === viewerUid) return true;
+      return (viewerProfile.sectionLeaderFor || []).indexOf(n.instrumentName) !== -1;
+    }
+
+    function renderConcertNoteItem(n){
+      if (editingConcertNoteId === n.id){
+        return (
+          '<div class="note-item">' +
+            '<textarea class="note-item-edit-textarea" data-concert-note-edit-input="' + n.id + '">' + escapeHtmlForOverview(editingConcertNoteDraft) + '</textarea>' +
+            '<div class="note-item-edit-row">' +
+              '<button type="button" class="note-item-cancel-btn" data-concert-note-cancel="' + n.id + '">取消</button>' +
+              '<button type="button" class="note-item-save-btn" data-concert-note-save="' + n.id + '">儲存</button>' +
+            '</div>' +
+          '</div>'
+        );
+      }
+      var actionsHtml = '';
+      if (n.authorUid === viewerUid) actionsHtml += '<button type="button" data-concert-note-edit-btn="' + n.id + '" aria-label="編輯">✎</button>';
+      if (canDeleteConcertNote(n)) actionsHtml += '<button type="button" data-concert-note-delete="' + n.id + '" aria-label="刪除">×</button>';
+      return (
+        '<div class="note-item">' +
+          '<div class="note-item-text">' + escapeHtmlForOverview(n.note) + '</div>' +
+          '<div class="note-item-meta">' +
+            '<span class="note-item-date">' + formatConcertNoteDate(n.createdAt) + '</span>' +
+            (actionsHtml ? '<div class="note-item-actions">' + actionsHtml + '</div>' : '') +
+          '</div>' +
+        '</div>'
+      );
+    }
+
+    function renderConcertNotes(){
+      renderConcertNoteFilterChips();
+
+      var c = myConcertsData.filter(function(x){ return x.concertId === activeNotesConcertId; })[0];
+      var listEl = document.getElementById('concertNotesList');
+      var emptyEl = document.getElementById('concertNotesEmpty');
+      var visibleNotes = concertNotesFilter === 'ALL'
+        ? concertNotesCache
+        : concertNotesCache.filter(function(n){ return n.instrumentName === concertNotesFilter; });
+
+      if (visibleNotes.length === 0){
+        listEl.innerHTML = '';
+        emptyEl.classList.remove('hidden');
+        return;
+      }
+      emptyEl.classList.add('hidden');
+
+      var pieceOrder = (c ? c.pieces : []).map(function(p){ return p.pieceId; });
+      var pieceTitleById = {};
+      (c ? c.pieces : []).forEach(function(p){ if (p.pieceId) pieceTitleById[p.pieceId] = p.title; });
+      var pieceGroups = groupConcertNotesByPiece(visibleNotes, pieceOrder, pieceTitleById);
+
+      if (concertNotesFilter !== 'ALL'){
+        // 已經篩到單一分部，曲目底下直接是平的筆記列表，不用再巢狀一層分部收合
+        listEl.innerHTML = pieceGroups.map(function(group){
+          return (
+            '<div class="note-piece-group">' +
+              '<div class="note-piece-title">' + escapeHtmlForOverview(group.title) + '</div>' +
+              group.notes.map(renderConcertNoteItem).join('') +
+            '</div>'
+          );
+        }).join('');
+        return;
+      }
+
+      // 「全部」：曲目底下依分部分組收合，自己的分部預設展開
+      var myInstruments = myInstrumentsForActiveConcert();
+      listEl.innerHTML = pieceGroups.map(function(group){
+        var byInstrument = {};
+        group.notes.forEach(function(n){
+          if (!byInstrument[n.instrumentName]) byInstrument[n.instrumentName] = [];
+          byInstrument[n.instrumentName].push(n);
+        });
+        var instrumentNames = Object.keys(byInstrument);
+        instrumentNames.sort(function(a, b){
+          var aMine = myInstruments.indexOf(a) !== -1 ? 0 : 1;
+          var bMine = myInstruments.indexOf(b) !== -1 ? 0 : 1;
+          return aMine - bMine || a.localeCompare(b);
+        });
+        var instrumentsHtml = instrumentNames.map(function(name){
+          var isMine = myInstruments.indexOf(name) !== -1;
+          var notesHtml = byInstrument[name].map(renderConcertNoteItem).join('');
+          return (
+            '<details class="note-instrument-group"' + (isMine ? ' open' : '') + '>' +
+              '<summary>' + escapeHtmlForOverview(name || '（未標記樂器）') + '（' + byInstrument[name].length + '）</summary>' +
+              notesHtml +
+            '</details>'
+          );
+        }).join('');
+        return (
+          '<div class="note-piece-group">' +
+            '<div class="note-piece-title">' + escapeHtmlForOverview(group.title) + '</div>' +
+            instrumentsHtml +
+          '</div>'
+        );
+      }).join('');
+    }
+
+    function openConcertNotesSheet(concertId){
+      var c = myConcertsData.filter(function(x){ return x.concertId === concertId; })[0];
+      if (!c) return;
+      activeNotesConcertId = concertId;
+      editingConcertNoteId = null;
+      document.getElementById('concertNotesSheetTitle').textContent = c.title + '・分部筆記';
+
+      var pieceSelect = document.getElementById('noteNewPieceSelect');
+      pieceSelect.innerHTML = '<option value="">不指定曲目（通用提醒）</option>' +
+        c.pieces.filter(function(p){ return p.pieceId; }).map(function(p){
+          return '<option value="' + p.pieceId + '">' + escapeHtmlForOverview(p.title) + '</option>';
+        }).join('');
+
+      var myInstruments = c.instruments || [];
+      // 預設篩選自己的分部；只有完全不在這場音樂會名單內（沒有登記任何樂器）才預設「全部」，
+      // 跟角色（admin/owner/conductor）無關
+      concertNotesFilter = myInstruments.length > 0 ? myInstruments[0] : 'ALL';
+
+      var instrumentSelect = document.getElementById('noteNewInstrumentSelect');
+      if (myInstruments.length > 1){
+        instrumentSelect.innerHTML = myInstruments.map(function(name){
+          return '<option value="' + escapeHtmlForOverview(name) + '">' + escapeHtmlForOverview(name) + '</option>';
+        }).join('');
+        instrumentSelect.classList.remove('hidden');
+      } else {
+        instrumentSelect.innerHTML = '';
+        instrumentSelect.classList.add('hidden');
+      }
+
+      var addBtn = document.getElementById('noteAddBtn');
+      addBtn.disabled = myInstruments.length === 0;
+      document.getElementById('noteAddStatus').textContent = myInstruments.length === 0
+        ? '你在這場音樂會沒有登記樂器身分，無法新增筆記' : '';
+      document.getElementById('noteNewTextarea').value = '';
+
+      document.getElementById('concertNotesSheetOverlay').classList.add('active');
+      concertNotesCache = [];
+      renderConcertNotes();
+      loadConcertNotes(concertId).then(function(notes){
+        if (activeNotesConcertId !== concertId) return; // sheet 已經被關掉/切換，捨棄過期結果
+        concertNotesCache = notes;
+        renderConcertNotes();
+      }).catch(function(err){
+        console.error('分部筆記載入失敗', err);
+      });
+    }
+
+    function closeConcertNotesSheet(){
+      document.getElementById('concertNotesSheetOverlay').classList.remove('active');
+      activeNotesConcertId = null;
+      editingConcertNoteId = null;
     }
 
     function renderMyConcerts(concerts){
@@ -1839,6 +2302,7 @@
             '<div class="my-concert-title">' + escapeHtmlForOverview(c.title) + '</div>' +
             '<div class="my-concert-instrument">分部：' + escapeHtmlForOverview(c.instruments.join('、') || '未設定') + '</div>' +
             piecesHtml +
+            '<button type="button" class="concert-notes-btn" data-concert-notes="' + c.concertId + '">分部筆記</button>' +
           '</div>'
         );
       }).join('');
@@ -1971,7 +2435,10 @@
       // 不在這裡直接跑：這組讀取只有「團務總覽」分頁用得到，掛成 lazy loader，等使用者第一次
       // 切過去才真的發出請求（大多數人只看首頁的「個人焦點」分頁就離開了）
       setOverviewLazyLoad(function(){
-        loadMyConcerts(viewerUid).then(renderMyConcerts).catch(function(err){
+        loadMyConcerts(viewerUid).then(function(concerts){
+          myConcertsData = concerts;
+          renderMyConcerts(concerts);
+        }).catch(function(err){
           console.error('我的音樂會 載入失敗', err);
         });
       });
