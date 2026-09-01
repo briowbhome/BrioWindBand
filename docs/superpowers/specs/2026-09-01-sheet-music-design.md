@@ -37,9 +37,8 @@
 |---|---|---|
 | `sheetMusicUrl` | string \| null | Firebase Storage 下載連結，`null` 表示這個分部還沒上傳樂譜 |
 | `sheetMusicUploadedBy` | uid \| null | |
-| `sheetMusicUploadedAt` | timestamp \| null | |
 
-既有的 `{partId, instrumentName, label}` 不變。
+既有的 `{partId, instrumentName, label}` 不變。**刻意不存 `sheetMusicUploadedAt`**：Firestore 不允許 `serverTimestamp()` 出現在陣列元素裡（會直接丟出錯誤），而這個時間戳記沒有任何畫面會顯示，不值得為了它繞道用 client 端 `new Date()`（違反專案既有「時間欄位一律用 `serverTimestamp()`」的慣例）或另外多開一個 collection 存。
 
 ### Storage 路徑
 
@@ -118,7 +117,7 @@ service firebase.storage {
   - 還沒上傳：「上傳樂譜」
   - 已上傳：「更換」＋「檢視」（開新分頁）＋「移除」
 - 上傳直接在唯讀檢視模式操作，**不用先進編輯模式**——跟編輯分部結構（新增/刪除分部欄位）是分開的兩個操作路徑
-- 上傳流程：選檔 → 前端檢查型別是 PDF、大小 < 10MB → `uploadBytes()` 到 `repertoire/{pieceId}/{partId}.pdf` → `getDownloadURL()` → 讀取目前最新的 `parts` 陣列（來自 `subscribeRepertoire()` 快取）、找到對應 `partId` 更新三個欄位 → `updateDoc()` 整份 `parts` 陣列寫回
+- 上傳流程：選檔 → 前端檢查型別是 PDF、大小 < 10MB → `uploadBytes()` 到 `repertoire/{pieceId}/{partId}.pdf` → `getDownloadURL()` → 讀取目前最新的 `parts` 陣列（來自 `subscribeRepertoire()` 快取）、找到對應 `partId` 更新 `sheetMusicUrl`/`sheetMusicUploadedBy` 兩個欄位 → `updateDoc()` 整份 `parts` 陣列寫回
 - **編輯模式裡新增的分部欄位（還沒存檔的草稿）不開放上傳**——避免使用者填了新分部、上傳了檔案、卻取消存檔，造成 Storage 裡有孤兒檔案但 Firestore 完全沒有對應紀錄的情況。上傳動作只對已經持久化（有真正 `partId` 且已存在於 Firestore 文件裡）的分部開放
 
 ### 團員端新頁面「譜夾」（暫定檔名 `sheet-music.html`）
