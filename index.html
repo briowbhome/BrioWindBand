@@ -284,6 +284,34 @@
   .note-item-cancel-btn{ background:none; color:var(--ink-soft); }
   .empty-note{ font-size:12.5px; color:var(--ink-soft); padding:8px 0; }
 
+  /* ---------- 意見回饋：浮動圖示（僅首頁），bottom sheet 表單，圖示跟後台
+     admin-nav.js 用的是同一個「驚嘆對話框」造型，示意稿討論定案 ---------- */
+  .feedback-fab{
+    position:fixed; right:18px; z-index:40;
+    bottom:calc(78px + env(safe-area-inset-bottom));
+    width:46px; height:46px; border-radius:50%;
+    background:var(--paper-raised); border:1px solid var(--line); box-shadow:var(--shadow-card);
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .feedback-fab:active{ background:var(--sage-bg); }
+  .fb-type-picker{ display:flex; gap:8px; }
+  .fb-type-chip{
+    flex:1; text-align:center; padding:10px; border-radius:var(--radius-sm);
+    border:1px solid var(--line); background:var(--paper-raised); color:var(--ink-soft);
+    font-size:13px; font-weight:600; cursor:pointer;
+  }
+  .fb-type-chip.selected.bug{ background:rgba(122,35,49,.1); border-color:var(--burgundy); color:var(--burgundy); }
+  .fb-type-chip.selected.feature{ background:rgba(184,134,58,.14); border-color:var(--brass-deep); color:var(--brass-deep); }
+  .fb-shot-btn{
+    width:100%; border:1px dashed var(--line); background:none; border-radius:var(--radius-sm);
+    padding:12px; font-size:12.5px; color:var(--ink-soft); cursor:pointer; text-align:center; margin-top:8px;
+  }
+  .fb-shot-preview{ display:flex; align-items:center; gap:10px; margin-top:8px; }
+  .fb-shot-preview img{ width:56px; height:56px; object-fit:cover; border-radius:var(--radius-sm); border:1px solid var(--line); }
+  .fb-shot-preview .meta{ flex:1; font-size:12px; color:var(--ink-soft); }
+  .fb-shot-preview button{ background:none; border:none; color:var(--burgundy); font-size:12px; cursor:pointer; }
+  .fb-diag-note{ margin-top:12px; font-size:11px; color:var(--ink-soft); line-height:1.6; }
+
   /* ---------- QR Code 放大檢視：比照 event-admin.html 簽到分頁同一套元件，點縮圖放大、
      點遮罩收合 ---------- */
   .qr-zoom-overlay{
@@ -1015,11 +1043,47 @@
   </div>
 </div>
 
+<!-- 意見回饋浮動圖示：只在首頁出現 -->
+<div class="feedback-fab" id="feedbackFabBtn" aria-label="意見回饋">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8A2.5 2.5 0 0 1 17.5 16H10l-4.2 3.4a.6.6 0 0 1-.98-.47V16A2.5 2.5 0 0 1 4 13.5v-8Z" stroke="#20242F" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 6.7v4" stroke="#20242F" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="12.6" r="0.9" fill="#20242F"/></svg>
+</div>
+
+<!-- 意見回饋 Bottom Sheet -->
+<div class="sheet-overlay" id="feedbackSheetOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button type="button" class="sheet-close" id="feedbackSheetClose" aria-label="關閉">×</button>
+      <div class="name">意見回饋</div>
+    </div>
+    <div class="sheet-body">
+      <div class="fb-type-picker">
+        <div class="fb-type-chip selected bug" data-fb-type="bug">Bug 回報</div>
+        <div class="fb-type-chip feature" data-fb-type="feature">功能建議</div>
+      </div>
+      <textarea id="fbTitleInput" class="note-textarea" placeholder="標題" style="margin-top:8px;min-height:auto;"></textarea>
+      <textarea id="fbDescInput" class="note-textarea" placeholder="描述：盡量說明發生的狀況、在哪個頁面、操作步驟…"></textarea>
+      <input type="file" accept="image/*" id="fbShotInput" class="hidden">
+      <button type="button" class="fb-shot-btn" id="fbShotAddBtn">＋ 新增截圖（選填）</button>
+      <div class="fb-shot-preview hidden" id="fbShotPreview">
+        <img id="fbShotPreviewImg" alt="截圖預覽">
+        <div class="meta" id="fbShotPreviewMeta"></div>
+        <button type="button" id="fbShotRemoveBtn">移除</button>
+      </div>
+      <div class="fb-diag-note">會自動附上裝置資訊（瀏覽器/系統版本）跟目前頁面網址，方便排查問題。</div>
+      <p class="form-error hidden" id="fbFormError"></p>
+    </div>
+    <div class="sheet-footer">
+      <button type="button" class="cta-btn" id="fbSubmitBtn">送出</button>
+    </div>
+  </div>
+</div>
+
 <!-- 推播通知開關推廣提示：置中 modal，一定要點按鈕才會關閉 -->
 <div class="notif-prompt-overlay" id="notifPromptOverlay">
   <div class="notif-prompt-card">
     <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M6 9a6 6 0 0 1 12 0v4l1.8 3.2a.6.6 0 0 1-.5.9H4.7a.6.6 0 0 1-.5-.9L6 13V9Z" stroke="#20242F" stroke-width="1.5" stroke-linejoin="round"/><path d="M9.5 19.5a2.5 2.5 0 0 0 5 0" stroke="#20242F" stroke-width="1.5" stroke-linecap="round"/></svg>
-    <div class="notif-prompt-title">推播通知功能即將上線</div>
+    <div class="notif-prompt-title">推播通知功能已上線</div>
     <div class="notif-prompt-sub">開啟後可以直接收到出缺席調查、團費繳納或活動通知等推播提醒。在「個人中心」裡也隨時可以調整。</div>
     <button type="button" class="cta-btn" id="notifPromptEnableBtn">立即開啟</button>
     <button type="button" class="notif-prompt-later" id="notifPromptLaterBtn">稍後再說</button>
@@ -1819,6 +1883,98 @@
       }
     });
 
+    // ---------- 意見回饋：事件綁定 ----------
+    document.getElementById('feedbackFabBtn').addEventListener('click', function(){
+      document.getElementById('feedbackSheetOverlay').classList.add('active');
+    });
+
+    var feedbackSheetOverlay = document.getElementById('feedbackSheetOverlay');
+    document.getElementById('feedbackSheetClose').addEventListener('click', function(){
+      feedbackSheetOverlay.classList.remove('active');
+    });
+    feedbackSheetOverlay.addEventListener('click', function(e){
+      if (e.target === feedbackSheetOverlay) feedbackSheetOverlay.classList.remove('active');
+    });
+
+    document.querySelectorAll('.fb-type-chip').forEach(function(chip){
+      chip.addEventListener('click', function(){
+        document.querySelectorAll('.fb-type-chip').forEach(function(c){ c.classList.remove('selected'); });
+        chip.classList.add('selected');
+        fbSelectedType = chip.getAttribute('data-fb-type');
+      });
+    });
+
+    document.getElementById('fbShotAddBtn').addEventListener('click', function(){
+      document.getElementById('fbShotInput').click();
+    });
+
+    document.getElementById('fbShotInput').addEventListener('change', function(e){
+      var file = e.target.files && e.target.files[0];
+      if (!file) return;
+      var errEl = document.getElementById('fbFormError');
+      errEl.classList.add('hidden');
+      compressFeedbackShot(file, function(dataUrl){
+        if (dataUrl.length > MAX_FEEDBACK_SHOT_LENGTH){
+          errEl.textContent = '圖片太大，請換一張或裁切後再試';
+          errEl.classList.remove('hidden');
+          document.getElementById('fbShotInput').value = '';
+          return;
+        }
+        fbShotDataUrl = dataUrl;
+        document.getElementById('fbShotPreviewImg').src = dataUrl;
+        document.getElementById('fbShotPreviewMeta').textContent = file.name;
+        document.getElementById('fbShotPreview').classList.remove('hidden');
+        document.getElementById('fbShotAddBtn').classList.add('hidden');
+      }, function(){
+        errEl.textContent = '圖片讀取失敗，請換一張再試';
+        errEl.classList.remove('hidden');
+      });
+    });
+
+    document.getElementById('fbShotRemoveBtn').addEventListener('click', function(){
+      fbShotDataUrl = null;
+      document.getElementById('fbShotInput').value = '';
+      document.getElementById('fbShotPreview').classList.add('hidden');
+      document.getElementById('fbShotAddBtn').classList.remove('hidden');
+    });
+
+    document.getElementById('fbSubmitBtn').addEventListener('click', function(){
+      var title = document.getElementById('fbTitleInput').value.trim();
+      var desc = document.getElementById('fbDescInput').value.trim();
+      var errEl = document.getElementById('fbFormError');
+      errEl.classList.add('hidden');
+      if (!title || !desc){
+        errEl.textContent = '請填寫標題跟描述';
+        errEl.classList.remove('hidden');
+        return;
+      }
+      var submitBtn = document.getElementById('fbSubmitBtn');
+      submitBtn.disabled = true;
+      createFeedbackItem({
+        type: fbSelectedType,
+        title: title,
+        description: desc,
+        screenshotDataUrl: fbShotDataUrl
+      }).then(function(){
+        document.getElementById('fbTitleInput').value = '';
+        document.getElementById('fbDescInput').value = '';
+        fbShotDataUrl = null;
+        document.getElementById('fbShotInput').value = '';
+        document.getElementById('fbShotPreview').classList.add('hidden');
+        document.getElementById('fbShotAddBtn').classList.remove('hidden');
+        fbSelectedType = 'bug';
+        document.querySelectorAll('.fb-type-chip').forEach(function(c){ c.classList.remove('selected'); });
+        document.querySelector('.fb-type-chip[data-fb-type="bug"]').classList.add('selected');
+        feedbackSheetOverlay.classList.remove('active');
+        showToast('已送出，感謝回饋');
+      }).catch(function(err){
+        errEl.textContent = '送出失敗：' + err.code;
+        errEl.classList.remove('hidden');
+      }).finally(function(){
+        submitBtn.disabled = false;
+      });
+    });
+
     var rsvpSheetOverlay = document.getElementById('rsvpSheetOverlay');
     var rsvpOpenEventId = null;
     var rsvpSelectedStatus = 'attending';
@@ -2066,6 +2222,53 @@
 
     function deleteConcertNote(concertId, noteId){
       return deleteDoc(doc(db, 'concerts', concertId, 'notes', noteId));
+    }
+
+    // ---------- 意見回饋：截圖選填、client 端壓縮後跟其他欄位一起存進 feedbackItems，
+    // 不裝 Firebase Storage（比照 finance-admin.html 收款 QR Code 直接存欄位的做法，
+    // 但截圖通常比 QR Code 圖大，這裡多一段 canvas 壓縮） ----------
+    var MAX_FEEDBACK_SHOT_LENGTH = 400000; // base64 字串長度上限，約對應壓縮後 300KB
+    var fbSelectedType = 'bug';
+    var fbShotDataUrl = null;
+
+    function compressFeedbackShot(file, onDone, onError){
+      var reader = new FileReader();
+      reader.onload = function(){
+        var img = new Image();
+        img.onload = function(){
+          var maxDim = 1000;
+          var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          var canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(img.width * scale));
+          canvas.height = Math.max(1, Math.round(img.height * scale));
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          onDone(canvas.toDataURL('image/jpeg', 0.7));
+        };
+        img.onerror = onError;
+        img.src = reader.result;
+      };
+      reader.onerror = onError;
+      reader.readAsDataURL(file);
+    }
+
+    function createFeedbackItem(fields){
+      var ref = doc(collection(db, 'feedbackItems'));
+      return setDoc(ref, {
+        type: fields.type,
+        title: fields.title,
+        description: fields.description,
+        screenshotDataUrl: fields.screenshotDataUrl || null,
+        deviceInfo: navigator.userAgent,
+        pageUrl: location.href,
+        submitterUid: viewerUid,
+        submitterName: viewerProfile.name || '',
+        submitterAccount: viewerProfile.account || '',
+        status: 'pending',
+        adminNote: null,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
     }
 
     function formatConcertNoteDate(ts){

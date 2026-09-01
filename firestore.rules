@@ -384,5 +384,16 @@ service cloud.firestore {
       allow get, list: if hasProfile();
       allow create, update, delete: if isAdminTier();
     }
+
+    // Bug 回報／功能許願池：團員只能新增（寫自己 submitterUid），完全不能讀取——
+    // 包含提交者本人都看不到，這是使用者明確要求的「單向回報」設計，不像
+    // attendanceReports/feePayments 有一條「本人可查詢自己紀錄」的規則，這裡完全
+    // 不需要。標記狀態/刪除/內部備註只有 admin-tier 能做，不新增權限旗標——
+    // 沒有獨立的「回饋管理」職能角色
+    match /feedbackItems/{itemId} {
+      allow create: if hasProfile() && request.resource.data.submitterUid == request.auth.uid;
+      allow get, list: if isAdminTier();
+      allow update, delete: if isAdminTier();
+    }
   }
 }

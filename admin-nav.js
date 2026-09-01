@@ -22,7 +22,9 @@ const PAGES = [
   { key: 'stats', href: 'stats-admin.html', label: '統計資料',
     icon: '<path d="M4 20V10M11 20V4M18 20v-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' },
   { key: 'conductor', href: 'conductor-admin.html', label: '指揮專用',
-    icon: '<path d="m5 19 12-12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="18" cy="6" r="2.4" stroke="currentColor" stroke-width="1.6"/><path d="M5 19c-1 0-1.6-.9-1.2-1.8l1.7-3.7 3.7 3.7-1.8 1.7c-.4.4-1 .1-2.4.1Z" fill="currentColor"/>' }
+    icon: '<path d="m5 19 12-12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="18" cy="6" r="2.4" stroke="currentColor" stroke-width="1.6"/><path d="M5 19c-1 0-1.6-.9-1.2-1.8l1.7-3.7 3.7 3.7-1.8 1.7c-.4.4-1 .1-2.4.1Z" fill="currentColor"/>' },
+  { key: 'feedback', href: 'feedback-admin.html', label: '意見回饋',
+    icon: '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8A2.5 2.5 0 0 1 17.5 16H10l-4.2 3.4a.6.6 0 0 1-.98-.47V16A2.5 2.5 0 0 1 4 13.5v-8Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 6.7v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="12.6" r="0.95" fill="currentColor"/>' }
 ];
 
 function ensureStyle() {

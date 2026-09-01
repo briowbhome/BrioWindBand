@@ -264,6 +264,36 @@
   .toggle-switch.on .knob{ transform:translateX(18px); }
   .toggle-switch:disabled{ opacity:.5; cursor:default; }
 
+  /* ---------- 意見回饋：跟 index.html 浮動圖示開的是同一種表單設計，這裡各自
+     複製一份（專案慣例不共用邏輯檔），入口是個人中心卡片而不是浮動圖示 ---------- */
+  .feedback-link-btn{
+    width:100%; display:flex; align-items:center; justify-content:space-between;
+    background:none; border:none; padding:0; font-size:13.5px; font-weight:700; color:var(--ink);
+    cursor:pointer; text-align:left;
+  }
+  .fb-type-picker{ display:flex; gap:8px; margin-top:8px; }
+  .fb-type-chip{
+    flex:1; text-align:center; padding:10px; border-radius:var(--radius-sm);
+    border:1px solid var(--line); background:var(--paper-raised); color:var(--ink-soft);
+    font-size:13px; font-weight:600; cursor:pointer;
+  }
+  .fb-type-chip.selected.bug{ background:rgba(122,35,49,.1); border-color:var(--burgundy); color:var(--burgundy); }
+  .fb-type-chip.selected.feature{ background:rgba(184,134,58,.14); border-color:var(--brass-deep); color:var(--brass-deep); }
+  .fb-input, .fb-textarea{
+    width:100%; margin-top:8px; border:1px solid var(--line); background:var(--paper-raised);
+    border-radius:var(--radius-sm); padding:10px 11px; font-size:13.5px; color:var(--ink); font-family:inherit;
+  }
+  .fb-textarea{ min-height:80px; resize:vertical; line-height:1.6; }
+  .fb-shot-btn{
+    width:100%; border:1px dashed var(--line); background:none; border-radius:var(--radius-sm);
+    padding:12px; font-size:12.5px; color:var(--ink-soft); cursor:pointer; text-align:center; margin-top:8px;
+  }
+  .fb-shot-preview{ display:flex; align-items:center; gap:10px; margin-top:8px; }
+  .fb-shot-preview img{ width:56px; height:56px; object-fit:cover; border-radius:var(--radius-sm); border:1px solid var(--line); }
+  .fb-shot-preview .meta{ flex:1; font-size:12px; color:var(--ink-soft); }
+  .fb-shot-preview button{ background:none; border:none; color:var(--burgundy); font-size:12px; cursor:pointer; }
+  .fb-diag-note{ margin-top:12px; font-size:11px; color:var(--ink-soft); line-height:1.6; }
+
   /* ---------- 連結列 ---------- */
   .link-list{ margin:0 20px 14px; display:flex; flex-direction:column; gap:8px; }
   .link-row{
@@ -452,6 +482,13 @@
     <div class="pref-hint hidden" id="notifHint"></div>
   </div>
 
+  <div class="pref-card" id="feedbackCard">
+    <button type="button" class="feedback-link-btn" id="feedbackOpenBtn">
+      <span>意見回饋</span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+
   <div class="link-list" id="adminLinks"></div>
 
   <button type="button" class="logout-btn" id="logoutBtn">登出</button>
@@ -502,8 +539,39 @@
   </div>
 </div>
 
+<div class="sheet-overlay" id="feedbackSheetOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button type="button" class="sheet-close" id="feedbackSheetClose" aria-label="關閉">×</button>
+      <div class="name">意見回饋</div>
+    </div>
+    <div class="sheet-body">
+      <div class="fb-type-picker">
+        <div class="fb-type-chip selected bug" data-fb-type="bug">Bug 回報</div>
+        <div class="fb-type-chip feature" data-fb-type="feature">功能建議</div>
+      </div>
+      <input type="text" id="fbTitleInput" class="fb-input" placeholder="標題">
+      <textarea id="fbDescInput" class="fb-textarea" placeholder="描述：盡量說明發生的狀況、在哪個頁面、操作步驟…"></textarea>
+      <input type="file" accept="image/*" id="fbShotInput" class="hidden">
+      <button type="button" class="fb-shot-btn" id="fbShotAddBtn">＋ 新增截圖（選填）</button>
+      <div class="fb-shot-preview hidden" id="fbShotPreview">
+        <img id="fbShotPreviewImg" alt="截圖預覽">
+        <div class="meta" id="fbShotPreviewMeta"></div>
+        <button type="button" id="fbShotRemoveBtn">移除</button>
+      </div>
+      <div class="fb-diag-note">會自動附上裝置資訊（瀏覽器/系統版本）跟目前頁面網址，方便排查問題，不需要額外操作。</div>
+      <p class="profile-form-error hidden" id="fbFormError"></p>
+    </div>
+    <div class="sheet-footer">
+      <button type="button" class="cta-btn" id="fbSubmitBtn">送出</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
   import { resolveMemberAccess, peekCachedProfile, logout } from './auth-guard.js';
+  import { showToast } from './toast.js';
   import { db, auth } from './firebase-init.js';
   import {
     collection, query, where, orderBy, limit, onSnapshot,
@@ -565,6 +633,7 @@
       document.getElementById('guestCard').classList.remove('hidden');
       document.getElementById('passwordCardWrap').classList.add('hidden');
       document.getElementById('notifPrefCard').classList.add('hidden');
+      document.getElementById('feedbackCard').classList.add('hidden');
       document.getElementById('logoutBtn').classList.add('hidden');
       document.getElementById('notifBtn').classList.add('hidden');
       document.getElementById('versionFooter').textContent = 'v' + APP_VERSION;
@@ -573,6 +642,10 @@
 
     var result = access;
     var profile = access.profile;
+
+    feedbackViewerUid = result.uid;
+    feedbackViewerName = profile.name || '';
+    feedbackViewerAccount = profile.account || '';
 
     document.getElementById('profileAvatar').textContent = profile.name ? profile.name.charAt(0) : '?';
     document.getElementById('profileAvatar').classList.remove('skel');
@@ -1216,6 +1289,153 @@
         setToggleState(false);
         showHint('訂閱失敗，請稍後再試');
       });
+    });
+  });
+
+  // ---------- 意見回饋：跟 index.html 浮動圖示是各自獨立的一份，欄位/邏輯一致，
+  // 只是入口跟觸發點不同（這裡是卡片點擊，不是浮動圖示） ----------
+  var MAX_FEEDBACK_SHOT_LENGTH = 400000;
+  var fbSelectedType = 'bug';
+  var fbShotDataUrl = null;
+  var feedbackViewerUid = null;
+  var feedbackViewerName = '';
+  var feedbackViewerAccount = '';
+
+  function compressFeedbackShot(file, onDone, onError){
+    var reader = new FileReader();
+    reader.onload = function(){
+      var img = new Image();
+      img.onload = function(){
+        var maxDim = 1000;
+        var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        onDone(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.onerror = onError;
+      img.src = reader.result;
+    };
+    reader.onerror = onError;
+    reader.readAsDataURL(file);
+  }
+
+  function createFeedbackItem(fields){
+    var ref = doc(collection(db, 'feedbackItems'));
+    return setDoc(ref, {
+      type: fields.type,
+      title: fields.title,
+      description: fields.description,
+      screenshotDataUrl: fields.screenshotDataUrl || null,
+      deviceInfo: navigator.userAgent,
+      pageUrl: location.href,
+      submitterUid: feedbackViewerUid,
+      submitterName: feedbackViewerName,
+      submitterAccount: feedbackViewerAccount,
+      status: 'pending',
+      adminNote: null,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+  }
+
+  var feedbackSheetOverlay = document.getElementById('feedbackSheetOverlay');
+  var feedbackOpenBtn = document.getElementById('feedbackOpenBtn');
+  if (feedbackOpenBtn){
+    feedbackOpenBtn.addEventListener('click', function(){
+      feedbackSheetOverlay.classList.add('active');
+    });
+  }
+  document.getElementById('feedbackSheetClose').addEventListener('click', function(){
+    feedbackSheetOverlay.classList.remove('active');
+  });
+  feedbackSheetOverlay.addEventListener('click', function(e){
+    if (e.target === feedbackSheetOverlay) feedbackSheetOverlay.classList.remove('active');
+  });
+
+  document.querySelectorAll('.fb-type-chip').forEach(function(chip){
+    chip.addEventListener('click', function(){
+      document.querySelectorAll('.fb-type-chip').forEach(function(c){ c.classList.remove('selected'); });
+      chip.classList.add('selected');
+      fbSelectedType = chip.getAttribute('data-fb-type');
+    });
+  });
+
+  document.getElementById('fbShotAddBtn').addEventListener('click', function(){
+    document.getElementById('fbShotInput').click();
+  });
+
+  document.getElementById('fbShotInput').addEventListener('change', function(e){
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    var errEl = document.getElementById('fbFormError');
+    errEl.classList.add('hidden');
+    compressFeedbackShot(file, function(dataUrl){
+      if (dataUrl.length > MAX_FEEDBACK_SHOT_LENGTH){
+        errEl.textContent = '圖片太大，請換一張或裁切後再試';
+        errEl.classList.remove('hidden');
+        document.getElementById('fbShotInput').value = '';
+        return;
+      }
+      fbShotDataUrl = dataUrl;
+      document.getElementById('fbShotPreviewImg').src = dataUrl;
+      document.getElementById('fbShotPreviewMeta').textContent = file.name;
+      document.getElementById('fbShotPreview').classList.remove('hidden');
+      document.getElementById('fbShotAddBtn').classList.add('hidden');
+    }, function(){
+      errEl.textContent = '圖片讀取失敗，請換一張再試';
+      errEl.classList.remove('hidden');
+    });
+  });
+
+  document.getElementById('fbShotRemoveBtn').addEventListener('click', function(){
+    fbShotDataUrl = null;
+    document.getElementById('fbShotInput').value = '';
+    document.getElementById('fbShotPreview').classList.add('hidden');
+    document.getElementById('fbShotAddBtn').classList.remove('hidden');
+  });
+
+  document.getElementById('fbSubmitBtn').addEventListener('click', function(){
+    var title = document.getElementById('fbTitleInput').value.trim();
+    var desc = document.getElementById('fbDescInput').value.trim();
+    var errEl = document.getElementById('fbFormError');
+    errEl.classList.add('hidden');
+    if (!feedbackViewerUid){
+      errEl.textContent = '請先登入';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    if (!title || !desc){
+      errEl.textContent = '請填寫標題跟描述';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    var submitBtn = document.getElementById('fbSubmitBtn');
+    submitBtn.disabled = true;
+    createFeedbackItem({
+      type: fbSelectedType,
+      title: title,
+      description: desc,
+      screenshotDataUrl: fbShotDataUrl
+    }).then(function(){
+      document.getElementById('fbTitleInput').value = '';
+      document.getElementById('fbDescInput').value = '';
+      fbShotDataUrl = null;
+      document.getElementById('fbShotInput').value = '';
+      document.getElementById('fbShotPreview').classList.add('hidden');
+      document.getElementById('fbShotAddBtn').classList.remove('hidden');
+      fbSelectedType = 'bug';
+      document.querySelectorAll('.fb-type-chip').forEach(function(c){ c.classList.remove('selected'); });
+      document.querySelector('.fb-type-chip[data-fb-type="bug"]').classList.add('selected');
+      feedbackSheetOverlay.classList.remove('active');
+      showToast('已送出，感謝回饋');
+    }).catch(function(err){
+      errEl.textContent = '送出失敗：' + err.code;
+      errEl.classList.remove('hidden');
+    }).finally(function(){
+      submitBtn.disabled = false;
     });
   });
 </script>
