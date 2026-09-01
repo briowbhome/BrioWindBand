@@ -206,14 +206,71 @@
   }
   .my-concert-piece-row .k{ color:var(--ink); }
   .my-concert-piece-row .v{ color:var(--ink-soft); text-align:right; flex:none; }
-  /* 「我的團費」是扁平清單，不像「我的音樂會」每筆包在 .my-concert-card 裡（那個卡片的
-     padding 順便讓裡面的 piece-row 有左右留白）。這裡直接補上同樣 20px 的水平留白，
-     不動共用的 .my-concert-piece-row 本身，避免影響「我的音樂會」原本的排版 */
-  #myFeeDuesSlot .my-concert-piece-row{ margin:0 20px; }
-  /* 未繳且該筆項目有填匯款資訊時，才在標題/狀態列下方多顯示這塊，同一份水平留白 */
-  #myFeeDuesSlot .fee-remit-info{ margin:0 20px 10px; padding:8px 10px; background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm); font-size:11.5px; line-height:1.6; color:var(--ink-soft); }
-  #myFeeDuesSlot .fee-remit-info b{ color:var(--ink); font-weight:600; }
+  /* ---------- 團務總覽「清單容器」：8/31 公告分類這輪新增，「我的團費」跟新的「公告」
+     區塊共用同一種「一個容器＋分隔線列表」樣式，跟「我的音樂會」的獨立卡片區隔開——
+     團費/公告都是條列性質的清單，音樂會每筆資訊量大適合各自獨立卡片，兩種視覺語言
+     刻意不同。這是對「我的團費」既有扁平樣式的順手修正（原本完全沒有容器邊框），
+     使用者看過示意稿後要求一起調整，不是這輪功能本身的範圍 ---------- */
+  .overview-list{
+    margin:0 20px 14px; background:var(--paper-raised); border:1px solid var(--line);
+    border-radius:var(--radius-lg); box-shadow:var(--shadow-card); overflow:hidden;
+  }
+  .overview-list-row{ padding:11px 14px; }
+  .overview-list-row + .overview-list-row{ border-top:1px solid var(--line); }
+  .overview-list-row-top{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; font-size:12.5px; }
+  .overview-list-row-top .k{ color:var(--ink); }
+  .overview-list-row-top .v{ color:var(--ink-soft); text-align:right; flex:none; }
+  /* 未繳且該筆項目有填匯款資訊時，才在標題/狀態列下方多顯示這塊 */
+  .overview-list-row .fee-remit-info{ margin-top:8px; padding:8px 10px; background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm); font-size:11.5px; line-height:1.6; color:var(--ink-soft); }
+  .overview-list-row .fee-remit-info b{ color:var(--ink); font-weight:600; }
   .fee-qr-img{ width:140px; height:140px; object-fit:contain; border:1px solid var(--line); border-radius:8px; background:#fff; cursor:zoom-in; }
+
+  /* ---------- 團務總覽「公告」區塊：活動／更新公告，臨時公告維持在 appbar 下方常駐，
+     不重複放在這裡 ---------- */
+  .ov-ann-top{ display:flex; align-items:center; gap:8px; }
+  .ov-ann-badge{
+    display:inline-flex; flex:none; padding:2px 8px; border-radius:999px; font-size:9.5px; font-weight:700;
+  }
+  .ov-ann-badge.event{ background:rgba(184,134,58,.14); color:var(--brass-deep); }
+  .ov-ann-badge.update{ background:var(--sage-bg); color:var(--sage); }
+  .ov-ann-title{ font-size:12.5px; font-weight:700; color:var(--ink); flex:1; }
+  .ov-ann-meta{ font-size:10.5px; color:var(--ink-soft); margin-top:2px; }
+  .ov-ann-expand{ flex:none; background:none; border:none; color:var(--ink-soft); font-size:11px; cursor:pointer; padding:2px 4px; }
+  .update-item{ margin-top:8px; padding-top:8px; border-top:1px solid var(--line); }
+  .update-item:first-child{ margin-top:8px; }
+  .update-item-title{
+    font-family:'Noto Serif TC',serif; font-weight:700; font-size:13px; color:var(--ink);
+    display:flex; align-items:baseline; gap:6px;
+  }
+  .update-item-title::before{ content:''; width:5px; height:5px; border-radius:50%; background:var(--brass); flex:none; }
+  .update-item-desc{ font-size:12px; color:var(--ink-soft); line-height:1.6; margin-top:4px; }
+
+  /* ---------- 更新公告彈窗：視覺語言比照既有 notif-prompt-overlay/notif-prompt-card
+     （推播通知開關推廣提示），獨立新元件、不共用同一個彈窗改內容。標題（圖示+發布
+     標題）跟按鈕固定不動，中間項目清單超過高度才捲動，比照 .sheet-header/.sheet-body/
+     .sheet-footer 頭尾固定、中間捲動的既有慣例 ---------- */
+  .update-prompt-overlay{
+    position:fixed; inset:0; z-index:90;
+    background:rgba(32,36,47,.5);
+    display:none; align-items:center; justify-content:center;
+    padding:0 28px;
+  }
+  .update-prompt-overlay.active{ display:flex; }
+  .update-prompt-card{
+    width:100%; max-width:320px; max-height:78vh;
+    background:var(--paper-raised); border-radius:18px;
+    box-shadow:0 20px 40px -12px rgba(32,36,47,.4);
+    display:flex; flex-direction:column;
+  }
+  .update-prompt-head{ padding:22px 20px 0; flex:none; }
+  .update-prompt-head svg{ display:block; margin:0 auto 14px; }
+  .update-prompt-eyebrow{
+    text-align:center; font-family:'Noto Serif TC',serif; font-weight:700;
+    font-size:16px; color:var(--ink); line-height:1.5;
+  }
+  .update-prompt-items{ flex:1; overflow-y:auto; padding:0 20px; margin-top:6px; }
+  .update-prompt-foot{ padding:14px 20px 20px; flex:none; }
+  .update-prompt-foot .cta-btn{ width:100%; }
 
   /* ---------- 分部筆記：卡片上開 bottom sheet，互動樣式比照 conductor-admin.html
      排練筆記的既有 CSS（.note-item 系列直接複製過來，這個專案不共用邏輯/樣式檔） ---------- */
@@ -936,7 +993,11 @@
     </div>
     <div id="myFeeDuesWrap" class="hidden">
       <div class="section-label" style="margin:8px 20px 4px;"><span class="tw">我的團費</span></div>
-      <div id="myFeeDuesSlot"></div>
+      <div id="myFeeDuesSlot" class="overview-list"></div>
+    </div>
+    <div id="overviewAnnounceWrap" class="hidden">
+      <div class="section-label" style="margin:8px 20px 4px;"><span class="tw">公告</span></div>
+      <div id="overviewAnnounceSlot" class="overview-list"></div>
     </div>
   </div>
 
@@ -1092,6 +1153,20 @@
 
 <div class="qr-zoom-overlay" id="qrZoomOverlay">
   <img id="qrZoomImg" alt="收款 QR Code 放大">
+</div>
+
+<!-- 更新公告彈窗：localStorage 記錄看過的最新一則更新公告 ID，跟推播通知提示各自獨立 -->
+<div class="update-prompt-overlay" id="updatePromptOverlay">
+  <div class="update-prompt-card">
+    <div class="update-prompt-head">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 3.5l1.8 5.7L19.5 11l-5.7 1.8L12 18.5l-1.8-5.7L4.5 11l5.7-1.8L12 3.5Z" stroke="#20242F" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      <div class="update-prompt-eyebrow" id="updatePromptEyebrow">—</div>
+    </div>
+    <div class="update-prompt-items" id="updatePromptItems"></div>
+    <div class="update-prompt-foot">
+      <button type="button" class="cta-btn" id="updatePromptCloseBtn">知道了</button>
+    </div>
+  </div>
 </div>
 
 <script type="module">
@@ -1477,12 +1552,18 @@
     }
     var unreadAnnounceIdsAtOpen = computeUnreadAnnounceIds();
 
-    onSnapshot(query(collection(db, 'announcements'), orderBy('createdAt', 'desc'), limit(5)), function(snap){
+    // 8/31 公告分類：category 'urgent'（含沒有這個欄位的舊資料）/'event'/'update'。
+    // limit 從 5 拉高到 20——appbar 常駐區塊只挑 category==='urgent' 的最新一則，如果
+    // 活動/更新公告發得比較密集，臨時公告可能不在最新 5 筆之內，拉高上限確保撈得到
+    onSnapshot(query(collection(db, 'announcements'), orderBy('createdAt', 'desc'), limit(20)), function(snap){
       var items = snap.docs.map(function(docSnap){
         var data = docSnap.data();
         return {
           id: docSnap.id,
           content: data.content,
+          category: data.category || 'urgent',
+          items: Array.isArray(data.items) ? data.items : null,
+          showPrompt: data.showPrompt !== false, // 只有 category==='update' 才有意義，預設 true
           createdAt: data.createdAt && data.createdAt.toDate ? data.createdAt.toDate() : new Date()
         };
       });
@@ -1490,18 +1571,23 @@
       latestAnnouncements = items;
       renderNotifDot();
       renderNotifSheet();
+      renderOverviewAnnouncements();
+      maybeShowUpdatePrompt();
 
+      // appbar 正下方常駐區塊：只處理臨時公告，活動/更新公告改在團務總覽「公告」
+      // 區塊顯示，這裡完全不混分類
+      var urgentItems = items.filter(function(it){ return it.category === 'urgent'; });
       var wrap = document.getElementById('announceWrap');
-      if (items.length === 0){
+      if (urgentItems.length === 0){
         wrap.classList.add('hidden');
         return;
       }
       wrap.classList.remove('hidden');
 
-      document.getElementById('announceHeadline').textContent = items[0].content;
-      document.getElementById('announceMeta').textContent = formatRelativeTime(items[0].createdAt);
+      document.getElementById('announceHeadline').textContent = urgentItems[0].content;
+      document.getElementById('announceMeta').textContent = formatRelativeTime(urgentItems[0].createdAt);
 
-      var rest = items.slice(1);
+      var rest = urgentItems.slice(1);
       if (rest.length === 0){
         announceMoreBtn.classList.add('hidden');
         announceList.classList.add('hidden');
@@ -1519,6 +1605,88 @@
         );
       }).join('');
     });
+
+    // ---------- 團務總覽「公告」區塊：活動／更新公告（臨時公告不重複顯示） ----------
+    function renderUpdateItemsHtml(items){
+      return (items || []).map(function(it){
+        return (
+          '<div class="update-item">' +
+            '<div class="update-item-title">' + escapeHtmlForOverview(it.title) + '</div>' +
+            '<div class="update-item-desc">' + escapeHtmlForOverview(it.description) + '</div>' +
+          '</div>'
+        );
+      }).join('');
+    }
+
+    function renderOverviewAnnouncements(){
+      var overviewItems = latestAnnouncements.filter(function(it){ return it.category === 'event' || it.category === 'update'; });
+      var wrap = document.getElementById('overviewAnnounceWrap');
+      if (overviewItems.length === 0){
+        wrap.classList.add('hidden');
+        updateOverviewEmptyState();
+        return;
+      }
+      wrap.classList.remove('hidden');
+      updateOverviewEmptyState();
+      document.getElementById('overviewAnnounceSlot').innerHTML = overviewItems.map(function(item){
+        var badgeLabel = item.category === 'update' ? '更新' : '活動';
+        var expandHtml = item.category === 'update'
+          ? '<button type="button" class="ov-ann-expand" data-ov-ann-expand="' + item.id + '">展開 ▾</button>'
+          : '';
+        var itemsHtml = item.category === 'update'
+          ? '<div class="hidden" data-ov-ann-items="' + item.id + '">' + renderUpdateItemsHtml(item.items) + '</div>'
+          : '';
+        return (
+          '<div class="overview-list-row">' +
+            '<div class="ov-ann-top">' +
+              '<span class="ov-ann-badge ' + item.category + '">' + badgeLabel + '</span>' +
+              '<span class="ov-ann-title">' + escapeHtmlForOverview(item.content) + '</span>' +
+              expandHtml +
+            '</div>' +
+            '<div class="ov-ann-meta">' + formatRelativeTime(item.createdAt) + '</div>' +
+            itemsHtml +
+          '</div>'
+        );
+      }).join('');
+    }
+
+    document.getElementById('overviewAnnounceSlot').addEventListener('click', function(e){
+      var btn = e.target.closest('[data-ov-ann-expand]');
+      if (!btn) return;
+      var id = btn.getAttribute('data-ov-ann-expand');
+      var itemsEl = document.querySelector('[data-ov-ann-items="' + id + '"]');
+      if (!itemsEl) return;
+      var collapsed = itemsEl.classList.contains('hidden');
+      itemsEl.classList.toggle('hidden');
+      btn.textContent = collapsed ? '收合 ▴' : '展開 ▾';
+    });
+
+    // ---------- 更新公告彈窗：localStorage 記錄看過的最新一則更新公告 ID，訪客也會看到
+    // （不依賴個人資料，跟通知鈴鐺「訪客沒有個人資料查不到已讀狀態」的限制不一樣） ----------
+    var UPDATE_PROMPT_STORAGE_KEY = 'brioSeenUpdateAnnouncementId';
+    var updatePromptChecked = false;
+
+    function maybeShowUpdatePrompt(){
+      if (updatePromptChecked) return; // 只在頁面載入後檢查一次，避免監聽期間資料變動重複彈出
+      // 只挑 showPrompt 沒被關掉的——單純記錄用的小更新（showPrompt:false）不會被拿來當
+      // 最新一則，就算它比其他更新公告更新，也不會佔走彈窗，也不會擋住更早那則被看到
+      var updateItems = latestAnnouncements.filter(function(it){ return it.category === 'update' && it.showPrompt; });
+      if (updateItems.length === 0) return;
+      updatePromptChecked = true;
+      var latest = updateItems[0];
+      var seenId;
+      try { seenId = localStorage.getItem(UPDATE_PROMPT_STORAGE_KEY); } catch (e) { seenId = null; }
+      if (seenId === latest.id) return;
+
+      document.getElementById('updatePromptEyebrow').textContent = latest.content;
+      document.getElementById('updatePromptItems').innerHTML = renderUpdateItemsHtml(latest.items);
+      document.getElementById('updatePromptOverlay').classList.add('active');
+
+      document.getElementById('updatePromptCloseBtn').onclick = function(){
+        try { localStorage.setItem(UPDATE_PROMPT_STORAGE_KEY, latest.id); } catch (e) {}
+        document.getElementById('updatePromptOverlay').classList.remove('active');
+      };
+    }
 
     // 出缺席回報：查詢自己在哪些活動的參與名單內，橫幅提示尚未回報的活動，點擊直接開啟回報 sheet。
     // 訪客沒有 uid、審核中的人結構上不會出現在任何名單裡（見下方身分驗證區塊），
@@ -2484,11 +2652,20 @@
       editingConcertNoteId = null;
     }
 
+    // 團務總覽現在有三個各自獨立、非同步進來的區塊（我的音樂會/我的團費/公告），
+    // 「目前沒有其他團務資訊」只在三個都空的時候才顯示，任何一個有內容都要蓋掉
+    function updateOverviewEmptyState(){
+      var allEmpty = document.getElementById('myConcertsWrap').classList.contains('hidden') &&
+        document.getElementById('myFeeDuesWrap').classList.contains('hidden') &&
+        document.getElementById('overviewAnnounceWrap').classList.contains('hidden');
+      document.getElementById('overviewEmptyMsg').classList.toggle('hidden', !allEmpty);
+    }
+
     function renderMyConcerts(concerts){
-      if (concerts.length === 0) return; // 保持預設的「目前沒有其他團務資訊」
-      document.getElementById('overviewEmptyMsg').classList.add('hidden');
+      if (concerts.length === 0){ updateOverviewEmptyState(); return; }
       var wrap = document.getElementById('myConcertsWrap');
       wrap.classList.remove('hidden');
+      updateOverviewEmptyState();
       document.getElementById('myConcertsSlot').innerHTML = concerts.map(function(c){
         var piecesHtml = c.pieces.length === 0
           ? '<div class="my-concert-piece-row"><span class="k">（尚未加入曲目）</span></div>'
@@ -2519,14 +2696,11 @@
       var wrap = document.getElementById('myFeeDuesWrap');
       if (myFeeDuesList.length === 0){
         wrap.classList.add('hidden');
-        // 只有「我的音樂會」也沒資料時，才重新顯示空狀態訊息
-        if (document.getElementById('myConcertsWrap').classList.contains('hidden')){
-          document.getElementById('overviewEmptyMsg').classList.remove('hidden');
-        }
+        updateOverviewEmptyState();
         return;
       }
-      document.getElementById('overviewEmptyMsg').classList.add('hidden');
       wrap.classList.remove('hidden');
+      updateOverviewEmptyState();
       document.getElementById('myFeeDuesSlot').innerHTML = myFeeDuesList.map(function(due){
         var payment = myFeePaymentsByDueId[due.id];
         var dateVal = payment && payment.paidAt && payment.paidAt.toDate ? payment.paidAt.toDate() : null;
@@ -2535,7 +2709,7 @@
           ? '已繳 $' + payment.amountPaid.toLocaleString('zh-Hant') + (dateText ? '・' + dateText : '')
           : '未繳 $' + feeDueAmountForMe(due).toLocaleString('zh-Hant');
         var rowHtml = (
-          '<div class="my-concert-piece-row">' +
+          '<div class="overview-list-row-top">' +
             '<span class="k">' + escapeHtmlForOverview(due.title) + '</span>' +
             '<span class="v">' + statusText + '</span>' +
           '</div>'
@@ -2555,7 +2729,7 @@
               qrHtml +
             '</div>'
           : '';
-        return rowHtml + remitHtml;
+        return '<div class="overview-list-row">' + rowHtml + remitHtml + '</div>';
       }).join('');
     }
 

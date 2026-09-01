@@ -123,12 +123,54 @@
     font-family:'Roboto Mono',monospace; font-size:10.5px; font-weight:600;
     letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft);
   }
-  .field textarea{
+  .field textarea, .field input{
     border:1px solid var(--line); background:var(--paper);
     border-radius:var(--radius-sm); padding:11px 13px;
     font-size:14px; color:var(--ink); width:100%;
-    resize:vertical; min-height:80px; line-height:1.6;
+    font-family:inherit;
   }
+  .field textarea{ resize:vertical; min-height:80px; line-height:1.6; }
+
+  /* ---------- 8/31 公告分類：臨時/活動/更新，更新公告額外有「發布標題」+ 項目重複區塊 ---------- */
+  .cat-picker{ display:flex; gap:8px; margin-bottom:14px; }
+  .cat-chip{
+    flex:1; text-align:center; padding:9px 4px; border-radius:999px;
+    border:1px solid var(--line); background:var(--paper); color:var(--ink-soft);
+    font-size:12.5px; font-weight:600; cursor:pointer;
+  }
+  .cat-chip.selected{ background:var(--ink); border-color:var(--ink); color:var(--paper-raised); }
+  .cat-badge{
+    display:inline-flex; flex:none; padding:2px 8px; border-radius:999px; font-size:9.5px; font-weight:700;
+  }
+  .cat-badge.urgent{ background:rgba(122,35,49,.1); color:var(--burgundy); }
+  .cat-badge.event{ background:rgba(184,134,58,.14); color:var(--brass-deep); }
+  .cat-badge.update{ background:var(--sage-bg); color:var(--sage); }
+  .item-row{
+    margin-top:10px; padding:12px; background:var(--paper); border:1px solid var(--line);
+    border-radius:var(--radius-sm); position:relative;
+  }
+  .item-row input{
+    width:100%; border:none; border-bottom:1px solid var(--line); background:none;
+    padding:2px 24px 8px 0; font-size:14px; font-weight:700; color:var(--ink); font-family:inherit;
+  }
+  .item-row textarea{
+    width:100%; border:none; background:none; padding:8px 0 0; font-size:13px; color:var(--ink-soft);
+    line-height:1.6; resize:vertical; min-height:50px; font-family:inherit;
+  }
+  .item-remove{
+    position:absolute; top:10px; right:10px; width:22px; height:22px; border-radius:50%;
+    border:none; background:none; color:var(--ink-soft); font-size:14px; cursor:pointer;
+  }
+  .item-add-btn{
+    margin-top:10px; width:100%; border:1px dashed var(--line); background:none;
+    border-radius:var(--radius-sm); padding:10px; font-size:12.5px; color:var(--brass-deep);
+    font-weight:700; cursor:pointer;
+  }
+  .ann-update-items{ margin-top:10px; padding-top:10px; border-top:1px solid var(--line); }
+  .ann-update-item{ margin-top:8px; }
+  .ann-update-item:first-child{ margin-top:0; }
+  .ann-update-item-title{ font-size:12.5px; font-weight:700; color:var(--ink); }
+  .ann-update-item-desc{ font-size:12px; color:var(--ink-soft); line-height:1.6; margin-top:2px; }
 
   .push-row{
     display:flex; align-items:center; justify-content:space-between; gap:12px;
@@ -228,9 +270,25 @@
   </div>
 
   <form class="card" id="annForm">
+    <div class="cat-picker">
+      <div class="cat-chip selected" data-cat="urgent">臨時</div>
+      <div class="cat-chip" data-cat="event">活動</div>
+      <div class="cat-chip" data-cat="update">更新</div>
+    </div>
     <div class="field">
-      <label>公告內容</label>
+      <label id="annContentLabel">公告內容</label>
       <textarea id="annContent" placeholder="例如：團練提前至 13:30 開始" required></textarea>
+    </div>
+    <div id="annItemsWrap" class="hidden">
+      <div id="annItemsList"></div>
+      <button type="button" class="item-add-btn" id="annItemAddBtn">＋ 新增項目</button>
+      <div class="push-row" id="showPromptRow">
+        <div>
+          <div class="push-label">首頁彈出提醒</div>
+          <div class="push-hint">開啟後，團員打開首頁時會跳出這次更新內容</div>
+        </div>
+        <button type="button" class="toggle-switch on" id="showPromptToggle" aria-label="首頁彈出提醒"><span class="knob"></span></button>
+      </div>
     </div>
     <div class="push-row" id="pushRow">
       <div>
@@ -269,6 +327,14 @@
   var annById = {};
   var editingId = null;
   var currentAdminUid = null;
+  var selectedCategory = 'urgent';
+  var draftItems = []; // [{title, description}]，只有 category==='update' 時才用到
+
+  function escapeHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
 
   // 發布者查詢紀錄，供後台查看操作紀錄用（前台不顯示，見 schema.md 公告系統說明）。
   // 用 uid 快取姓名，避免每次 render() 都重新查一次；查詢中先回 null 不顯示，
@@ -319,6 +385,72 @@
     pushToggle.classList.toggle('on');
   });
 
+  var showPromptToggle = document.getElementById('showPromptToggle');
+  showPromptToggle.addEventListener('click', function(){
+    showPromptToggle.classList.toggle('on');
+  });
+
+  // ---------- 8/31 公告分類：更新公告有「發布標題」+ 項目重複區塊，其他兩類維持原本
+  // 單一內容欄位 ----------
+  function renderItemsList(){
+    document.getElementById('annItemsList').innerHTML = draftItems.map(function(item, idx){
+      var removeBtn = draftItems.length > 1
+        ? '<button type="button" class="item-remove" data-item-remove="' + idx + '" aria-label="刪除項目">×</button>'
+        : '';
+      return (
+        '<div class="item-row">' +
+          removeBtn +
+          '<input type="text" data-item-title="' + idx + '" placeholder="項目標題" value="' + escapeHtml(item.title) + '">' +
+          '<textarea data-item-desc="' + idx + '" placeholder="項目說明">' + escapeHtml(item.description) + '</textarea>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function setCategory(cat){
+    selectedCategory = cat;
+    document.querySelectorAll('.cat-chip').forEach(function(chip){
+      chip.classList.toggle('selected', chip.getAttribute('data-cat') === cat);
+    });
+    var isUpdate = cat === 'update';
+    document.getElementById('annContentLabel').textContent = isUpdate ? '發布標題' : '公告內容';
+    document.getElementById('annContent').placeholder = isUpdate ? '例如：v0.14 更新' : '例如：團練提前至 13:30 開始';
+    document.getElementById('annItemsWrap').classList.toggle('hidden', !isUpdate);
+    if (isUpdate && draftItems.length === 0) draftItems = [{ title: '', description: '' }];
+    renderItemsList();
+  }
+
+  document.querySelectorAll('.cat-chip').forEach(function(chip){
+    chip.addEventListener('click', function(){
+      setCategory(chip.getAttribute('data-cat'));
+    });
+  });
+
+  document.getElementById('annItemAddBtn').addEventListener('click', function(){
+    draftItems.push({ title: '', description: '' });
+    renderItemsList();
+  });
+
+  document.getElementById('annItemsList').addEventListener('click', function(e){
+    var btn = e.target.closest('[data-item-remove]');
+    if (!btn) return;
+    draftItems.splice(Number(btn.getAttribute('data-item-remove')), 1);
+    renderItemsList();
+  });
+
+  // 輸入時只更新 draftItems 陣列，不重繪 DOM——重繪會讓正在輸入的欄位失焦
+  document.getElementById('annItemsList').addEventListener('input', function(e){
+    var titleInput = e.target.closest('[data-item-title]');
+    if (titleInput){
+      draftItems[Number(titleInput.getAttribute('data-item-title'))].title = titleInput.value;
+      return;
+    }
+    var descInput = e.target.closest('[data-item-desc]');
+    if (descInput){
+      draftItems[Number(descInput.getAttribute('data-item-desc'))].description = descInput.value;
+    }
+  });
+
   function showFormError(message){
     annFormError.textContent = message;
     annFormError.classList.toggle('show', !!message);
@@ -333,6 +465,9 @@
     annCancelBtn.classList.add('hidden');
     pushRow.classList.remove('hidden');
     pushToggle.classList.remove('on');
+    showPromptToggle.classList.add('on');
+    draftItems = [];
+    setCategory('urgent');
     showFormError('');
   }
 
@@ -346,6 +481,11 @@
     annSubmitBtn.textContent = '儲存變更';
     annCancelBtn.classList.remove('hidden');
     pushRow.classList.add('hidden');
+    draftItems = (ann.items && ann.items.length)
+      ? ann.items.map(function(it){ return { title: it.title || '', description: it.description || '' }; })
+      : [];
+    showPromptToggle.classList.toggle('on', ann.showPrompt !== false);
+    setCategory(ann.category || 'urgent');
     showFormError('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -358,21 +498,38 @@
 
     var content = document.getElementById('annContent').value.trim();
     if (!content){
-      showFormError('請輸入公告內容');
+      showFormError(selectedCategory === 'update' ? '請輸入發布標題' : '請輸入公告內容');
       return;
+    }
+
+    var items = null;
+    if (selectedCategory === 'update'){
+      items = draftItems
+        .map(function(it){ return { title: it.title.trim(), description: it.description.trim() }; })
+        .filter(function(it){ return it.title && it.description; });
+      if (items.length === 0){
+        showFormError('請至少填寫一個更新項目（標題+說明都要填）');
+        return;
+      }
     }
 
     annSubmitBtn.disabled = true;
     annSubmitBtn.textContent = editingId ? '儲存中…' : '發布中…';
 
+    var payload = {
+      content: content,
+      category: selectedCategory,
+      items: items,
+      showPrompt: selectedCategory === 'update' ? showPromptToggle.classList.contains('on') : null
+    };
+
     var task = editingId
-      ? updateDoc(doc(db, 'announcements', editingId), { content: content })
-      : addDoc(collection(db, 'announcements'), {
-          content: content,
+      ? updateDoc(doc(db, 'announcements', editingId), payload)
+      : addDoc(collection(db, 'announcements'), Object.assign({
           sendPush: pushToggle.classList.contains('on'),
           createdBy: currentAdminUid,
           createdAt: serverTimestamp()
-        });
+        }, payload));
 
     task.then(function(){
       enterCreateMode();
@@ -414,13 +571,31 @@
       return db_ - da;
     });
 
+    var CAT_LABEL = { urgent: '臨時', event: '活動', update: '更新' };
+
     annList.innerHTML = ids.map(function(id){
       var ann = annById[id];
       var creatorName = getCreatorName(ann.createdBy);
       var metaText = (ann.createdAt ? formatRelativeTime(ann.createdAt) : '') + (creatorName ? ' · ' + creatorName + ' 新增' : '');
+      var itemsHtml = (ann.items && ann.items.length)
+        ? '<div class="ann-update-items">' + ann.items.map(function(it){
+            return (
+              '<div class="ann-update-item">' +
+                '<div class="ann-update-item-title">' + escapeHtml(it.title) + '</div>' +
+                '<div class="ann-update-item-desc">' + escapeHtml(it.description) + '</div>' +
+              '</div>'
+            );
+          }).join('') + '</div>'
+        : '';
+      var promptOffHtml = (ann.category === 'update' && ann.showPrompt === false)
+        ? '<span style="margin-left:6px;font-size:9.5px;color:var(--ink-soft);">（首頁不彈出）</span>'
+        : '';
       return (
         '<div class="ann-item">' +
-          '<div class="ann-text">' + ann.content + '</div>' +
+          '<span class="cat-badge ' + ann.category + '">' + (CAT_LABEL[ann.category] || ann.category) + '</span>' +
+          promptOffHtml +
+          '<div class="ann-text" style="margin-top:6px;">' + ann.content + '</div>' +
+          itemsHtml +
           '<div class="ann-meta">' + metaText + '</div>' +
           '<div class="ann-actions">' +
             '<button type="button" data-edit="' + id + '">編輯</button>' +
@@ -468,6 +643,9 @@
         var data = docSnap.data();
         annById[docSnap.id] = {
           content: data.content,
+          category: data.category || 'urgent',
+          items: Array.isArray(data.items) ? data.items : null,
+          showPrompt: data.showPrompt,
           createdAt: data.createdAt && data.createdAt.toDate ? data.createdAt.toDate() : null,
           createdBy: data.createdBy || null
         };
