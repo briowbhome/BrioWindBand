@@ -1,6 +1,9 @@
 import {
   collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import {
+  ref, uploadBytes, getDownloadURL, deleteObject
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js";
 
 // callback(pieces) 每次 repertoire 有變動都會呼叫，pieces 是 [{id, title, composer, parts}]。
 // 沒有 order 欄位（曲目資料庫本身不需要排序，排序是「音樂會裡的曲目」才有的概念，見
@@ -48,4 +51,19 @@ export function randomPartId() {
   return Array.from(crypto.getRandomValues(new Uint8Array(6))).map(function (b) {
     return b.toString(16).padStart(2, "0");
   }).join("");
+}
+
+// 樂譜檔案固定路徑 repertoire/{pieceId}/{partId}.pdf（只收 PDF、10MB 上限，
+// storage.rules 有同樣的限制），重新上傳直接覆蓋同路徑檔案，前端不用另外清理舊檔
+export function uploadPartSheetMusic(storage, pieceId, partId, file) {
+  var fileRef = ref(storage, "repertoire/" + pieceId + "/" + partId + ".pdf");
+  return uploadBytes(fileRef, file, { contentType: "application/pdf" }).then(function () {
+    return getDownloadURL(fileRef);
+  });
+}
+
+// sheetMusicUrl 是 getDownloadURL() 回傳的下載連結，Firebase SDK 的 ref() 可以直接
+// 從這種 https 下載連結反推出 Storage 物件參照，不用另外存一份 Storage 路徑欄位
+export function deletePartSheetMusic(storage, sheetMusicUrl) {
+  return deleteObject(ref(storage, sheetMusicUrl));
 }
