@@ -222,6 +222,18 @@
   .part-add-btn:active{ background:var(--sage-bg); }
   .part-empty{ padding:8px 2px; font-size:12px; color:var(--ink-soft); }
 
+  .part-row-view{ justify-content:space-between; }
+  .part-sheet-actions{ display:flex; gap:6px; flex:none; }
+  .part-sheet-btn{
+    border:1px solid var(--line); background:var(--paper); color:var(--brass-deep);
+    border-radius:999px; padding:5px 11px; font-size:11px; font-weight:700; cursor:pointer;
+    font-family:inherit; white-space:nowrap; text-decoration:none; display:inline-block;
+  }
+  .part-sheet-btn:active{ background:var(--sage-bg); }
+  .part-sheet-btn.view{ color:var(--sage); }
+  .part-sheet-btn.danger{ color:var(--burgundy-deep); }
+  .part-sheet-btn.upload{ background:var(--brass); color:var(--ink); border-color:var(--brass); }
+
   .sheet-footer{
     display:flex; gap:10px;
     padding:14px 20px calc(14px + env(safe-area-inset-bottom));
@@ -358,13 +370,15 @@
 </div>
 </div>
 
+<input type="file" id="sheetMusicFileInput" accept="application/pdf" class="hidden">
+
 <script type="module">
   import { initAdminNav } from './admin-nav.js';
   import { showToast } from './toast.js';
   import { requireAdminOrSheetMusicManager, peekCachedProfile } from './auth-guard.js';
-  import { db } from './firebase-init.js';
+  import { db, storage } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
-  import { subscribeRepertoire, addPiece, updatePiece, deletePiece, randomPartId } from './repertoire.js';
+  import { subscribeRepertoire, addPiece, updatePiece, deletePiece, randomPartId, uploadPartSheetMusic, deletePartSheetMusic } from './repertoire.js';
   import { subscribeInstruments, FAMILY_LABELS, FAMILY_ORDER } from './instruments.js';
 
   function escapeHtml(s){
@@ -471,10 +485,9 @@
     }).join('');
   }
 
-  // 唯讀摘要（點清單裡的曲目、還沒進編輯表單時）也直接列出所有分部，不用先點「✎ 編輯」才看得到。
-  // 一個樂器一列，分部只是標示「這個樂器拆成幾份」，不需要每個分部各自佔一行——只有 1 個分部
-  // （沒拆分）的樂器只顯示樂器名稱，拆了 2 份以上才在下面補一行小字列出各分部標籤（比照
-  // event-admin.html 音樂會分頁「曲目→樂器清單」同一種 event-title/event-meta 呈現方式）
+  // 8/26 原本設計是「一個樂器一行」（超過一個分部才補一行小字列標籤），這輪因為每個
+  // 分部（partId）各自有獨立的樂譜檔案操作，改成「一個分部一行」才放得下操作按鈕——
+  // 這是對已上線版面的必要調整，已用 Artifact 示意稿跟使用者確認過
   function renderPieceViewParts(parts){
     var container = document.getElementById('pieceViewParts');
     if (!parts || parts.length === 0){
@@ -483,16 +496,23 @@
     }
     var grouped = groupPartsByInstrument(parts);
     container.innerHTML = grouped.order.map(function(instrumentName){
-      var partsForInstrument = grouped.byInstrument[instrumentName];
-      var meta = partsForInstrument.length > 1
-        ? partsForInstrument.map(function(p){ return p.label; }).join('、')
-        : '';
       return (
-        '<div class="part-row part-row-view">' +
-          '<div class="part-label">' + escapeHtml(instrumentName) +
-          (meta ? '<div class="part-view-meta">' + escapeHtml(meta) + '</div>' : '') +
-          '</div>' +
-        '</div>'
+        '<div class="part-group-label">' + escapeHtml(instrumentName) + '</div>' +
+        grouped.byInstrument[instrumentName].map(function(part){
+          var actionsHtml = part.sheetMusicUrl
+            ? (
+                '<a class="part-sheet-btn view" href="' + escapeHtml(part.sheetMusicUrl) + '" target="_blank" rel="noopener">檢視</a>' +
+                '<button type="button" class="part-sheet-btn" data-sheet-upload="' + part.partId + '">更換</button>' +
+                '<button type="button" class="part-sheet-btn danger" data-sheet-remove="' + part.partId + '">移除</button>'
+              )
+            : '<button type="button" class="part-sheet-btn upload" data-sheet-upload="' + part.partId + '">上傳樂譜</button>';
+          return (
+            '<div class="part-row part-row-view">' +
+              '<span class="part-label">' + escapeHtml(part.label) + '</span>' +
+              '<div class="part-sheet-actions">' + actionsHtml + '</div>' +
+            '</div>'
+          );
+        }).join('')
       );
     }).join('');
   }
@@ -549,8 +569,17 @@
     var btn = e.target.closest('[data-remove-part]');
     if (!btn) return;
     var partId = btn.getAttribute('data-remove-part');
+    var removedPart = draftParts.filter(function(p){ return p.partId === partId; })[0];
     draftParts = draftParts.filter(function(p){ return p.partId !== partId; });
     renderPartGroups();
+    // 分部欄位本身刪掉了，底下掛的樂譜檔案也一併清掉，不留孤兒檔案；不擋 UI、也不等它
+    // 完成——刪除 Storage 檔案失敗不影響「這個分部欄位已經從草稿移除」這件事，使用者按
+    // 「儲存變更」後 Firestore 的 parts 陣列本來就不會再有這個 partId
+    if (removedPart && removedPart.sheetMusicUrl){
+      deletePartSheetMusic(storage, removedPart.sheetMusicUrl).catch(function(err){
+        console.error('刪除分部樂譜檔案失敗', err);
+      });
+    }
   });
 
   var pieceList = document.getElementById('pieceList');
@@ -714,13 +743,117 @@
     );
     if (!ok) return;
     pieceDeleteBtn.disabled = true;
+    var sheetMusicUrls = ((p && p.parts) || []).map(function(part){ return part.sheetMusicUrl; }).filter(function(url){ return url; });
     deletePiece(db, editingPieceId).then(function(){
       pieceDeleteBtn.disabled = false;
       closePieceSheet();
+      // 曲目文件刪掉之後才清 Storage 檔案：如果曲目本身刪除失敗（例如權限問題），
+      // 樂譜檔案不會被誤刪
+      sheetMusicUrls.forEach(function(url){
+        deletePartSheetMusic(storage, url).catch(function(err){
+          console.error('刪除分部樂譜檔案失敗', err);
+        });
+      });
     }).catch(function(err){
       pieceDeleteBtn.disabled = false;
       showToast('刪除失敗：' + err.code, 'error');
     });
+  });
+
+  // 樂譜上傳只在「唯讀摘要」畫面操作（editingPieceId 一定有值，因為只有 openEditSheet()
+  // 會顯示 pieceViewMode），跟編輯分部結構（新增/刪除分部欄位）分開流程；編輯模式裡
+  // 新增、還沒存檔的草稿分部不會出現在 pieceViewParts 裡，天生就不能上傳，
+  // 不會有「取消存檔但 Storage 已經有孤兒檔案」的情況
+  var sheetMusicFileInput = document.getElementById('sheetMusicFileInput');
+  var pendingSheetPartId = null;
+  var sheetMusicUploadInFlight = {}; // partId -> true，避免同一個分部重複點擊上傳
+
+  function validateSheetMusicFile(file){
+    if (file.type !== 'application/pdf'){
+      showToast('只能上傳 PDF 檔案', 'error');
+      return false;
+    }
+    if (file.size >= 10 * 1024 * 1024){
+      showToast('檔案大小不能超過 10MB', 'error');
+      return false;
+    }
+    return true;
+  }
+
+  function uploadSheetMusic(partId, file){
+    if (sheetMusicUploadInFlight[partId]) return;
+    if (!validateSheetMusicFile(file)) return;
+    var targetPieceId = editingPieceId;
+    var p = piecesById[targetPieceId];
+    if (!p) return;
+    sheetMusicUploadInFlight[partId] = true;
+    uploadPartSheetMusic(storage, targetPieceId, partId, file).then(function(url){
+      var updatedParts = p.parts.map(function(part){
+        return part.partId === partId
+          ? Object.assign({}, part, { sheetMusicUrl: url, sheetMusicUploadedBy: currentAdminUid })
+          : part;
+      });
+      return updatePiece(db, targetPieceId, p.title, p.composer, updatedParts).then(function(){
+        if (editingPieceId === targetPieceId) renderPieceViewParts(updatedParts);
+        showToast('樂譜已上傳', 'success');
+      });
+    }).catch(function(err){
+      showToast('上傳失敗：' + err.code, 'error');
+    }).finally(function(){
+      delete sheetMusicUploadInFlight[partId];
+    });
+  }
+
+  function removeSheetMusic(partId){
+    if (sheetMusicUploadInFlight[partId]) return;
+    var targetPieceId = editingPieceId;
+    var p = piecesById[targetPieceId];
+    if (!p) return;
+    var part = p.parts.filter(function(x){ return x.partId === partId; })[0];
+    if (!part || !part.sheetMusicUrl) return;
+    sheetMusicUploadInFlight[partId] = true;
+    deletePartSheetMusic(storage, part.sheetMusicUrl).catch(function(err){
+      // Storage 物件可能已經不存在（例如手動在 Firebase Console 刪過），
+      // 不擋住後續的 Firestore 欄位清理
+      console.error('刪除 Storage 檔案失敗', err);
+    }).then(function(){
+      var updatedParts = p.parts.map(function(x){
+        return x.partId === partId
+          ? Object.assign({}, x, { sheetMusicUrl: null, sheetMusicUploadedBy: null })
+          : x;
+      });
+      return updatePiece(db, targetPieceId, p.title, p.composer, updatedParts);
+    }).then(function(){
+      if (editingPieceId === targetPieceId) renderPieceViewParts(p.parts.map(function(x){
+        return x.partId === partId ? Object.assign({}, x, { sheetMusicUrl: null, sheetMusicUploadedBy: null }) : x;
+      }));
+      showToast('樂譜已移除', 'success');
+    }).catch(function(err){
+      showToast('移除失敗：' + err.code, 'error');
+    }).finally(function(){
+      delete sheetMusicUploadInFlight[partId];
+    });
+  }
+
+  document.getElementById('pieceViewParts').addEventListener('click', function(e){
+    var uploadBtn = e.target.closest('[data-sheet-upload]');
+    if (uploadBtn){
+      pendingSheetPartId = uploadBtn.getAttribute('data-sheet-upload');
+      sheetMusicFileInput.click();
+      return;
+    }
+    var removeBtn = e.target.closest('[data-sheet-remove]');
+    if (removeBtn){
+      var ok = confirm('確定要移除這個分部的樂譜檔案嗎？此動作無法復原。');
+      if (ok) removeSheetMusic(removeBtn.getAttribute('data-sheet-remove'));
+    }
+  });
+
+  sheetMusicFileInput.addEventListener('change', function(e){
+    var file = e.target.files[0];
+    e.target.value = ''; // 清空，允許連續選同一個檔案也能再次觸發 change
+    if (file && pendingSheetPartId) uploadSheetMusic(pendingSheetPartId, file);
+    pendingSheetPartId = null;
   });
 
   requireAdminOrSheetMusicManager().then(function(result){
