@@ -2,6 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { getFunctions } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-functions.js";
+import { getStorage } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCGT88l8VtEXBZGeRaKLiQXmDgWOdjr7rw",
@@ -17,3 +18,4 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 // 區域要跟 functions/index.js 的 REGION 一致，不然 callable 會打不到部署的函式
 export const functions = getFunctions(app, "asia-east1");
+export const storage = getStorage(app);
