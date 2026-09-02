@@ -163,7 +163,7 @@
   <div id="folderContent">
     <div class="section-label"><span class="tw">我的音樂會</span><span class="en">By Concert</span></div>
     <div id="myConcertsSlot"></div>
-    <div class="section-label"><span class="tw">其他曲目</span><span class="en">Not In Any Concert</span></div>
+    <div class="section-label"><span class="tw">其他曲目</span><span class="en">Other Sheets</span></div>
     <div id="otherPiecesSlot"></div>
   </div>
 
@@ -193,7 +193,7 @@
   import { requireApprovedMember } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import {
-    collection, collectionGroup, query, doc, getDoc, getDocs
+    collection, doc, getDoc, getDocs
   } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
   function escapeHtml(s){
@@ -229,8 +229,12 @@
 
   // 依「音樂會分組」+「其他曲目」兩區組出「譜夾」要顯示的完整資料。第一區只列出
   // 自己有參與的音樂會（concertRosters 有自己），第二區是 repertoire 裡有、但沒有任何
-  // concerts/*/pieces 引用過的曲目（用 collectionGroup 查全部音樂會的 pieces，不限自己
-  // 有沒有參與，因為第二區的定義是「完全沒被任何音樂會用到」）
+  // concerts/*/pieces 引用過的曲目。原本想用 collectionGroup(db, 'pieces') 一次查全部
+  // 音樂會的曲目引用，但實測發現即使 concerts/{concertId}/pieces/{pieceId} 這條巢狀規則
+  // 已經是 hasProfile()，collectionGroup 查詢還是會被 Firestore 判 permission-denied——
+  // 巢狀 match 規則不會自動套用到跨路徑的 collectionGroup 查詢。改成直接撈全部音樂會、
+  // 逐一查各自的 pieces 子集合再合併，跟 concerts 集合既有的 hasProfile() 規則一致，
+  // 也是這個專案其他讀取端（例如 index.html 的 loadMyConcerts()）已經在用的查詢模式
   async function loadSheetMusicFolder(uid, profile){
     var repertoireSnap = await getDocs(collection(db, 'repertoire'));
     var repertoireById = {};
@@ -241,9 +245,12 @@
       repertoireList.push(data);
     });
 
-    var allPiecesSnap = await getDocs(collectionGroup(db, 'pieces'));
+    var allConcertsSnap = await getDocs(collection(db, 'concerts'));
     var usedPieceIds = {};
-    allPiecesSnap.forEach(function(d){ usedPieceIds[d.id] = true; });
+    await Promise.all(allConcertsSnap.docs.map(async function(concertDoc){
+      var piecesSnap = await getDocs(collection(db, 'concerts', concertDoc.id, 'pieces'));
+      piecesSnap.forEach(function(d){ usedPieceIds[d.id] = true; });
+    }));
 
     var rosterSnap = await getDocs(collection(db, 'concertRosters'));
     var myEntries = [];
