@@ -306,13 +306,127 @@
     };
   }
 
+  // chip 選中狀態：key 是 "pieceId|instrumentName"，value 是目前選中的 partId。
+  // 開啟頁面時用 myPartId（這場音樂會自己實際被指派到的分部）預設選中，
+  // 沒有指派紀錄的人（分部長/admin 純檢視）fallback 選該樂器第一個分部
+  var selectedPartByGroup = {};
+
+  function groupKey(pieceId, instrumentName){ return pieceId + '|' + instrumentName; }
+
+  function renderInstrumentGroup(pieceId, group){
+    var key = groupKey(pieceId, group.instrumentName);
+    if (!(key in selectedPartByGroup)){
+      selectedPartByGroup[key] = group.myPartId || group.parts[0].partId;
+    }
+    var selectedPartId = selectedPartByGroup[key];
+    var selectedPart = group.parts.filter(function(p){ return p.partId === selectedPartId; })[0] || group.parts[0];
+
+    var chipsHtml = group.parts.length > 1
+      ? '<div class="chip-row" data-chip-group="' + escapeHtml(key) + '">' +
+          group.parts.map(function(p){
+            return '<button type="button" class="part-chip' + (p.partId === selectedPartId ? ' active' : '') + '" data-part-chip="' + escapeHtml(p.partId) + '">' + escapeHtml(p.label) + '</button>';
+          }).join('') +
+        '</div>'
+      : '';
+
+    var linkHtml = selectedPart.sheetMusicUrl
+      ? '<a class="view-link" href="' + escapeHtml(selectedPart.sheetMusicUrl) + '" target="_blank" rel="noopener">' +
+          '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M6 4h9l3 3v13H6z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>' +
+          '檢視「' + escapeHtml(selectedPart.label) + '」樂譜' +
+        '</a>'
+      : '<span class="view-link disabled">（尚未上傳樂譜）</span>';
+
+    return (
+      '<div class="instrument-block">' +
+        (group.parts.length > 1 ? '<div class="instrument-block-label">' + escapeHtml(group.instrumentName) + '</div>' : '') +
+        chipsHtml +
+        linkHtml +
+      '</div>'
+    );
+  }
+
+  function renderMyConcerts(myConcerts){
+    var wrap = document.getElementById('myConcertsSlot');
+    if (myConcerts.length === 0){
+      wrap.innerHTML = '<div class="empty">目前沒有找到你有參與、且能看到樂譜的音樂會曲目</div>';
+      return;
+    }
+    wrap.innerHTML = myConcerts.map(function(c){
+      return (
+        '<div class="concert-card">' +
+          '<div class="concert-title">' + escapeHtml(c.title) + '</div>' +
+          c.pieces.map(function(p){
+            return (
+              '<div class="piece-block">' +
+                '<div class="piece-name">' + escapeHtml(p.title) + '</div>' +
+                p.instrumentGroups.map(function(g){ return renderInstrumentGroup(p.pieceId, g); }).join('') +
+              '</div>'
+            );
+          }).join('') +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function renderOtherPieces(otherPieces){
+    var wrap = document.getElementById('otherPiecesSlot');
+    if (otherPieces.length === 0){
+      wrap.innerHTML = '<div class="empty">沒有其他曲目</div>';
+      return;
+    }
+    wrap.innerHTML = '<div class="list">' + otherPieces.map(function(p){
+      return (
+        '<div class="other-piece-row">' +
+          '<span class="other-piece-name">' + escapeHtml(p.title) + '</span>' +
+          '<span class="other-piece-count">' + (p.parts || []).length + ' 個分部</span>' +
+        '</div>'
+      );
+    }).join('') + '</div>';
+  }
+
+  var lastLoadedGroups = {}; // key（pieceId|instrumentName）-> group 物件，chip 重繪時要用
+
+  function indexGroups(myConcerts){
+    myConcerts.forEach(function(c){
+      c.pieces.forEach(function(p){
+        p.instrumentGroups.forEach(function(g){
+          lastLoadedGroups[groupKey(p.pieceId, g.instrumentName)] = g;
+        });
+      });
+    });
+  }
+
+  // chip 點擊事件委派在整個內容容器上，因為第一區的音樂會/曲目/分部組合是動態算出來的，
+  // 每次點擊只重繪被點到的那個分部群組，不重繪整頁（避免捲動位置跳動）
+  document.getElementById('folderContent').addEventListener('click', function(e){
+    var chip = e.target.closest('[data-part-chip]');
+    if (!chip) return;
+    var chipRow = chip.closest('[data-chip-group]');
+    var key = chipRow.getAttribute('data-chip-group');
+    selectedPartByGroup[key] = chip.getAttribute('data-part-chip');
+    var pieceId = key.split('|')[0];
+    var group = lastLoadedGroups[key];
+    if (!group) return;
+    var block = chipRow.parentElement;
+    block.outerHTML = renderInstrumentGroup(pieceId, group);
+  });
+
   requireApprovedMember().then(function(result){
     if (!result) return;
+    document.getElementById('myConcertsSlot').innerHTML = '<div class="empty">載入中…</div>';
+    document.getElementById('otherPiecesSlot').innerHTML = '';
     loadSheetMusicFolder(result.uid, result.profile).then(function(data){
-      console.log('sheet music folder loaded', data); // Task 6 會換成真正的渲染邏輯
+      indexGroups(data.myConcerts);
+      renderMyConcerts(data.myConcerts);
+      renderOtherPieces(data.otherPieces);
     }).catch(function(err){
       console.error('譜夾資料載入失敗', err);
+      document.getElementById('myConcertsSlot').innerHTML = '<div class="empty">讀取失敗，請重新整理再試一次</div>';
     });
+  });
+
+  document.querySelectorAll('.tab-soon').forEach(function(btn){
+    btn.setAttribute('disabled', 'true');
   });
 </script>
 </body>
