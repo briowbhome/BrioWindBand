@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>布利歐管樂團｜譜夾</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#F2EFE5">
+<link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+<script src="./pwa-register.js" defer></script>
+<style>
+  :root{
+    --ink:#20242F;
+    --ink-soft:#4A4F5C;
+    --paper:#F2EFE5;
+    --paper-raised:#FBFAF4;
+    --line:#DAD3BE;
+    --brass:#B8863A;
+    --brass-deep:#8F6A2C;
+    --burgundy:#7A2331;
+    --burgundy-deep:#5C1A26;
+    --sage:#5F6E58;
+    --sage-bg:#E7EBDF;
+    --radius-lg:20px;
+    --radius-md:14px;
+    --radius-sm:9px;
+    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% -10%, #EFE9D6 0%, transparent 45%),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Noto Sans TC','Noto Sans',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    min-height:100dvh;
+    display:flex;
+    justify-content:center;
+  }
+
+  button, a{ -webkit-tap-highlight-color: transparent; font-family:inherit; }
+  :focus-visible{ outline:2.5px solid var(--brass-deep); outline-offset:2px; border-radius:6px; }
+
+  .app{
+    width:100%;
+    max-width:460px;
+    min-height:100vh;
+    min-height:100dvh;
+    background:var(--paper);
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .hidden{ display:none !important; }
+
+  @keyframes skel-pulse{ 0%,100%{ opacity:.55; } 50%{ opacity:1; } }
+  .skel{ background:var(--line); animation:skel-pulse 1.4s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce){ .skel{ animation:none; opacity:.75; } }
+
+  .appbar{ display:flex; align-items:center; gap:12px; padding:18px 20px 14px; }
+  .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
+  .brandtext{ display:flex; flex-direction:column; line-height:1.1; }
+  .brandtext .name{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:19px; letter-spacing:.02em; }
+  .brandtext .sub{ font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.14em; color:var(--ink-soft); margin-top:3px; text-transform:uppercase; }
+
+  .staff{
+    height:16px; margin:0 20px 6px;
+    background-image: repeating-linear-gradient(var(--line), var(--line) 1px, transparent 1px, transparent 4px);
+    opacity:.9;
+  }
+
+  .section-label{ display:flex; align-items:baseline; gap:8px; margin:20px 20px 4px; }
+  .section-label .tw{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:15.5px; }
+  .section-label .en{ font-family:'Roboto Mono',monospace; font-size:10px; letter-spacing:.12em; color:var(--ink-soft); text-transform:uppercase; }
+  .empty{ margin:0 20px 20px; padding:24px; text-align:center; font-size:13px; color:var(--ink-soft); background:var(--paper-raised); border:1px solid var(--line); border-radius:var(--radius-lg); }
+
+  .concert-card{
+    margin:0 20px 16px;
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-card);
+    padding:14px 16px;
+  }
+  .concert-title{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:14.5px; }
+  .piece-block{ padding:11px 0; border-top:1px solid var(--line); }
+  .piece-block:first-of-type{ border-top:none; margin-top:8px; }
+  .piece-name{ font-size:13px; font-weight:500; }
+  .instrument-block{ margin-top:8px; }
+  .instrument-block-label{ font-size:11px; color:var(--ink-soft); margin-bottom:4px; }
+  .chip-row{ display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; }
+  .chip-row::-webkit-scrollbar{ display:none; }
+  .part-chip{
+    flex:none; border:1px solid var(--line); background:var(--paper); color:var(--ink-soft);
+    border-radius:999px; padding:5px 12px; font-size:11px; font-weight:600; cursor:pointer;
+    font-family:'Noto Sans TC',sans-serif; white-space:nowrap;
+  }
+  .part-chip.active{ background:var(--brass); border-color:var(--brass); color:var(--ink); }
+  .view-link{
+    display:inline-flex; align-items:center; gap:5px; margin-top:9px;
+    font-size:12px; font-weight:700; color:var(--brass-deep); text-decoration:none; cursor:pointer;
+  }
+  .view-link svg{ flex:none; }
+  .view-link.disabled{ color:var(--ink-soft); cursor:default; }
+
+  .list{
+    margin:0 20px 24px;
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-card);
+    overflow:hidden;
+  }
+  .other-piece-row{
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    padding:12px 16px; border-bottom:1px solid var(--line);
+  }
+  .other-piece-row:last-child{ border-bottom:none; }
+  .other-piece-name{ font-size:12.5px; font-weight:500; }
+  .other-piece-count{ font-size:10.5px; color:var(--ink-soft); flex:none; }
+
+  .tabbar{
+    position:sticky; bottom:0; margin-top:auto;
+    background:var(--paper-raised);
+    border-top:1px solid var(--line);
+    display:flex; justify-content:space-around; align-items:center;
+    padding:8px 6px calc(8px + env(safe-area-inset-bottom));
+  }
+  .tab{
+    display:flex; flex-direction:column; align-items:center; gap:3px;
+    background:none; border:none; cursor:pointer;
+    color:var(--ink-soft); text-decoration:none;
+    font-family:'Noto Sans TC',sans-serif; font-size:10.5px;
+    padding:4px 10px;
+  }
+  .tab.active{ color:var(--burgundy); }
+  .tab .ico{ width:20px; height:20px; }
+  .tab.tab-soon{ opacity:.42; }
+</style>
+</head>
+<body>
+<div class="app" id="appRoot">
+
+  <div class="appbar">
+    <img class="mark" src="assets/BrioLogo.jpg" alt="布利歐管樂團 Logo">
+    <div class="brandtext">
+      <div class="name">布利歐管樂團</div>
+      <div class="sub">Brio Wind Band</div>
+    </div>
+  </div>
+
+  <div class="staff"></div>
+
+  <div id="folderContent">
+    <div class="section-label"><span class="tw">我的音樂會</span><span class="en">By Concert</span></div>
+    <div id="myConcertsSlot"></div>
+    <div class="section-label"><span class="tw">其他曲目</span><span class="en">Not In Any Concert</span></div>
+    <div id="otherPiecesSlot"></div>
+  </div>
+
+  <!-- Bottom tab bar -->
+  <div class="tabbar">
+    <a class="tab" href="index.html">
+      <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M4 11 12 4l8 7" stroke="#4A4F5C" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10v9h12v-9" stroke="#4A4F5C" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      首頁
+    </a>
+    <button class="tab tab-soon">
+      <svg class="ico" viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="16" rx="2" stroke="#4A4F5C" stroke-width="1.6"/><path d="M4 10h16M9 3v4M15 3v4" stroke="#4A4F5C" stroke-width="1.6" stroke-linecap="round"/></svg>
+      行事曆
+    </button>
+    <a class="tab active" href="sheet-music.html">
+      <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M6 4h9l3 3v13H6z" stroke="#7A2331" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 11h6M9 14h6M9 17h4" stroke="#7A2331" stroke-width="1.6" stroke-linecap="round"/></svg>
+      譜夾
+    </a>
+    <a class="tab" href="profile.html">
+      <span class="avatar" style="width:20px;height:20px;border-radius:50%;background:var(--burgundy);"></span>
+      我的
+    </a>
+  </div>
+
+</div>
+
+<script type="module">
+  import { requireApprovedMember } from './auth-guard.js';
+  import { db } from './firebase-init.js';
+  import {
+    collection, collectionGroup, query, doc, getDoc, getDocs
+  } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+
+  function escapeHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+
+  // 分部依樂器分組（跟 repertoire-admin.html 的 groupPartsByInstrument() 同一套邏輯，
+  // 這個專案不共用邏輯檔，各頁面各自維護一份）
+  function groupPartsByInstrument(parts){
+    var byInstrument = {};
+    var order = [];
+    parts.forEach(function(part){
+      if (!byInstrument[part.instrumentName]){
+        byInstrument[part.instrumentName] = [];
+        order.push(part.instrumentName);
+      }
+      byInstrument[part.instrumentName].push(part);
+    });
+    return { byInstrument: byInstrument, order: order };
+  }
+
+  // 可見性規則（設計文件「權限」一節）：以樂器為單位，不細到 partId。
+  // assignedInstrumentNames 是這個人在「這場音樂會、這首曲子」實際被指派過的樂器集合，
+  // 呼叫端只查目前這張卡片所屬的那場音樂會，不跨音樂會合併判斷
+  function canViewInstrument(profile, instrumentName, assignedInstrumentNames){
+    if (profile.role === 'admin' || profile.role === 'owner' || profile.role === 'conductor') return true;
+    if (profile.permissions && profile.permissions.canViewAllSheetMusic === true) return true;
+    if ((profile.sectionLeaderFor || []).indexOf(instrumentName) !== -1) return true;
+    return !!assignedInstrumentNames[instrumentName];
+  }
+
+  // 依「音樂會分組」+「其他曲目」兩區組出「譜夾」要顯示的完整資料。第一區只列出
+  // 自己有參與的音樂會（concertRosters 有自己），第二區是 repertoire 裡有、但沒有任何
+  // concerts/*/pieces 引用過的曲目（用 collectionGroup 查全部音樂會的 pieces，不限自己
+  // 有沒有參與，因為第二區的定義是「完全沒被任何音樂會用到」）
+  async function loadSheetMusicFolder(uid, profile){
+    var repertoireSnap = await getDocs(collection(db, 'repertoire'));
+    var repertoireById = {};
+    var repertoireList = [];
+    repertoireSnap.forEach(function(d){
+      var data = Object.assign({ id: d.id }, d.data());
+      repertoireById[d.id] = data;
+      repertoireList.push(data);
+    });
+
+    var allPiecesSnap = await getDocs(collectionGroup(db, 'pieces'));
+    var usedPieceIds = {};
+    allPiecesSnap.forEach(function(d){ usedPieceIds[d.id] = true; });
+
+    var rosterSnap = await getDocs(collection(db, 'concertRosters'));
+    var myEntries = [];
+    rosterSnap.forEach(function(docSnap){
+      var members = docSnap.data().members || [];
+      var mine = members.filter(function(m){ return m.uid === uid; })[0];
+      if (mine) myEntries.push({ concertId: docSnap.id });
+    });
+
+    var myConcerts = await Promise.all(myEntries.map(async function(entry){
+      var concertSnap = await getDoc(doc(db, 'concerts', entry.concertId));
+      if (!concertSnap.exists()) return null;
+
+      var piecesSnap = await getDocs(collection(db, 'concerts', entry.concertId, 'pieces'));
+      var pieceRefs = piecesSnap.docs.map(function(d){ return { id: d.id, order: d.data().order || 0 }; });
+      pieceRefs.sort(function(a, b){ return a.order - b.order; });
+
+      var pieces = await Promise.all(pieceRefs.map(async function(ref){
+        var piece = repertoireById[ref.id];
+        if (!piece) return null; // （曲目已刪除）不列進譜夾，跟其他讀取端不同——這裡沒有樂譜可看，列出來沒有意義
+
+        var sectionsSnap = await getDocs(collection(db, 'concerts', entry.concertId, 'pieces', ref.id, 'sections'));
+        var assignedInstrumentNames = {};
+        var myPartIdByInstrument = {};
+        sectionsSnap.forEach(function(secDoc){
+          var instrumentName = secDoc.id;
+          (secDoc.data().parts || []).forEach(function(part){
+            if ((part.members || []).indexOf(uid) !== -1){
+              assignedInstrumentNames[instrumentName] = true;
+              myPartIdByInstrument[instrumentName] = part.partId;
+            }
+          });
+        });
+
+        var grouped = groupPartsByInstrument(piece.parts || []);
+        var instrumentGroups = grouped.order.filter(function(instrumentName){
+          return canViewInstrument(profile, instrumentName, assignedInstrumentNames);
+        }).map(function(instrumentName){
+          return {
+            instrumentName: instrumentName,
+            parts: grouped.byInstrument[instrumentName],
+            myPartId: myPartIdByInstrument[instrumentName] || null
+          };
+        });
+        if (instrumentGroups.length === 0) return null; // 這個人在這首曲子完全看不到任何分部，不列出來
+
+        return { pieceId: ref.id, title: piece.title, instrumentGroups: instrumentGroups };
+      }));
+
+      return { concertId: entry.concertId, title: concertSnap.data().title, pieces: pieces.filter(function(p){ return p; }) };
+    }));
+
+    var otherPieces = repertoireList
+      .filter(function(p){ return !usedPieceIds[p.id]; })
+      .sort(function(a, b){ return (a.title || '').localeCompare(b.title || '', 'zh-Hant'); });
+
+    return {
+      myConcerts: myConcerts.filter(function(c){ return c && c.pieces.length > 0; }),
+      otherPieces: otherPieces
+    };
+  }
+
+  requireApprovedMember().then(function(result){
+    if (!result) return;
+    loadSheetMusicFolder(result.uid, result.profile).then(function(data){
+      console.log('sheet music folder loaded', data); // Task 6 會換成真正的渲染邏輯
+    }).catch(function(err){
+      console.error('譜夾資料載入失敗', err);
+    });
+  });
+</script>
+</body>
+</html>
