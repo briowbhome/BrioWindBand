@@ -501,6 +501,7 @@
     { key: 'canManageRoles', label: '可調整他人角色/權限' },
     { key: 'canDeleteAccounts', label: '可軟刪除現役帳號' },
     { key: 'canManageSheetMusic', label: '可管理樂譜資料夾' },
+    { key: 'canViewAllSheetMusic', label: '可檢視全部分部樂譜' },
     { key: 'canManageEventTypes', label: '可管理活動類型' },
     { key: 'canManageFinance', label: '可管理財務記帳' }
   ];
@@ -855,7 +856,7 @@
       : {
           role: draftRole,
           permissions: Object.assign(
-            { canManageRoles: false, canDeleteAccounts: false, canManageSheetMusic: false, canManageEventTypes: false, canManageFinance: false },
+            { canManageRoles: false, canDeleteAccounts: false, canManageSheetMusic: false, canViewAllSheetMusic: false, canManageEventTypes: false, canManageFinance: false },
             draftPermissions
           ),
           sectionLeaderFor: draftSections,
