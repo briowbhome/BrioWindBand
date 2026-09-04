@@ -2,7 +2,7 @@ import {
   collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import {
-  ref, uploadBytes, getDownloadURL, deleteObject
+  ref, uploadBytesResumable, getDownloadURL, deleteObject
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js";
 
 // callback(pieces) 每次 repertoire 有變動都會呼叫，pieces 是
@@ -56,22 +56,44 @@ export function randomPartId() {
   }).join("");
 }
 
+// 共用的 resumable 上傳邏輯。onProgress(bytesTransferred, bytesTotal) 選填，上傳中進度變化
+// 時會呼叫；cancelToken 選填，是呼叫端傳入的物件，這裡會把目前的 UploadTask 掛在
+// cancelToken.task 上，呼叫端要中斷上傳就呼叫 cancelToken.task.cancel()（不是設 .cancelled
+// 旗標——resumable 上傳沒有「還沒開始」的空檔可以插旗標檢查，一呼叫就已經在傳，要中斷
+// 必須直接呼叫 Firebase SDK 的 cancel()）。回傳值固定是 Promise<下載網址>，沒傳
+// onProgress/cancelToken 的舊呼叫端行為完全不變
+function uploadResumable(fileRef, file, onProgress, cancelToken) {
+  var task = uploadBytesResumable(fileRef, file, { contentType: "application/pdf" });
+  if (cancelToken) cancelToken.task = task;
+  return new Promise(function (resolve, reject) {
+    task.on("state_changed", function (snapshot) {
+      if (onProgress) onProgress(snapshot.bytesTransferred, snapshot.totalBytes);
+    }, function (err) {
+      if (err.code === "storage/canceled") {
+        var cancelErr = new Error("已取消上傳");
+        cancelErr.isCancelled = true;
+        reject(cancelErr);
+      } else {
+        reject(err);
+      }
+    }, function () {
+      getDownloadURL(task.snapshot.ref).then(resolve, reject);
+    });
+  });
+}
+
 // 樂譜檔案固定路徑 repertoire/{pieceId}/{partId}.pdf（只收 PDF、20MB 上限，
 // storage.rules 有同樣的限制），重新上傳直接覆蓋同路徑檔案，前端不用另外清理舊檔
-export function uploadPartSheetMusic(storage, pieceId, partId, file) {
+export function uploadPartSheetMusic(storage, pieceId, partId, file, onProgress, cancelToken) {
   var fileRef = ref(storage, "repertoire/" + pieceId + "/" + partId + ".pdf");
-  return uploadBytes(fileRef, file, { contentType: "application/pdf" }).then(function () {
-    return getDownloadURL(fileRef);
-  });
+  return uploadResumable(fileRef, file, onProgress, cancelToken);
 }
 
 // 總譜（指揮用、全部分部合一的版本）掛在曲目層級，不屬於任何 partId，固定路徑
 // repertoire/{pieceId}/full-score.pdf，跟分部譜共用同一份 storage.rules 大小/型別限制
-export function uploadFullScore(storage, pieceId, file) {
+export function uploadFullScore(storage, pieceId, file, onProgress, cancelToken) {
   var fileRef = ref(storage, "repertoire/" + pieceId + "/full-score.pdf");
-  return uploadBytes(fileRef, file, { contentType: "application/pdf" }).then(function () {
-    return getDownloadURL(fileRef);
-  });
+  return uploadResumable(fileRef, file, onProgress, cancelToken);
 }
 
 // 總譜的 URL/上傳者存在曲目文件的頂層欄位（不是陣列元素），只更新這兩個欄位，

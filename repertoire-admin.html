@@ -294,6 +294,18 @@
     height:100%; width:0%; background:var(--brass); border-radius:999px;
     transition:width .15s ease;
   }
+  .split-progress-steps{ display:flex; gap:6px; width:220px; }
+  .split-progress-step-seg{ flex:1; height:4px; border-radius:999px; background:var(--line); }
+  .split-progress-step-seg.done{ background:var(--brass); }
+  .split-progress-step-seg.active{ background:var(--brass); opacity:.45; }
+  .split-progress-step-label{
+    font-family:'Roboto Mono',monospace; font-size:10px; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--ink-soft); margin-top:-4px;
+  }
+  .split-progress-byte-line{
+    font-family:'Roboto Mono',monospace; font-size:11px; color:var(--ink-soft);
+    font-variant-numeric:tabular-nums; display:flex; justify-content:space-between; width:220px; margin-top:-6px;
+  }
 
   .split-label{
     font-family:'Roboto Mono',monospace; font-size:10.5px; font-weight:700;
@@ -317,11 +329,12 @@
     border-radius:4px 4px 0 0; z-index:1;
   }
   .split-thumb-cell .split-thumb-target-label{
-    position:relative; font-size:8.5px; color:var(--ink-soft); padding:0 4px 2px; z-index:1;
-    background:rgba(251,250,244,.85); width:100%; text-align:center; box-sizing:border-box;
+    position:relative; font-size:10.5px; font-weight:700; color:var(--sage); padding:2px 4px 3px; z-index:1;
+    background:var(--sage-bg); width:100%; text-align:center; box-sizing:border-box;
   }
   .split-thumb-cell.selected{ outline:3px solid var(--brass); outline-offset:-3px; }
-  .split-thumb-cell.assigned{ outline:3px solid var(--sage); outline-offset:-3px; opacity:.7; cursor:default; }
+  .split-thumb-cell.assigned{ outline:3px solid var(--sage); outline-offset:-3px; cursor:default; }
+  .split-thumb-cell.assigned img{ opacity:.7; }
 
   .split-panel{ width:260px; flex:none; display:flex; flex-direction:column; gap:10px; }
   .split-target-select{
@@ -563,11 +576,17 @@
     </div>
     <div class="split-progress-overlay hidden" id="splitProgressOverlay">
       <div class="split-progress-box">
-        <div class="split-progress-spinner"></div>
+        <div class="split-progress-spinner" id="splitProgressSpinner"></div>
+        <div class="split-progress-steps hidden" id="splitProgressSteps">
+          <div class="split-progress-step-seg" id="splitProgressStep1"></div>
+          <div class="split-progress-step-seg" id="splitProgressStep2"></div>
+        </div>
+        <div class="split-progress-step-label hidden" id="splitProgressStepLabel"></div>
         <div class="split-progress-text" id="splitProgressText">讀取 PDF 中…</div>
         <div class="split-progress-bar-track hidden" id="splitProgressBarWrap">
           <div class="split-progress-bar-fill" id="splitProgressBarFill"></div>
         </div>
+        <div class="split-progress-byte-line hidden" id="splitProgressByteLine"></div>
         <button type="button" class="part-sheet-btn hidden" id="splitProgressCancelBtn">取消</button>
       </div>
     </div>
@@ -1370,29 +1389,69 @@
     renderDraftFilesSummary();
   }
 
-  function applyImmediateBatch(mapping, newPartDefs){
+  // options.onProgress(fileIndex, fileCount, label, bytesTransferred, bytesTotal) 選填，
+  // 每個檔案上傳進度變化時呼叫（fileIndex 從 1 起算）；options.cancelToken 選填，
+  // 取消時呼叫端要做的事（設 .cancelled、呼叫 .task.cancel()）見 splitProgressCancelBtn
+  // 的點擊處理。**檔案改成逐一循序上傳（不是平行）**——這樣才有辦法明確講出「正在傳哪一個」，
+  // 而且取消語意才單純：目前這個檔案取消掉，後面還沒開始傳的直接不傳，前面已經傳完的
+  // 不受影響、照樣正常寫進 Firestore（借用下面本來就有的「部分成功」邏輯，取消對這個函式
+  // 來說只是「提早不繼續傳下一個」而已，跟真的上傳失敗一樣可以放著讓已成功的部分照常生效）
+  function applyImmediateBatch(mapping, newPartDefs, options){
+    options = options || {};
+    var onProgress = options.onProgress;
+    var cancelToken = options.cancelToken;
     var targetPieceId = editingPieceId;
     var p = piecesById[targetPieceId];
-    if (!p) return;
+    if (!p) return Promise.resolve();
     // 這次操作如果有順便新增分部（來自分割上傳的「＋新增分部」），先併入本地工作副本
     // baseParts——不能等 subscribeRepertoire 的 onSnapshot 把新分部同步回來才用，
     // 那是非同步的、時間點不保證趕得上這裡的合併
     var baseParts = p.parts.concat(newPartDefs || []);
-    return Promise.all(mapping.map(function(m){
-      if (m.target === 'FULL_SCORE'){
-        return uploadFullScore(storage, targetPieceId, m.file)
-          .then(function(url){ return { target: 'FULL_SCORE', url: url }; })
-          .catch(function(err){ console.error('總譜上傳失敗', err); return { target: 'FULL_SCORE', error: err }; });
-      }
-      return uploadPartSheetMusic(storage, targetPieceId, m.target, m.file)
-        .then(function(url){ return { target: m.target, url: url }; })
-        .catch(function(err){ console.error('分部樂譜上傳失敗：' + m.target, err); return { target: m.target, error: err }; });
-    })).then(function(results){
+
+    function labelForTarget(target){
+      if (target === 'FULL_SCORE') return '總譜';
+      var part = baseParts.filter(function(pt){ return pt.partId === target; })[0];
+      return part ? part.label : target;
+    }
+
+    var results = [];
+    var cancelledEarly = false;
+
+    return mapping.reduce(function(chain, m, i){
+      return chain.then(function(){
+        if (cancelledEarly) return; // 前一個檔案已經被取消，後面的不再繼續傳
+        // 使用者剛好在兩個檔案交接的瞬間按取消，這時候 .task 還指著上一個「已經傳完」的
+        // task（呼叫 .cancel() 對它是無效果的），得另外檢查 .cancelled 旗標才攔得住
+        if (cancelToken && cancelToken.cancelled){
+          cancelledEarly = true;
+          results.push({ target: m.target, cancelled: true });
+          return;
+        }
+        var label = labelForTarget(m.target);
+        var fileOnProgress = function(bytesTransferred, bytesTotal){
+          if (onProgress) onProgress(i + 1, mapping.length, label, bytesTransferred, bytesTotal);
+        };
+        var uploadPromise = m.target === 'FULL_SCORE'
+          ? uploadFullScore(storage, targetPieceId, m.file, fileOnProgress, cancelToken)
+          : uploadPartSheetMusic(storage, targetPieceId, m.target, m.file, fileOnProgress, cancelToken);
+        return uploadPromise
+          .then(function(url){ results.push({ target: m.target, url: url }); })
+          .catch(function(err){
+            if (err && err.isCancelled){
+              cancelledEarly = true;
+              results.push({ target: m.target, cancelled: true });
+            } else {
+              console.error((m.target === 'FULL_SCORE' ? '總譜' : '分部樂譜') + '上傳失敗：' + m.target, err);
+              results.push({ target: m.target, error: err });
+            }
+          });
+      });
+    }, Promise.resolve()).then(function(){
       if (editingPieceId !== targetPieceId) return; // sheet 已經切換到別的曲目，捨棄過期結果
       var urlByPartId = {};
       var fullScoreResult = null;
       results.forEach(function(r){
-        if (r.target === 'FULL_SCORE') fullScoreResult = r;
+        if (r.target === 'FULL_SCORE' && r.url) fullScoreResult = r;
         else if (r.url) urlByPartId[r.target] = r.url;
       });
       var updatedParts = baseParts.map(function(part){
@@ -1406,7 +1465,10 @@
       }
       return writeTask.then(function(){
         var failedCount = results.filter(function(r){ return r.error; }).length;
-        if (failedCount > 0){
+        var succeededCount = results.filter(function(r){ return r.url; }).length;
+        if (cancelledEarly){
+          showToast('已取消上傳（' + succeededCount + '／' + mapping.length + ' 個檔案已完成上傳）', 'error');
+        } else if (failedCount > 0){
           showToast(failedCount + ' 個檔案上傳失敗，請個別重試', 'error');
         } else {
           showToast('樂譜已上傳', 'success');
@@ -1417,7 +1479,7 @@
         }
       });
     }).catch(function(err){
-      showToast('批次上傳失敗：' + err.code, 'error');
+      showToast('批次上傳失敗：' + (err && (err.code || err.message) || err), 'error');
     });
   }
 
@@ -1446,18 +1508,37 @@
   var splitCancelToken = null; // 讀取 PDF 階段用，{ cancelled:false }，取消按鈕會把它設成 true
 
   // 阻擋式進度彈窗：蓋住整個分割上傳視窗，讀取 PDF（準備預覽）跟確認上傳兩個階段都會用到。
-  // 只有讀取階段有進度條／取消按鈕，確認上傳階段目前只需要單純的「處理中」阻擋畫面
+  // 讀取階段跟確認上傳階段的「切割」子步驟都是簡單的頁數/檔案數進度；確認上傳階段的
+  // 「上傳」子步驟額外多一組步驟指示（splitProgressSteps）跟位元組進度行，因為上傳是逐檔
+  // 循序進行（不是平行），可以明確講出「正在傳哪一個檔案」，方便使用者知道卡在哪裡
   var splitProgressOverlay = document.getElementById('splitProgressOverlay');
+  var splitProgressSteps = document.getElementById('splitProgressSteps');
+  var splitProgressStep1 = document.getElementById('splitProgressStep1');
+  var splitProgressStep2 = document.getElementById('splitProgressStep2');
+  var splitProgressStepLabel = document.getElementById('splitProgressStepLabel');
   var splitProgressText = document.getElementById('splitProgressText');
   var splitProgressBarWrap = document.getElementById('splitProgressBarWrap');
   var splitProgressBarFill = document.getElementById('splitProgressBarFill');
+  var splitProgressByteLine = document.getElementById('splitProgressByteLine');
   var splitProgressCancelBtn = document.getElementById('splitProgressCancelBtn');
 
-  function showSplitProgress(text, opts){
+  // opts.step 選填：1＝兩步驟指示的「切割」進行中，2＝「上傳」進行中（切割那格會顯示已完成）；
+  // 不傳就不顯示步驟指示（讀取 PDF 準備預覽用，那個流程本來就只有一步）
+  function showSplitProgress(opts){
     opts = opts || {};
-    splitProgressText.textContent = text;
+    var showSteps = opts.step === 1 || opts.step === 2;
+    splitProgressSteps.classList.toggle('hidden', !showSteps);
+    if (showSteps){
+      splitProgressStep1.className = 'split-progress-step-seg' + (opts.step === 1 ? ' active' : ' done');
+      splitProgressStep2.className = 'split-progress-step-seg' + (opts.step === 2 ? ' active' : '');
+    }
+    splitProgressStepLabel.classList.toggle('hidden', !opts.stepLabel);
+    if (opts.stepLabel) splitProgressStepLabel.textContent = opts.stepLabel;
+    splitProgressText.textContent = opts.text || '';
     splitProgressBarWrap.classList.toggle('hidden', !opts.showBar);
-    splitProgressBarFill.style.width = '0%';
+    splitProgressBarFill.style.width = (opts.percent || 0) + '%';
+    splitProgressByteLine.classList.toggle('hidden', !opts.byteLine);
+    if (opts.byteLine) splitProgressByteLine.textContent = opts.byteLine;
     splitProgressCancelBtn.classList.toggle('hidden', !opts.showCancel);
     splitProgressOverlay.classList.remove('hidden');
   }
@@ -1468,9 +1549,18 @@
     splitProgressText.textContent = '讀取 PDF 中…（第 ' + current + ' ／ ' + total + ' 頁）';
     splitProgressBarFill.style.width = Math.round((current / total) * 100) + '%';
   }
+  // 讀取 PDF 階段取消是設 .cancelled 旗標（下一頁邊界才檢查）；確認上傳階段的「上傳」
+  // 子步驟取消是直接呼叫目前這個檔案的 UploadTask.cancel()（見 repertoire.js
+  // uploadResumable() 說明），兩種情況都可能同時掛在同一個 splitCancelToken 上，
+  // 這裡兩個都做，各自的呼叫端只會用到其中一種
   splitProgressCancelBtn.addEventListener('click', function(){
-    if (splitCancelToken) splitCancelToken.cancelled = true;
+    if (!splitCancelToken) return;
+    splitCancelToken.cancelled = true;
+    if (splitCancelToken.task) splitCancelToken.task.cancel();
   });
+  function formatMB(bytes){
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
 
   // 回到「選擇 PDF 檔案」畫面，但不關掉整個分割上傳視窗——取消讀取、讀取失敗、
   // 使用者主動要重新選檔，這三種情況都是共用這個重置，只是觸發點不同
@@ -1529,7 +1619,7 @@
     // 取消或讀取失敗時，底下原本顯示的畫面完全沒被動過，關掉讀取彈窗就直接還原
     var cancelToken = { cancelled: false };
     splitCancelToken = cancelToken;
-    showSplitProgress('讀取「' + file.name + '」中…', { showBar: true, showCancel: true });
+    showSplitProgress({ text: '讀取「' + file.name + '」中…', showBar: true, showCancel: true });
     renderPdfThumbnails(file, SPLIT_THUMB_WIDTH_PX, {
       onProgress: updateSplitProgress,
       cancelToken: cancelToken
@@ -1763,20 +1853,64 @@
       return { key: a.target === '__new__' ? a.newPartId : a.target, startPage: a.start, endPage: a.end };
     });
 
-    // 這階段（切割＋上傳 Firebase）先只做阻擋式的處理中畫面，不做進度條／取消——
-    // 切割是本機瞬間完成，真正花時間的是上傳，量測進度需要換成 uploadBytesResumable()，
-    // 影響全站共用的上傳函式，先不動
-    showSplitProgress('上傳中…', { showBar: false, showCancel: false });
+    // staged 模式（新增曲目表單）這步只是把切好的 Blob 存進本地草稿，不會真的上傳
+    // Firebase（要等曲目真的建立時才上傳），維持單純的阻擋畫面就好，不需要位元組進度／取消。
+    // immediate 模式（既有曲目）才會真的碰 Firebase Storage，才值得做完整的兩步驟進度／取消
+    if (batchMode === 'staged'){
+      showSplitProgress({ text: '上傳中…' });
+      extractPageRanges(sourceFile, ranges).then(function(results){
+        var mapping = results.map(function(r){ return { file: r.blob, target: r.key }; });
+        applyStagedBatch(mapping, newPartDefs);
+        hideSplitProgress();
+        closeSplitUploadOverlay();
+      }).catch(function(err){
+        hideSplitProgress();
+        console.error('切割 PDF 失敗', err);
+        showToast('切割 PDF 失敗：' + err.message, 'error');
+      });
+      return;
+    }
 
-    extractPageRanges(sourceFile, ranges).then(function(results){
+    var cancelToken = { cancelled: false };
+    splitCancelToken = cancelToken;
+
+    showSplitProgress({
+      step: 1, stepLabel: '步驟 1／2　切割中',
+      text: '切割中…', showCancel: true
+    });
+
+    extractPageRanges(sourceFile, ranges, {
+      cancelToken: cancelToken,
+      onProgress: function(current, total){
+        showSplitProgress({
+          step: 1, stepLabel: '步驟 1／2　切割中',
+          text: '切割中…（第 ' + current + ' ／ ' + total + ' 個檔案）', showCancel: true
+        });
+      }
+    }).then(function(results){
       var mapping = results.map(function(r){ return { file: r.blob, target: r.key }; });
-      if (batchMode === 'staged'){ applyStagedBatch(mapping, newPartDefs); return; }
-      return applyImmediateBatch(mapping, newPartDefs);
+      return applyImmediateBatch(mapping, newPartDefs, {
+        cancelToken: cancelToken,
+        onProgress: function(fileIndex, fileCount, label, bytesTransferred, bytesTotal){
+          showSplitProgress({
+            step: 2, stepLabel: '步驟 2／2　上傳中',
+            text: '上傳「' + label + '」中…（' + fileIndex + ' ／ ' + fileCount + '）',
+            showBar: true, percent: Math.round((bytesTransferred / (bytesTotal || 1)) * 100),
+            byteLine: formatMB(bytesTransferred) + ' ／ ' + formatMB(bytesTotal),
+            showCancel: true
+          });
+        }
+      });
     }).then(function(){
       hideSplitProgress();
       closeSplitUploadOverlay();
     }).catch(function(err){
       hideSplitProgress();
+      if (err && err.isCancelled){
+        // 切割階段就取消：這時候還沒有任何檔案上傳，直接關掉就好，不用跳提示
+        closeSplitUploadOverlay();
+        return;
+      }
       console.error('切割 PDF 失敗', err);
       showToast('切割 PDF 失敗：' + err.message, 'error');
     });

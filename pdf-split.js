@@ -49,13 +49,23 @@ export async function renderPdfThumbnails(file, maxWidthPx, options) {
 // 依指定的頁碼範圍，把來源 PDF 切成多份獨立檔案（Blob）。用 pdf-lib 的 copyPages() 直接
 // 複製原始頁面物件，不重新繪製/壓縮，畫質跟原始合訂本完全一致。ranges 的 key 是呼叫端
 // 自訂的識別字串（這個專案用 partId 或 'FULL_SCORE'），回傳結果的 key 一一對應方便呼叫端
-// 比對；pdf-lib 的頁碼是 0-indexed，這裡做轉換，呼叫端一律傳 1-indexed
-export async function extractPageRanges(file, ranges) {
+// 比對；pdf-lib 的頁碼是 0-indexed，這裡做轉換，呼叫端一律傳 1-indexed。
+// options.onProgress(current, total) 每切完一個範圍就呼叫一次；options.cancelToken 跟
+// renderPdfThumbnails() 同一套 { cancelled:false } 慣例，每個範圍開始前檢查
+export async function extractPageRanges(file, ranges, options) {
+  options = options || {};
+  var onProgress = options.onProgress;
+  var cancelToken = options.cancelToken;
   var PDFDocument = window.PDFLib.PDFDocument;
   var arrayBuffer = await file.arrayBuffer();
   var sourceDoc = await PDFDocument.load(arrayBuffer);
   var results = [];
   for (var i = 0; i < ranges.length; i++) {
+    if (cancelToken && cancelToken.cancelled) {
+      var cancelErr = new Error("使用者取消切割");
+      cancelErr.isCancelled = true;
+      throw cancelErr;
+    }
     var range = ranges[i];
     var indices = [];
     for (var p = range.startPage; p <= range.endPage; p++) indices.push(p - 1);
@@ -64,6 +74,7 @@ export async function extractPageRanges(file, ranges) {
     copiedPages.forEach(function (page) { outDoc.addPage(page); });
     var bytes = await outDoc.save();
     results.push({ key: range.key, blob: new Blob([bytes], { type: "application/pdf" }) });
+    if (onProgress) onProgress(i + 1, ranges.length);
   }
   return results;
 }
