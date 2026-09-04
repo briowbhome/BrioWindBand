@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'brio-v23';
+const CACHE_VERSION = 'brio-v27';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -18,6 +18,8 @@ const CORE_ASSETS = [
   './feedback-admin.html',
   './profile.html',
   './sheet-music.html',
+  './pdf-split.js',
+  './pdf.worker.min.mjs',
   './auth-guard.js',
   './auth-service.js',
   './firebase-init.js',

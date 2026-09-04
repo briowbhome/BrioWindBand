@@ -11,6 +11,7 @@
 <meta name="theme-color" content="#F2EFE5">
 <link rel="apple-touch-icon" href="assets/icons/icon-180.png">
 <script src="./pwa-register.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js" defer></script>
 <style>
   :root{
     --ink:#20242F;
@@ -233,6 +234,114 @@
   .part-sheet-btn.view{ color:var(--sage); }
   .part-sheet-btn.danger{ color:var(--burgundy-deep); }
   .part-sheet-btn.upload{ background:var(--brass); color:var(--ink); border-color:var(--brass); }
+  .part-sheet-btn.batch{ background:var(--paper-raised); }
+  .part-sheet-btn:disabled{ opacity:.5; cursor:default; }
+
+  .parts-header{ display:flex; align-items:center; justify-content:space-between; margin:16px 0 8px; }
+  .parts-header .survey-section-label{ margin:0; }
+  .parts-header-actions{ display:flex; align-items:center; gap:8px; }
+
+  .batch-map-row{ display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid var(--line); }
+  .batch-map-remove{
+    flex:none; width:20px; height:20px; border-radius:50%; border:none; background:none;
+    color:var(--ink-soft); cursor:pointer; font-size:14px; line-height:1;
+  }
+  .batch-map-remove:active{ color:var(--burgundy-deep); }
+  .batch-map-filename{ flex:1; min-width:0; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .batch-map-select{
+    flex:none; width:150px; border:1px solid var(--line); background:var(--paper);
+    border-radius:var(--radius-sm); padding:7px 8px; font-size:11.5px; color:var(--ink);
+  }
+  .batch-map-select.warn{ border-color:var(--burgundy); color:var(--burgundy-deep); }
+  .batch-map-warn-text{ font-size:10.5px; color:var(--burgundy-deep); margin:-4px 0 6px 28px; }
+
+  .draft-file-tag{
+    display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--sage);
+    padding:4px 0;
+  }
+  .draft-file-tag svg{ flex:none; }
+  .draft-file-tag button{
+    background:none; border:none; color:var(--ink-soft); cursor:pointer; font-size:13px; padding:0; line-height:1;
+  }
+  .draft-file-empty{ font-size:11.5px; color:var(--ink-soft); padding:4px 0; }
+
+  .split-upload-btn{ display:none; }
+  body.layout-desktop .split-upload-btn{ display:inline-block; }
+
+  #splitUploadOverlay .sheet{ width:96vw; max-width:1600px; max-height:94vh; position:relative; }
+
+  .split-progress-overlay{
+    position:absolute; inset:0; z-index:10;
+    background:rgba(251,250,244,.94);
+    display:flex; align-items:center; justify-content:center;
+    border-radius:20px 20px 0 0;
+  }
+  .split-progress-box{
+    display:flex; flex-direction:column; align-items:center; gap:12px;
+    padding:24px 32px; max-width:320px; text-align:center;
+  }
+  .split-progress-spinner{
+    width:34px; height:34px; border-radius:50%;
+    border:3px solid var(--line); border-top-color:var(--brass);
+    animation:split-progress-spin .8s linear infinite;
+  }
+  @keyframes split-progress-spin{ to{ transform:rotate(360deg); } }
+  .split-progress-text{ font-size:13px; color:var(--ink); }
+  .split-progress-bar-track{
+    width:220px; height:6px; border-radius:999px; background:var(--line); overflow:hidden;
+  }
+  .split-progress-bar-fill{
+    height:100%; width:0%; background:var(--brass); border-radius:999px;
+    transition:width .15s ease;
+  }
+
+  .split-label{
+    font-family:'Roboto Mono',monospace; font-size:10.5px; font-weight:700;
+    letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft);
+  }
+
+  .split-file-info-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0 0 6px; }
+
+  .split-layout{ display:flex; gap:20px; align-items:flex-start; }
+  .split-thumbs{ flex:1; min-width:0; height:78vh; overflow-y:auto; padding-right:4px; }
+  .split-thumb-grid{ display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
+  .split-thumb-cell{
+    aspect-ratio:3/4; border:1px solid var(--line); border-radius:8px;
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-end;
+    cursor:pointer; background:var(--paper); color:var(--ink); overflow:hidden; padding:0;
+    position:relative;
+  }
+  .split-thumb-cell img{ width:100%; height:100%; object-fit:cover; position:absolute; top:0; left:0; }
+  .split-thumb-cell .split-thumb-num{
+    position:relative; font-size:10px; padding:2px 4px; background:rgba(251,250,244,.85);
+    border-radius:4px 4px 0 0; z-index:1;
+  }
+  .split-thumb-cell .split-thumb-target-label{
+    position:relative; font-size:8.5px; color:var(--ink-soft); padding:0 4px 2px; z-index:1;
+    background:rgba(251,250,244,.85); width:100%; text-align:center; box-sizing:border-box;
+  }
+  .split-thumb-cell.selected{ outline:3px solid var(--brass); outline-offset:-3px; }
+  .split-thumb-cell.assigned{ outline:3px solid var(--sage); outline-offset:-3px; opacity:.7; cursor:default; }
+
+  .split-panel{ width:260px; flex:none; display:flex; flex-direction:column; gap:10px; }
+  .split-target-select{
+    width:100%; border:1px solid var(--line); background:var(--paper);
+    border-radius:var(--radius-sm); padding:9px 10px; font-size:13px; color:var(--ink);
+  }
+  .split-new-part-box{
+    display:none; flex-direction:column; gap:8px; padding:10px;
+    border:1px dashed var(--brass); border-radius:var(--radius-sm);
+  }
+  .split-new-part-box select, .split-new-part-box input{
+    border:1px solid var(--line); background:var(--paper);
+    border-radius:var(--radius-sm); padding:9px 10px; font-size:13px; color:var(--ink); width:100%;
+  }
+  .split-action-row{ display:flex; gap:8px; justify-content:flex-end; }
+  .split-assigned-list{ max-height:220px; overflow-y:auto; }
+  .split-assigned-row{
+    display:flex; justify-content:space-between; align-items:center; gap:8px;
+    padding:6px 0; border-bottom:1px solid var(--line); font-size:12px;
+  }
 
   .sheet-footer{
     display:flex; gap:10px;
@@ -333,7 +442,14 @@
     <div class="sheet-body">
       <div id="pieceViewMode" class="hidden">
         <div class="info-row"><span class="k">作曲/編曲</span><span class="v" id="pieceViewComposer">—</span></div>
-        <div class="survey-section-label">分部欄位</div>
+        <div id="fullScoreViewRow"></div>
+        <div class="parts-header">
+          <span class="survey-section-label">分部欄位</span>
+          <div class="parts-header-actions">
+            <button type="button" class="part-sheet-btn batch" id="batchUploadBtn">上傳多個樂譜</button>
+            <button type="button" class="part-sheet-btn batch split-upload-btn" id="splitUploadBtn">分割檔案上傳</button>
+          </div>
+        </div>
         <div id="pieceViewParts"></div>
         <div class="info-edit-row">
           <button type="button" class="info-edit-btn" id="pieceEditBtn">✎ 編輯</button>
@@ -358,6 +474,12 @@
             <button type="button" class="part-add-btn" id="partAddBtn">＋ 新增</button>
           </div>
         </div>
+        <div class="field" id="createSheetMusicField">
+          <label>樂譜檔案（選填，之後也可以在曲目詳情頁面補上）</label>
+          <div id="draftFilesSummary"></div>
+          <button type="button" class="part-sheet-btn batch" id="createBatchUploadBtn">批次上傳樂譜</button>
+          <button type="button" class="part-sheet-btn batch split-upload-btn" id="createSplitUploadBtn">分割合訂本上傳</button>
+        </div>
         <p class="form-error" id="pieceFormError"></p>
       </div>
     </div>
@@ -370,7 +492,89 @@
 </div>
 </div>
 
+<div class="sheet-overlay" id="batchMapOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button type="button" class="sheet-close" id="batchMapClose" aria-label="關閉">×</button>
+      <div class="name">批次上傳樂譜</div>
+    </div>
+    <div class="sheet-body">
+      <p class="lede" style="margin:0 0 10px;">已選 <span id="batchMapCount">0</span> 個檔案，逐一指定要對應的分部或總譜（同一個目標只能對應一個檔案）。</p>
+      <div id="batchMapList"></div>
+      <p class="form-error" id="batchMapError"></p>
+    </div>
+    <div class="sheet-footer">
+      <button type="button" class="cta-btn cta-btn-secondary" id="batchMapCancelBtn">取消</button>
+      <button type="button" class="cta-btn" id="batchMapConfirmBtn" disabled>確認上傳</button>
+    </div>
+  </div>
+</div>
+
 <input type="file" id="sheetMusicFileInput" accept="application/pdf" class="hidden">
+<input type="file" id="batchMapFileInput" accept="application/pdf" multiple class="hidden">
+
+<div class="sheet-overlay" id="splitUploadOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button type="button" class="sheet-close" id="splitUploadClose" aria-label="關閉">×</button>
+      <div class="name">分割合訂本上傳</div>
+    </div>
+    <div class="sheet-body">
+      <div id="splitUploadEmpty">
+        <p class="lede" style="margin:0 0 10px;">上傳一份合訂 PDF（例如總譜接續各分部譜，或純分部合訂本），選取頁碼範圍後分別切成獨立檔案上傳。</p>
+        <button type="button" class="cta-btn" id="splitChooseFileBtn">選擇 PDF 檔案</button>
+      </div>
+      <div id="splitUploadWorking" class="hidden">
+        <div class="split-file-info-row">
+          <p class="lede" id="splitFileInfo" style="margin:0;"></p>
+          <button type="button" class="part-sheet-btn" id="splitReselectFileBtn">重新選擇檔案</button>
+        </div>
+        <p class="form-error" id="splitPageWarning"></p>
+        <div class="split-layout">
+          <div class="split-thumbs">
+            <div class="split-thumb-grid" id="splitThumbGrid"></div>
+          </div>
+          <div class="split-panel">
+            <div class="split-label" id="splitSelectionLabel">點一頁設起點</div>
+            <select class="split-target-select" id="splitTargetSelect"></select>
+            <div class="split-new-part-box" id="splitNewPartBox">
+              <select id="splitNewPartInstrument"></select>
+              <input type="text" id="splitNewPartLabel" placeholder="例如：單簧管 1st">
+            </div>
+            <div class="split-action-row">
+              <button type="button" class="part-sheet-btn" id="splitClearBtn">清除選取</button>
+              <button type="button" class="part-sheet-btn upload" id="splitAssignBtn" disabled>確認選取範圍</button>
+            </div>
+            <div>
+              <div class="split-label" style="margin-bottom:6px;">已指定的範圍</div>
+              <div class="split-assigned-list" id="splitAssignedList">
+                <div class="part-empty">還沒有指定任何範圍</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sheet-footer">
+      <button type="button" class="cta-btn cta-btn-secondary" id="splitUploadCancelBtn">取消</button>
+      <button type="button" class="cta-btn" id="splitConfirmUploadBtn" disabled>確認並上傳（0 個檔案，0 個新分部）</button>
+    </div>
+    <div class="split-progress-overlay hidden" id="splitProgressOverlay">
+      <div class="split-progress-box">
+        <div class="split-progress-spinner"></div>
+        <div class="split-progress-text" id="splitProgressText">讀取 PDF 中…</div>
+        <div class="split-progress-bar-track hidden" id="splitProgressBarWrap">
+          <div class="split-progress-bar-fill" id="splitProgressBarFill"></div>
+        </div>
+        <button type="button" class="part-sheet-btn hidden" id="splitProgressCancelBtn">取消</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="splitSourceFileInput" accept="application/pdf" class="hidden">
 
 <script type="module">
   import { initAdminNav } from './admin-nav.js';
@@ -378,8 +582,12 @@
   import { requireAdminOrSheetMusicManager, peekCachedProfile } from './auth-guard.js';
   import { db, storage } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
-  import { subscribeRepertoire, addPiece, updatePiece, deletePiece, randomPartId, uploadPartSheetMusic, deletePartSheetMusic } from './repertoire.js';
+  import {
+    subscribeRepertoire, addPiece, updatePiece, deletePiece, randomPartId,
+    uploadPartSheetMusic, deletePartSheetMusic, uploadFullScore, updateFullScore
+  } from './repertoire.js';
   import { subscribeInstruments, FAMILY_LABELS, FAMILY_ORDER } from './instruments.js';
+  import { renderPdfThumbnails, extractPageRanges } from './pdf-split.js';
 
   function escapeHtml(s){
     return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
@@ -436,6 +644,12 @@
   var editingPieceId = null; // null = 新增模式
   var draftParts = []; // [{partId, instrumentName, label}]，編輯中的分部欄位草稿
   var instrumentsList = [];
+
+  // 新增曲目時「批次上傳樂譜」暫存的檔案，等曲目真的建立（拿到 pieceId）才會真正上傳，
+  // 避免取消新增時 Storage 留下孤兒檔案；編輯既有曲目的結構時不使用這兩個變數
+  // （既有曲目的樂譜操作固定在唯讀摘要畫面、立即上傳，見下方 batchMode）
+  var draftFullScoreFile = null; // File | null
+  var draftPartFiles = {}; // partId -> File
 
   function renderPartInstrumentOptions(){
     var current = document.getElementById('partInstrumentSelect').value;
@@ -632,12 +846,33 @@
   var pieceFormFooter = document.getElementById('pieceFormFooter');
   var pieceViewComposer = document.getElementById('pieceViewComposer');
 
+  // 總譜掛在曲目層級（不屬於任何 partId），跟分部譜共用同一套操作按鈕視覺，
+  // 用 data-full-score-upload/data-full-score-remove 兩個沒有值的屬性當作固定目標的
+  // 事件委派標記，跟分部列的 data-sheet-upload="{partId}" 分開判斷
+  function renderFullScoreViewRow(piece){
+    var container = document.getElementById('fullScoreViewRow');
+    var actionsHtml = piece.fullScoreUrl
+      ? (
+          '<a class="part-sheet-btn view" href="' + escapeHtml(piece.fullScoreUrl) + '" target="_blank" rel="noopener">檢視</a>' +
+          '<button type="button" class="part-sheet-btn" data-full-score-upload>更換</button>' +
+          '<button type="button" class="part-sheet-btn danger" data-full-score-remove>移除</button>'
+        )
+      : '<button type="button" class="part-sheet-btn upload" data-full-score-upload>上傳總譜</button>';
+    container.innerHTML =
+      '<div class="part-group-label">總譜</div>' +
+      '<div class="part-row part-row-view">' +
+        '<span class="part-label">整份樂譜（指揮／管理員可見）</span>' +
+        '<div class="part-sheet-actions">' + actionsHtml + '</div>' +
+      '</div>';
+  }
+
   function showPieceView(p){
     pieceViewMode.classList.remove('hidden');
     pieceEditForm.classList.add('hidden');
     pieceFormFooter.classList.add('hidden');
     document.getElementById('pieceSheetTitle').textContent = p.title || '—';
     pieceViewComposer.textContent = p.composer || '未填寫';
+    renderFullScoreViewRow(p);
     renderPieceViewParts(p.parts || []);
   }
 
@@ -652,12 +887,16 @@
     pieceTitleInput.value = '';
     pieceComposerInput.value = '';
     draftParts = [];
+    draftFullScoreFile = null;
+    draftPartFiles = {};
     document.getElementById('pieceSheetTitle').textContent = '新增曲目';
     pieceSaveBtn.textContent = '建立曲目';
     pieceCancelBtn.classList.add('hidden'); // 新增沒有「唯讀」畫面可以取消回去，只有關閉整個 sheet
     showFormError('');
     resetPartAddRow();
     renderPartGroups();
+    renderDraftFilesSummary();
+    document.getElementById('createSheetMusicField').classList.remove('hidden');
     showPieceEditForm();
     pieceSheetOverlay.classList.add('active');
     updateDetailEmptyVisibility();
@@ -685,6 +924,10 @@
     draftParts = (p.parts || []).slice();
     resetPartAddRow();
     renderPartGroups();
+    // 編輯既有曲目的結構（不是新增）時不顯示「批次上傳樂譜」欄位——樂譜操作固定留在
+    // 唯讀摘要畫面，跟既有「上傳只在唯讀摘要操作」的原則一致，這裡只是編輯 title/
+    // composer/分部定義，不牽涉樂譜檔案
+    document.getElementById('createSheetMusicField').classList.add('hidden');
     showPieceEditForm();
   });
 
@@ -720,13 +963,68 @@
     showFormError('');
     pieceSaveBtn.disabled = true;
 
-    var task = editingPieceId
-      ? updatePiece(db, editingPieceId, title, composer, draftParts)
-      : addPiece(db, currentAdminUid, title, composer, draftParts);
+    if (editingPieceId){
+      updatePiece(db, editingPieceId, title, composer, draftParts).then(function(){
+        pieceSaveBtn.disabled = false;
+        closePieceSheet();
+      }).catch(function(err){
+        pieceSaveBtn.disabled = false;
+        showFormError('操作失敗（' + err.code + '）');
+      });
+      return;
+    }
 
-    task.then(function(){
+    // 新增模式：先建立曲目拿到真正的 pieceId，暫存的樂譜檔案（總譜/分部）才依序真的
+    // 上傳，最後一次性把上傳結果寫回 Firestore。某個檔案上傳失敗不會擋住整個曲目建立，
+    // 該分部/總譜維持「尚未上傳」，可以事後在曲目詳情頁面個別補傳
+    var stagedFullScoreFile = draftFullScoreFile;
+    var stagedPartFiles = Object.assign({}, draftPartFiles);
+    var newParts = draftParts;
+
+    addPiece(db, currentAdminUid, title, composer, newParts).then(function(docRef){
+      var newPieceId = docRef.id;
+      var uploadTasks = [];
+      if (stagedFullScoreFile){
+        uploadTasks.push(
+          uploadFullScore(storage, newPieceId, stagedFullScoreFile)
+            .then(function(url){ return { target: 'FULL_SCORE', url: url }; })
+            .catch(function(err){ console.error('總譜上傳失敗', err); return { target: 'FULL_SCORE', error: err }; })
+        );
+      }
+      Object.keys(stagedPartFiles).forEach(function(partId){
+        uploadTasks.push(
+          uploadPartSheetMusic(storage, newPieceId, partId, stagedPartFiles[partId])
+            .then(function(url){ return { target: partId, url: url }; })
+            .catch(function(err){ console.error('分部樂譜上傳失敗：' + partId, err); return { target: partId, error: err }; })
+        );
+      });
+      if (uploadTasks.length === 0) return 0;
+      return Promise.all(uploadTasks).then(function(results){
+        var urlByPartId = {};
+        var fullScoreResult = null;
+        results.forEach(function(r){
+          if (r.target === 'FULL_SCORE') fullScoreResult = r;
+          else if (r.url) urlByPartId[r.target] = r.url;
+        });
+        var updatedParts = newParts.map(function(part){
+          return urlByPartId[part.partId]
+            ? Object.assign({}, part, { sheetMusicUrl: urlByPartId[part.partId], sheetMusicUploadedBy: currentAdminUid })
+            : part;
+        });
+        var writeTask = updatePiece(db, newPieceId, title, composer, updatedParts);
+        if (fullScoreResult && fullScoreResult.url){
+          writeTask = writeTask.then(function(){ return updateFullScore(db, newPieceId, fullScoreResult.url, currentAdminUid); });
+        }
+        return writeTask.then(function(){
+          return results.filter(function(r){ return r.error; }).length;
+        });
+      });
+    }).then(function(failedCount){
       pieceSaveBtn.disabled = false;
       closePieceSheet();
+      if (failedCount){
+        showToast(failedCount + ' 個樂譜檔案上傳失敗，曲目已建立，請到詳情頁面個別補傳', 'error');
+      }
     }).catch(function(err){
       pieceSaveBtn.disabled = false;
       showFormError('操作失敗（' + err.code + '）');
@@ -744,6 +1042,7 @@
     if (!ok) return;
     pieceDeleteBtn.disabled = true;
     var sheetMusicUrls = ((p && p.parts) || []).map(function(part){ return part.sheetMusicUrl; }).filter(function(url){ return url; });
+    if (p && p.fullScoreUrl) sheetMusicUrls.push(p.fullScoreUrl);
     deletePiece(db, editingPieceId).then(function(){
       pieceDeleteBtn.disabled = false;
       closePieceSheet();
@@ -768,18 +1067,22 @@
   var pendingSheetPartId = null;
   var sheetMusicUploadInFlight = {}; // partId -> true，避免同一個分部重複點擊上傳
 
+  var SHEET_MUSIC_MAX_BYTES = 20 * 1024 * 1024; // 分部譜/總譜共用同一個上限，見 storage.rules
+
   function validateSheetMusicFile(file){
     if (file.type !== 'application/pdf'){
       showToast('只能上傳 PDF 檔案', 'error');
       return false;
     }
-    if (file.size >= 10 * 1024 * 1024){
-      showToast('檔案大小不能超過 10MB', 'error');
+    if (file.size >= SHEET_MUSIC_MAX_BYTES){
+      showToast('檔案大小不能超過 20MB', 'error');
       return false;
     }
     return true;
   }
 
+  // partId 是 'FULL_SCORE' 時代表總譜（曲目層級、不屬於任何分部），跟一般分部共用
+  // 同一套上傳/移除/檔案選擇器，只是實際呼叫的資料層函式跟寫回的欄位不同
   function uploadSheetMusic(partId, file){
     if (sheetMusicUploadInFlight[partId]) return;
     if (!validateSheetMusicFile(file)) return;
@@ -787,6 +1090,21 @@
     var p = piecesById[targetPieceId];
     if (!p) return;
     sheetMusicUploadInFlight[partId] = true;
+
+    if (partId === 'FULL_SCORE'){
+      uploadFullScore(storage, targetPieceId, file).then(function(url){
+        return updateFullScore(db, targetPieceId, url, currentAdminUid).then(function(){
+          if (editingPieceId === targetPieceId) renderFullScoreViewRow(Object.assign({}, p, { fullScoreUrl: url }));
+          showToast('總譜已上傳', 'success');
+        });
+      }).catch(function(err){
+        showToast('上傳失敗：' + err.code, 'error');
+      }).finally(function(){
+        delete sheetMusicUploadInFlight[partId];
+      });
+      return;
+    }
+
     uploadPartSheetMusic(storage, targetPieceId, partId, file).then(function(url){
       var updatedParts = p.parts.map(function(part){
         return part.partId === partId
@@ -809,6 +1127,25 @@
     var targetPieceId = editingPieceId;
     var p = piecesById[targetPieceId];
     if (!p) return;
+
+    if (partId === 'FULL_SCORE'){
+      if (!p.fullScoreUrl) return;
+      sheetMusicUploadInFlight[partId] = true;
+      deletePartSheetMusic(storage, p.fullScoreUrl).catch(function(err){
+        console.error('刪除總譜 Storage 檔案失敗', err);
+      }).then(function(){
+        return updateFullScore(db, targetPieceId, null, null);
+      }).then(function(){
+        if (editingPieceId === targetPieceId) renderFullScoreViewRow(Object.assign({}, p, { fullScoreUrl: null }));
+        showToast('總譜已移除', 'success');
+      }).catch(function(err){
+        showToast('移除失敗：' + err.code, 'error');
+      }).finally(function(){
+        delete sheetMusicUploadInFlight[partId];
+      });
+      return;
+    }
+
     var part = p.parts.filter(function(x){ return x.partId === partId; })[0];
     if (!part || !part.sheetMusicUrl) return;
     sheetMusicUploadInFlight[partId] = true;
@@ -849,11 +1186,600 @@
     }
   });
 
+  document.getElementById('fullScoreViewRow').addEventListener('click', function(e){
+    if (e.target.closest('[data-full-score-upload]')){
+      pendingSheetPartId = 'FULL_SCORE';
+      sheetMusicFileInput.click();
+      return;
+    }
+    if (e.target.closest('[data-full-score-remove]')){
+      var ok = confirm('確定要移除總譜嗎？此動作無法復原。');
+      if (ok) removeSheetMusic('FULL_SCORE');
+    }
+  });
+
   sheetMusicFileInput.addEventListener('change', function(e){
     var file = e.target.files[0];
     e.target.value = ''; // 清空，允許連續選同一個檔案也能再次觸發 change
     if (file && pendingSheetPartId) uploadSheetMusic(pendingSheetPartId, file);
     pendingSheetPartId = null;
+  });
+
+  // ---------- 批次上傳樂譜：一次選一個或多個檔案，逐一對應到總譜/分部 ----------
+  // 已建立的曲目（batchMode 'immediate'）：確認對應後立刻上傳；新增曲目表單
+  // （batchMode 'staged'）：確認對應後先暫存進 draftFullScoreFile/draftPartFiles，
+  // 等按下「建立曲目」、真的拿到 pieceId 才上傳（見 pieceSaveBtn 的新增分支）
+  var batchMapFileInput = document.getElementById('batchMapFileInput');
+  var batchMapOverlay = document.getElementById('batchMapOverlay');
+  var batchMode = 'immediate';
+  var batchSelectedFiles = []; // File[]
+  var batchFileTargets = []; // 跟 batchSelectedFiles 平行，每個檔案目前選的目標（''/'FULL_SCORE'/partId）
+
+  function currentBatchTargetParts(){
+    if (batchMode === 'immediate'){
+      var p = piecesById[editingPieceId];
+      return p ? p.parts : [];
+    }
+    return draftParts;
+  }
+
+  function openBatchPicker(mode){
+    batchMode = mode;
+    batchMapFileInput.click();
+  }
+
+  document.getElementById('batchUploadBtn').addEventListener('click', function(){ openBatchPicker('immediate'); });
+  document.getElementById('createBatchUploadBtn').addEventListener('click', function(){ openBatchPicker('staged'); });
+
+  function batchTargetOptionsHtml(selectedValue){
+    var grouped = groupPartsByInstrument(currentBatchTargetParts());
+    return (
+      '<option value="">請選擇…</option>' +
+      '<option value="FULL_SCORE"' + (selectedValue === 'FULL_SCORE' ? ' selected' : '') + '>總譜</option>' +
+      grouped.order.map(function(instrumentName){
+        return (
+          '<optgroup label="' + escapeHtml(instrumentName) + '">' +
+          grouped.byInstrument[instrumentName].map(function(part){
+            return '<option value="' + part.partId + '"' + (selectedValue === part.partId ? ' selected' : '') + '>' + escapeHtml(part.label) + '</option>';
+          }).join('') +
+          '</optgroup>'
+        );
+      }).join('')
+    );
+  }
+
+  // 判斷某個目標現在已經有樂譜檔案了（用來提示「將覆蓋現有檔案」，不是用來擋送出）——
+  // 新增模式下既有曲目還不存在，一律當作沒有舊檔案
+  function batchTargetHasExistingFile(target){
+    if (batchMode !== 'immediate') return false;
+    var p = piecesById[editingPieceId];
+    if (!p) return false;
+    if (target === 'FULL_SCORE') return !!p.fullScoreUrl;
+    var part = p.parts.filter(function(x){ return x.partId === target; })[0];
+    return !!(part && part.sheetMusicUrl);
+  }
+
+  function renderBatchMapList(){
+    document.getElementById('batchMapCount').textContent = batchSelectedFiles.length;
+
+    var targetCounts = {};
+    batchFileTargets.forEach(function(t){ if (t) targetCounts[t] = (targetCounts[t] || 0) + 1; });
+
+    document.getElementById('batchMapList').innerHTML = batchSelectedFiles.map(function(file, i){
+      var target = batchFileTargets[i];
+      var isConflict = !!(target && targetCounts[target] > 1);
+      var showOverwriteWarn = !isConflict && target && batchTargetHasExistingFile(target);
+      return (
+        '<div class="batch-map-row">' +
+          '<button type="button" class="batch-map-remove" data-batch-remove="' + i + '" aria-label="移除這個檔案">×</button>' +
+          '<span class="batch-map-filename">' + escapeHtml(file.name) + '</span>' +
+          '<select class="batch-map-select' + (isConflict ? ' warn' : '') + '" data-batch-target="' + i + '">' + batchTargetOptionsHtml(target) + '</select>' +
+        '</div>' +
+        (isConflict ? '<div class="batch-map-warn-text">這個目標被多個檔案選中，請調整成不同目標</div>' : '') +
+        (showOverwriteWarn ? '<div class="batch-map-warn-text">將覆蓋現有檔案</div>' : '')
+      );
+    }).join('');
+
+    var allAssigned = batchSelectedFiles.length > 0 && batchFileTargets.every(function(t){ return !!t; });
+    var hasConflict = Object.keys(targetCounts).some(function(k){ return targetCounts[k] > 1; });
+    document.getElementById('batchMapConfirmBtn').disabled = !allAssigned || hasConflict;
+  }
+
+  batchMapFileInput.addEventListener('change', function(e){
+    var files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (files.length === 0) return;
+    var invalidType = files.filter(function(f){ return f.type !== 'application/pdf'; });
+    if (invalidType.length > 0){
+      showToast('只能選擇 PDF 檔案', 'error');
+      return;
+    }
+    var tooBig = files.filter(function(f){ return f.size >= SHEET_MUSIC_MAX_BYTES; });
+    if (tooBig.length > 0){
+      showToast('檔案大小不能超過 20MB：' + tooBig.map(function(f){ return f.name; }).join('、'), 'error');
+      return;
+    }
+    batchSelectedFiles = files;
+    batchFileTargets = files.map(function(){ return ''; });
+    renderBatchMapList();
+    batchMapOverlay.classList.add('active');
+  });
+
+  document.getElementById('batchMapList').addEventListener('change', function(e){
+    var select = e.target.closest('[data-batch-target]');
+    if (!select) return;
+    var i = Number(select.getAttribute('data-batch-target'));
+    batchFileTargets[i] = select.value;
+    renderBatchMapList();
+  });
+
+  document.getElementById('batchMapList').addEventListener('click', function(e){
+    var btn = e.target.closest('[data-batch-remove]');
+    if (!btn) return;
+    var i = Number(btn.getAttribute('data-batch-remove'));
+    batchSelectedFiles.splice(i, 1);
+    batchFileTargets.splice(i, 1);
+    renderBatchMapList();
+  });
+
+  function closeBatchMapOverlay(){
+    batchMapOverlay.classList.remove('active');
+    batchSelectedFiles = [];
+    batchFileTargets = [];
+  }
+
+  document.getElementById('batchMapCancelBtn').addEventListener('click', closeBatchMapOverlay);
+  document.getElementById('batchMapClose').addEventListener('click', closeBatchMapOverlay);
+  batchMapOverlay.addEventListener('click', function(e){
+    if (e.target === batchMapOverlay) closeBatchMapOverlay();
+  });
+
+  // 附加檔案的小 icon，跟 sheet-music.html「檢視樂譜」連結同一個手繪線條圖示，
+  // 不用 emoji（專案既有慣例）
+  var FILE_ICON_SVG = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M6 4h9l3 3v13H6z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 11h6M9 14h6M9 17h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+
+  function renderDraftFilesSummary(){
+    var fullScoreHtml = draftFullScoreFile
+      ? '<div class="draft-file-tag">' + FILE_ICON_SVG + escapeHtml(draftFullScoreFile.name) + '（總譜）<button type="button" data-clear-draft="FULL_SCORE" aria-label="移除待傳檔案">×</button></div>'
+      : '';
+    var partsHtml = Object.keys(draftPartFiles).map(function(partId){
+      var part = draftParts.filter(function(p){ return p.partId === partId; })[0];
+      var label = part ? part.label : partId;
+      return '<div class="draft-file-tag">' + FILE_ICON_SVG + escapeHtml(draftPartFiles[partId].name) + '（' + escapeHtml(label) + '）<button type="button" data-clear-draft="' + partId + '" aria-label="移除待傳檔案">×</button></div>';
+    }).join('');
+    var summary = fullScoreHtml + partsHtml;
+    document.getElementById('draftFilesSummary').innerHTML = summary || '<div class="draft-file-empty">尚未附加任何樂譜檔案</div>';
+  }
+
+  document.getElementById('draftFilesSummary').addEventListener('click', function(e){
+    var btn = e.target.closest('[data-clear-draft]');
+    if (!btn) return;
+    var key = btn.getAttribute('data-clear-draft');
+    if (key === 'FULL_SCORE') draftFullScoreFile = null;
+    else delete draftPartFiles[key];
+    renderDraftFilesSummary();
+  });
+
+  function applyStagedBatch(mapping, newPartDefs){
+    (newPartDefs || []).forEach(function(part){ draftParts.push(part); });
+    if (newPartDefs && newPartDefs.length > 0) renderPartGroups();
+    mapping.forEach(function(m){
+      if (m.target === 'FULL_SCORE') draftFullScoreFile = m.file;
+      else draftPartFiles[m.target] = m.file;
+    });
+    renderDraftFilesSummary();
+  }
+
+  function applyImmediateBatch(mapping, newPartDefs){
+    var targetPieceId = editingPieceId;
+    var p = piecesById[targetPieceId];
+    if (!p) return;
+    // 這次操作如果有順便新增分部（來自分割上傳的「＋新增分部」），先併入本地工作副本
+    // baseParts——不能等 subscribeRepertoire 的 onSnapshot 把新分部同步回來才用，
+    // 那是非同步的、時間點不保證趕得上這裡的合併
+    var baseParts = p.parts.concat(newPartDefs || []);
+    return Promise.all(mapping.map(function(m){
+      if (m.target === 'FULL_SCORE'){
+        return uploadFullScore(storage, targetPieceId, m.file)
+          .then(function(url){ return { target: 'FULL_SCORE', url: url }; })
+          .catch(function(err){ console.error('總譜上傳失敗', err); return { target: 'FULL_SCORE', error: err }; });
+      }
+      return uploadPartSheetMusic(storage, targetPieceId, m.target, m.file)
+        .then(function(url){ return { target: m.target, url: url }; })
+        .catch(function(err){ console.error('分部樂譜上傳失敗：' + m.target, err); return { target: m.target, error: err }; });
+    })).then(function(results){
+      if (editingPieceId !== targetPieceId) return; // sheet 已經切換到別的曲目，捨棄過期結果
+      var urlByPartId = {};
+      var fullScoreResult = null;
+      results.forEach(function(r){
+        if (r.target === 'FULL_SCORE') fullScoreResult = r;
+        else if (r.url) urlByPartId[r.target] = r.url;
+      });
+      var updatedParts = baseParts.map(function(part){
+        return urlByPartId[part.partId]
+          ? Object.assign({}, part, { sheetMusicUrl: urlByPartId[part.partId], sheetMusicUploadedBy: currentAdminUid })
+          : part;
+      });
+      var writeTask = updatePiece(db, targetPieceId, p.title, p.composer, updatedParts);
+      if (fullScoreResult && fullScoreResult.url){
+        writeTask = writeTask.then(function(){ return updateFullScore(db, targetPieceId, fullScoreResult.url, currentAdminUid); });
+      }
+      return writeTask.then(function(){
+        var failedCount = results.filter(function(r){ return r.error; }).length;
+        if (failedCount > 0){
+          showToast(failedCount + ' 個檔案上傳失敗，請個別重試', 'error');
+        } else {
+          showToast('樂譜已上傳', 'success');
+        }
+        if (editingPieceId === targetPieceId){
+          renderFullScoreViewRow(Object.assign({}, p, fullScoreResult && fullScoreResult.url ? { fullScoreUrl: fullScoreResult.url } : {}));
+          renderPieceViewParts(updatedParts);
+        }
+      });
+    }).catch(function(err){
+      showToast('批次上傳失敗：' + err.code, 'error');
+    });
+  }
+
+  document.getElementById('batchMapConfirmBtn').addEventListener('click', function(){
+    var mapping = batchSelectedFiles.map(function(file, i){ return { file: file, target: batchFileTargets[i] }; });
+    closeBatchMapOverlay();
+    if (batchMode === 'staged') applyStagedBatch(mapping);
+    else applyImmediateBatch(mapping);
+  });
+
+  // ---------- 分割合訂本上傳：上傳一份合訂 PDF，依頁碼範圍切成總譜/分部的獨立檔案 ----------
+  // 跟批次上傳共用同一個 batchMode 變數判斷「立即上傳（既有曲目）」或「暫存（新增曲目
+  // 表單）」——兩個面板互斥，一次只會開一個，共用同一套「目前分部清單」判斷邏輯
+  // （currentBatchTargetParts()）不會互相干擾
+  var splitUploadOverlay = document.getElementById('splitUploadOverlay');
+  var splitSourceFileInput = document.getElementById('splitSourceFileInput');
+  var SPLIT_PAGE_WARNING_THRESHOLD = 100;
+  var SPLIT_THUMB_WIDTH_PX = 360;
+
+  var splitSourceFile = null;
+  var splitPageCount = 0;
+  var splitThumbnails = []; // [{pageNum, dataUrl}]
+  var splitAnchor = null;   // 選取起點頁碼
+  var splitEndPage = null;  // 選取終點頁碼
+  var splitAssignments = []; // [{start, end, target, newInstrument, newLabel}]
+  var splitCancelToken = null; // 讀取 PDF 階段用，{ cancelled:false }，取消按鈕會把它設成 true
+
+  // 阻擋式進度彈窗：蓋住整個分割上傳視窗，讀取 PDF（準備預覽）跟確認上傳兩個階段都會用到。
+  // 只有讀取階段有進度條／取消按鈕，確認上傳階段目前只需要單純的「處理中」阻擋畫面
+  var splitProgressOverlay = document.getElementById('splitProgressOverlay');
+  var splitProgressText = document.getElementById('splitProgressText');
+  var splitProgressBarWrap = document.getElementById('splitProgressBarWrap');
+  var splitProgressBarFill = document.getElementById('splitProgressBarFill');
+  var splitProgressCancelBtn = document.getElementById('splitProgressCancelBtn');
+
+  function showSplitProgress(text, opts){
+    opts = opts || {};
+    splitProgressText.textContent = text;
+    splitProgressBarWrap.classList.toggle('hidden', !opts.showBar);
+    splitProgressBarFill.style.width = '0%';
+    splitProgressCancelBtn.classList.toggle('hidden', !opts.showCancel);
+    splitProgressOverlay.classList.remove('hidden');
+  }
+  function hideSplitProgress(){
+    splitProgressOverlay.classList.add('hidden');
+  }
+  function updateSplitProgress(current, total){
+    splitProgressText.textContent = '讀取 PDF 中…（第 ' + current + ' ／ ' + total + ' 頁）';
+    splitProgressBarFill.style.width = Math.round((current / total) * 100) + '%';
+  }
+  splitProgressCancelBtn.addEventListener('click', function(){
+    if (splitCancelToken) splitCancelToken.cancelled = true;
+  });
+
+  // 回到「選擇 PDF 檔案」畫面，但不關掉整個分割上傳視窗——取消讀取、讀取失敗、
+  // 使用者主動要重新選檔，這三種情況都是共用這個重置，只是觸發點不同
+  function resetSplitPickerToEmpty(){
+    splitSourceFile = null;
+    splitPageCount = 0;
+    splitThumbnails = [];
+    splitAnchor = null;
+    splitEndPage = null;
+    splitAssignments = [];
+    splitCancelToken = null;
+    hideSplitProgress();
+    document.getElementById('splitUploadEmpty').classList.remove('hidden');
+    document.getElementById('splitUploadWorking').classList.add('hidden');
+    document.getElementById('splitPageWarning').classList.remove('show');
+  }
+
+  function openSplitPicker(mode){
+    batchMode = mode;
+    resetSplitPickerToEmpty();
+    splitUploadOverlay.classList.add('active');
+  }
+
+  document.getElementById('splitUploadBtn').addEventListener('click', function(){ openSplitPicker('immediate'); });
+  document.getElementById('createSplitUploadBtn').addEventListener('click', function(){ openSplitPicker('staged'); });
+
+  document.getElementById('splitChooseFileBtn').addEventListener('click', function(){
+    splitSourceFileInput.click();
+  });
+  document.getElementById('splitReselectFileBtn').addEventListener('click', function(){
+    // 停留在目前的預覽畫面，不要跳回「選擇 PDF 檔案」的空畫面——
+    // 舊檔案的縮圖／選取狀態留給下面 change handler 選到新檔案時再清空，
+    // 這樣使用者按了之後改變主意、把原生檔案選取視窗直接關掉，畫面完全不受影響
+    splitSourceFileInput.click();
+  });
+
+  function closeSplitUploadOverlay(){
+    splitUploadOverlay.classList.remove('active');
+  }
+  document.getElementById('splitUploadCancelBtn').addEventListener('click', closeSplitUploadOverlay);
+  document.getElementById('splitUploadClose').addEventListener('click', closeSplitUploadOverlay);
+  splitUploadOverlay.addEventListener('click', function(e){
+    if (e.target === splitUploadOverlay) closeSplitUploadOverlay();
+  });
+
+  splitSourceFileInput.addEventListener('change', function(e){
+    var file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.type !== 'application/pdf'){
+      showToast('只能選擇 PDF 檔案', 'error');
+      return;
+    }
+    // 讀取中不動任何畫面／狀態（不清空舊縮圖、不切換 empty/working 面板）——
+    // 不管是第一次選檔還是「重新選擇檔案」，都只有讀取成功才真的覆蓋掉舊資料並換畫面；
+    // 取消或讀取失敗時，底下原本顯示的畫面完全沒被動過，關掉讀取彈窗就直接還原
+    var cancelToken = { cancelled: false };
+    splitCancelToken = cancelToken;
+    showSplitProgress('讀取「' + file.name + '」中…', { showBar: true, showCancel: true });
+    renderPdfThumbnails(file, SPLIT_THUMB_WIDTH_PX, {
+      onProgress: updateSplitProgress,
+      cancelToken: cancelToken
+    }).then(function(result){
+      hideSplitProgress();
+      splitSourceFile = file;
+      splitPageCount = result.pageCount;
+      splitThumbnails = result.thumbnails;
+      splitAnchor = null;
+      splitEndPage = null;
+      splitAssignments = [];
+      document.getElementById('splitFileInfo').textContent = file.name + ' ・ 共 ' + splitPageCount + ' 頁';
+      document.getElementById('splitUploadEmpty').classList.add('hidden');
+      document.getElementById('splitUploadWorking').classList.remove('hidden');
+      var warningEl = document.getElementById('splitPageWarning');
+      if (splitPageCount > SPLIT_PAGE_WARNING_THRESHOLD){
+        warningEl.textContent = '頁數較多（' + splitPageCount + ' 頁），確認上傳時的切割可能需要一點時間';
+        warningEl.classList.add('show');
+      } else {
+        warningEl.classList.remove('show');
+      }
+      renderSplitThumbGrid();
+      renderSplitTargetSelect();
+      renderSplitAssignedList();
+    }).catch(function(err){
+      hideSplitProgress();
+      if (err && err.isCancelled) return;
+      console.error('讀取 PDF 失敗', err);
+      showToast('讀取 PDF 失敗，請確認檔案沒有損毀', 'error');
+    });
+  });
+
+  function splitPageAssignment(pageNum){
+    return splitAssignments.filter(function(a){ return pageNum >= a.start && pageNum <= a.end; })[0] || null;
+  }
+
+  function splitCurrentRange(){
+    if (splitAnchor === null) return null;
+    var end = splitEndPage === null ? splitAnchor : splitEndPage;
+    return { lo: Math.min(splitAnchor, end), hi: Math.max(splitAnchor, end) };
+  }
+
+  // isSplitReadyToAssign() 放在這裡（不是跟目標下拉選單一起放）是刻意的：
+  // updateSplitSelectionUi() 每次點縮圖都會呼叫它，如果定義晚一點才出現，點縮圖選範圍
+  // 當下就會丟出 ReferenceError。目標下拉選單/新增分部欄位這時候還沒被填入選項也沒關係，
+  // 讀到的值就是空字串，這個函式自然回傳 false，「確認選取範圍」按鈕維持反灰，行為正確
+  function isSplitReadyToAssign(){
+    var range = splitCurrentRange();
+    if (!range) return false;
+    var target = document.getElementById('splitTargetSelect').value;
+    if (!target) return false;
+    if (target === '__new__'){
+      var instrument = document.getElementById('splitNewPartInstrument').value;
+      var label = document.getElementById('splitNewPartLabel').value.trim();
+      return !!(instrument && label);
+    }
+    return true;
+  }
+
+  function splitTargetLabel(assignment){
+    if (assignment.target === '__new__') return assignment.newLabel + '（新分部）';
+    if (assignment.target === 'FULL_SCORE') return '總譜';
+    var part = currentBatchTargetParts().filter(function(p){ return p.partId === assignment.target; })[0];
+    return part ? part.label : assignment.target;
+  }
+
+  function renderSplitThumbGrid(){
+    var range = splitCurrentRange();
+    var grid = document.getElementById('splitThumbGrid');
+    grid.innerHTML = splitThumbnails.map(function(t){
+      var a = splitPageAssignment(t.pageNum);
+      var isSelected = !a && range && t.pageNum >= range.lo && t.pageNum <= range.hi;
+      var cls = 'split-thumb-cell' + (a ? ' assigned' : (isSelected ? ' selected' : ''));
+      return (
+        '<button type="button" class="' + cls + '" data-split-page="' + t.pageNum + '">' +
+          '<img src="' + t.dataUrl + '" alt="第 ' + t.pageNum + ' 頁">' +
+          '<span class="split-thumb-num">' + t.pageNum + '</span>' +
+          (a ? '<span class="split-thumb-target-label">' + escapeHtml(splitTargetLabel(a)) + '</span>' : '') +
+        '</button>'
+      );
+    }).join('');
+  }
+
+  document.getElementById('splitThumbGrid').addEventListener('click', function(e){
+    var cell = e.target.closest('[data-split-page]');
+    if (!cell) return;
+    var p = Number(cell.getAttribute('data-split-page'));
+    if (splitPageAssignment(p)) return;
+    if (splitAnchor === null){
+      splitAnchor = p;
+      splitEndPage = null;
+    } else {
+      var lo = Math.min(splitAnchor, p), hi = Math.max(splitAnchor, p);
+      var overlaps = false;
+      for (var k = lo; k <= hi; k++){ if (splitPageAssignment(k)) { overlaps = true; break; } }
+      if (overlaps){
+        splitAnchor = p;
+        splitEndPage = null;
+      } else {
+        splitEndPage = p;
+      }
+    }
+    renderSplitThumbGrid();
+    updateSplitSelectionUi();
+  });
+
+  function updateSplitSelectionUi(){
+    var range = splitCurrentRange();
+    var label = document.getElementById('splitSelectionLabel');
+    if (!range){
+      label.textContent = '點一頁設起點';
+    } else if (splitEndPage === null){
+      label.textContent = '起點：第 ' + splitAnchor + ' 頁，再點一頁設終點（或點同一頁指定單頁）';
+    } else {
+      label.textContent = '第 ' + range.lo + '-' + range.hi + ' 頁（' + (range.hi - range.lo + 1) + ' 頁）';
+    }
+    document.getElementById('splitAssignBtn').disabled = !isSplitReadyToAssign();
+  }
+
+  document.getElementById('splitClearBtn').addEventListener('click', function(){
+    splitAnchor = null;
+    splitEndPage = null;
+    renderSplitThumbGrid();
+    updateSplitSelectionUi();
+  });
+
+  function renderSplitTargetSelect(){
+    var select = document.getElementById('splitTargetSelect');
+    var currentValue = select.value;
+    var grouped = groupPartsByInstrument(currentBatchTargetParts());
+    var usedTargets = {};
+    splitAssignments.forEach(function(a){ if (a.target !== '__new__') usedTargets[a.target] = true; });
+    select.innerHTML =
+      '<option value="">請選擇目標…</option>' +
+      '<option value="FULL_SCORE"' + (usedTargets.FULL_SCORE ? ' disabled' : '') + '>總譜' + (usedTargets.FULL_SCORE ? '（已指定）' : '') + '</option>' +
+      grouped.order.map(function(instrumentName){
+        return '<optgroup label="' + escapeHtml(instrumentName) + '">' +
+          grouped.byInstrument[instrumentName].map(function(part){
+            var used = usedTargets[part.partId];
+            return '<option value="' + part.partId + '"' + (used ? ' disabled' : '') + '>' + escapeHtml(part.label) + (used ? '（已指定）' : '') + '</option>';
+          }).join('') +
+          '</optgroup>';
+      }).join('') +
+      '<option value="__new__" style="font-weight:700;">＋ 新增分部</option>';
+    if (currentValue && !usedTargets[currentValue]) select.value = currentValue;
+  }
+
+  function renderSplitNewPartInstrumentOptions(){
+    document.getElementById('splitNewPartInstrument').innerHTML = instrumentsList.map(function(inst){
+      return '<option value="' + escapeHtml(inst.name) + '">' + escapeHtml(inst.name) + '</option>';
+    }).join('');
+  }
+
+  document.getElementById('splitTargetSelect').addEventListener('change', function(){
+    var isNew = this.value === '__new__';
+    document.getElementById('splitNewPartBox').style.display = isNew ? 'flex' : 'none';
+    if (isNew) renderSplitNewPartInstrumentOptions();
+    updateSplitSelectionUi();
+  });
+  document.getElementById('splitNewPartInstrument').addEventListener('change', updateSplitSelectionUi);
+  document.getElementById('splitNewPartLabel').addEventListener('input', updateSplitSelectionUi);
+
+  function renderSplitAssignedList(){
+    var list = document.getElementById('splitAssignedList');
+    if (splitAssignments.length === 0){
+      list.innerHTML = '<div class="part-empty">還沒有指定任何範圍</div>';
+      return;
+    }
+    list.innerHTML = splitAssignments.map(function(a, i){
+      return (
+        '<div class="split-assigned-row">' +
+          '<span>第 ' + a.start + '-' + a.end + ' 頁 → ' + escapeHtml(splitTargetLabel(a)) + '</span>' +
+          '<button type="button" class="part-sheet-btn danger" data-split-remove="' + i + '">移除</button>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  document.getElementById('splitAssignedList').addEventListener('click', function(e){
+    var btn = e.target.closest('[data-split-remove]');
+    if (!btn) return;
+    splitAssignments.splice(Number(btn.getAttribute('data-split-remove')), 1);
+    renderSplitThumbGrid();
+    renderSplitTargetSelect();
+    renderSplitAssignedList();
+    updateSplitConfirmBtn();
+  });
+
+  function updateSplitConfirmBtn(){
+    var newPartCount = splitAssignments.filter(function(a){ return a.target === '__new__'; }).length;
+    var btn = document.getElementById('splitConfirmUploadBtn');
+    btn.textContent = '確認並上傳（' + splitAssignments.length + ' 個檔案，' + newPartCount + ' 個新分部）';
+    btn.disabled = splitAssignments.length === 0;
+  }
+
+  document.getElementById('splitAssignBtn').addEventListener('click', function(){
+    var range = splitCurrentRange();
+    if (!range || !isSplitReadyToAssign()) return;
+    var target = document.getElementById('splitTargetSelect').value;
+    if (target === '__new__'){
+      splitAssignments.push({
+        start: range.lo, end: range.hi, target: '__new__',
+        newInstrument: document.getElementById('splitNewPartInstrument').value,
+        newLabel: document.getElementById('splitNewPartLabel').value.trim()
+      });
+      document.getElementById('splitNewPartLabel').value = '';
+      document.getElementById('splitNewPartBox').style.display = 'none';
+    } else {
+      splitAssignments.push({ start: range.lo, end: range.hi, target: target });
+    }
+    splitAnchor = null;
+    splitEndPage = null;
+    document.getElementById('splitTargetSelect').value = '';
+    renderSplitThumbGrid();
+    renderSplitTargetSelect();
+    renderSplitAssignedList();
+    updateSplitSelectionUi();
+    updateSplitConfirmBtn();
+  });
+
+  document.getElementById('splitConfirmUploadBtn').addEventListener('click', function(){
+    var sourceFile = splitSourceFile;
+    var assignmentsSnapshot = splitAssignments.slice();
+
+    var newPartDefs = assignmentsSnapshot.filter(function(a){ return a.target === '__new__'; }).map(function(a){
+      a.newPartId = randomPartId();
+      return { partId: a.newPartId, instrumentName: a.newInstrument, label: a.newLabel };
+    });
+
+    var ranges = assignmentsSnapshot.map(function(a){
+      return { key: a.target === '__new__' ? a.newPartId : a.target, startPage: a.start, endPage: a.end };
+    });
+
+    // 這階段（切割＋上傳 Firebase）先只做阻擋式的處理中畫面，不做進度條／取消——
+    // 切割是本機瞬間完成，真正花時間的是上傳，量測進度需要換成 uploadBytesResumable()，
+    // 影響全站共用的上傳函式，先不動
+    showSplitProgress('上傳中…', { showBar: false, showCancel: false });
+
+    extractPageRanges(sourceFile, ranges).then(function(results){
+      var mapping = results.map(function(r){ return { file: r.blob, target: r.key }; });
+      if (batchMode === 'staged'){ applyStagedBatch(mapping, newPartDefs); return; }
+      return applyImmediateBatch(mapping, newPartDefs);
+    }).then(function(){
+      hideSplitProgress();
+      closeSplitUploadOverlay();
+    }).catch(function(err){
+      hideSplitProgress();
+      console.error('切割 PDF 失敗', err);
+      showToast('切割 PDF 失敗：' + err.message, 'error');
+    });
   });
 
   requireAdminOrSheetMusicManager().then(function(result){

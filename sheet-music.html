@@ -94,7 +94,10 @@
   .concert-title{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:14.5px; }
   .piece-block{ padding:11px 0; border-top:1px solid var(--line); }
   .piece-block:first-of-type{ border-top:none; margin-top:8px; }
+  .piece-name-row{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
   .piece-name{ font-size:13px; font-weight:500; }
+  .full-score-link{ flex:none; font-size:11px; font-weight:700; color:var(--brass-deep); text-decoration:none; }
+  .full-score-link.disabled{ color:var(--ink-soft); font-weight:400; }
   .instrument-block{ margin-top:8px; }
   .instrument-block-label{ font-size:11px; color:var(--ink-soft); margin-bottom:4px; }
   .chip-row{ display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; }
@@ -126,6 +129,7 @@
   }
   .other-piece-row:last-child{ border-bottom:none; }
   .other-piece-name{ font-size:12.5px; font-weight:500; }
+  .other-piece-meta{ display:flex; align-items:center; gap:10px; flex:none; }
   .other-piece-count{ font-size:10.5px; color:var(--ink-soft); flex:none; }
 
   .tabbar{
@@ -227,6 +231,19 @@
     return !!assignedInstrumentNames[instrumentName];
   }
 
+  // 總譜（指揮用、全部分部合一的版本）視野跟分部譜不同——不是「自己分部」的概念，
+  // 只開放給管理員/擁有者/指揮/canViewAllSheetMusic，分部長跟一般被指派過的團員不算
+  function isFullScoreEligible(profile){
+    return profile.role === 'admin' || profile.role === 'owner' || profile.role === 'conductor' ||
+      (profile.permissions && profile.permissions.canViewAllSheetMusic === true);
+  }
+
+  function renderFullScoreLink(url){
+    return url
+      ? '<a class="full-score-link" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">總譜</a>'
+      : '<span class="full-score-link disabled">總譜（尚未上傳）</span>';
+  }
+
   // 依「音樂會分組」+「其他曲目」兩區組出「譜夾」要顯示的完整資料。第一區只列出
   // 自己有參與的音樂會（concertRosters 有自己），第二區是 repertoire 裡有、但沒有任何
   // concerts/*/pieces 引用過的曲目。原本想用 collectionGroup(db, 'pieces') 一次查全部
@@ -297,7 +314,7 @@
         });
         if (instrumentGroups.length === 0) return null; // 這個人在這首曲子完全看不到任何分部，不列出來
 
-        return { pieceId: ref.id, title: piece.title, instrumentGroups: instrumentGroups };
+        return { pieceId: ref.id, title: piece.title, fullScoreUrl: piece.fullScoreUrl || null, instrumentGroups: instrumentGroups };
       }));
 
       return { concertId: entry.concertId, title: concertSnap.data().title, pieces: pieces.filter(function(p){ return p; }) };
@@ -352,7 +369,7 @@
     );
   }
 
-  function renderMyConcerts(myConcerts){
+  function renderMyConcerts(myConcerts, fullScoreEligible){
     var wrap = document.getElementById('myConcertsSlot');
     if (myConcerts.length === 0){
       wrap.innerHTML = '<div class="empty">目前沒有找到你有參與、且能看到樂譜的音樂會曲目</div>';
@@ -365,7 +382,10 @@
           c.pieces.map(function(p){
             return (
               '<div class="piece-block">' +
-                '<div class="piece-name">' + escapeHtml(p.title) + '</div>' +
+                '<div class="piece-name-row">' +
+                  '<span class="piece-name">' + escapeHtml(p.title) + '</span>' +
+                  (fullScoreEligible ? renderFullScoreLink(p.fullScoreUrl) : '') +
+                '</div>' +
                 p.instrumentGroups.map(function(g){ return renderInstrumentGroup(p.pieceId, g); }).join('') +
               '</div>'
             );
@@ -375,7 +395,7 @@
     }).join('');
   }
 
-  function renderOtherPieces(otherPieces){
+  function renderOtherPieces(otherPieces, fullScoreEligible){
     var wrap = document.getElementById('otherPiecesSlot');
     if (otherPieces.length === 0){
       wrap.innerHTML = '<div class="empty">沒有其他曲目</div>';
@@ -385,7 +405,10 @@
       return (
         '<div class="other-piece-row">' +
           '<span class="other-piece-name">' + escapeHtml(p.title) + '</span>' +
-          '<span class="other-piece-count">' + (p.parts || []).length + ' 個分部</span>' +
+          '<div class="other-piece-meta">' +
+            (fullScoreEligible ? renderFullScoreLink(p.fullScoreUrl) : '') +
+            '<span class="other-piece-count">' + (p.parts || []).length + ' 個分部</span>' +
+          '</div>' +
         '</div>'
       );
     }).join('') + '</div>';
@@ -420,12 +443,13 @@
 
   requireApprovedMember().then(function(result){
     if (!result) return;
+    var fullScoreEligible = isFullScoreEligible(result.profile);
     document.getElementById('myConcertsSlot').innerHTML = '<div class="empty">載入中…</div>';
     document.getElementById('otherPiecesSlot').innerHTML = '';
     loadSheetMusicFolder(result.uid, result.profile).then(function(data){
       indexGroups(data.myConcerts);
-      renderMyConcerts(data.myConcerts);
-      renderOtherPieces(data.otherPieces);
+      renderMyConcerts(data.myConcerts, fullScoreEligible);
+      renderOtherPieces(data.otherPieces, fullScoreEligible);
     }).catch(function(err){
       console.error('譜夾資料載入失敗', err);
       document.getElementById('myConcertsSlot').innerHTML = '<div class="empty">讀取失敗，請重新整理再試一次</div>';

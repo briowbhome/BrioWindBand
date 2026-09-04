@@ -11,11 +11,13 @@ service firebase.storage {
         (firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'owner'] ||
          firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.permissions.canManageSheetMusic == true);
     }
+    // partFile 涵蓋分部譜（{partId}.pdf）跟總譜（full-score.pdf），共用同一組限制——
+    // 總譜頁數通常比單一分部譜多很多、又需要列印畫質，20MB 留了比較寬裕的空間
     match /repertoire/{pieceId}/{partFile} {
       allow read: if hasProfile();
       allow write: if canManageSheetMusic()
         && request.resource.contentType == 'application/pdf'
-        && request.resource.size < 10 * 1024 * 1024;
+        && request.resource.size < 20 * 1024 * 1024;
       allow delete: if canManageSheetMusic();
     }
   }
