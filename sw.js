@@ -30,6 +30,7 @@ const CORE_ASSETS = [
   './seating-chart.js',
   './finance.js',
   './ios-install.js',
+  './pull-refresh.js',
   './push-config.js',
   './manifest.json',
   './assets/BrioLogo.jpg',
@@ -56,18 +57,22 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+// 快取優先＋背景更新：先用本機已有的版本立即回應（不受當下網路好壞影響），
+// 背景同時打一次網路把快取更新成最新版，下次載入才會是新的。取捨是部署新版本後
+// 使用者要再重整一次才看得到（pwa-register.js 的更新提示 banner 會告知並讓他手動觸發）
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
 
   event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_VERSION).then((cache) => cache.put(event.request, copy));
-        return response;
+    caches.open(CACHE_VERSION).then((cache) =>
+      cache.match(event.request).then((cached) => {
+        const network = fetch(event.request)
+          .then((response) => { cache.put(event.request, response.clone()); return response; })
+          .catch(() => null);
+        return cached || network;
       })
-      .catch(() => caches.match(event.request))
+    )
   );
 });
 
