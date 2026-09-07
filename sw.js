@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'brio-v29';
+const CACHE_VERSION = 'brio-v30';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -43,7 +43,14 @@ const CORE_ASSETS = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_VERSION).then((cache) => cache.addAll(CORE_ASSETS))
+    caches.open(CACHE_VERSION).then((cache) =>
+      // cache.addAll() 內部的 fetch 會照瀏覽器自己的 HTTP 快取規則走，GitHub Pages
+      // 對靜態檔案下的 Cache-Control 可能讓這裡撈到還沒過期的舊內容，跟部署的新版本兜不起來，
+      // 明確用 no-store 跳過瀏覽器快取，確保每次安裝都是真的問伺服器要最新版本
+      Promise.all(CORE_ASSETS.map((url) =>
+        fetch(url, { cache: 'no-store' }).then((response) => cache.put(url, response))
+      ))
+    )
   );
   self.skipWaiting();
 });
@@ -67,7 +74,9 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.open(CACHE_VERSION).then((cache) =>
       cache.match(event.request).then((cached) => {
-        const network = fetch(event.request)
+        // 同樣要跳過瀏覽器 HTTP 快取（理由同 install 事件），不然背景更新可能一直
+        // 撈到同一份舊內容，變成不管重整幾次都更新不了
+        const network = fetch(event.request, { cache: 'no-store' })
           .then((response) => { cache.put(event.request, response.clone()); return response; })
           .catch(() => null);
         return cached || network;
