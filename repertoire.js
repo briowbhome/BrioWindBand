@@ -6,7 +6,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js";
 
 // callback(pieces) 每次 repertoire 有變動都會呼叫，pieces 是
-// [{id, title, composer, parts, fullScoreUrl, fullScoreUploadedBy}]。
+// [{id, title, composer, parts, fullScoreUrl, fullScoreUploadedBy, fullScoreFileGroupId}]。
 // 沒有 order 欄位（曲目資料庫本身不需要排序，排序是「音樂會裡的曲目」才有的概念，見
 // concerts/{concertId}/pieces 的 order 欄位），讀取端自行依 title 排序顯示
 export function subscribeRepertoire(db, callback, onError) {
@@ -19,7 +19,8 @@ export function subscribeRepertoire(db, callback, onError) {
         composer: data.composer || null,
         parts: data.parts || [],
         fullScoreUrl: data.fullScoreUrl || null,
-        fullScoreUploadedBy: data.fullScoreUploadedBy || null
+        fullScoreUploadedBy: data.fullScoreUploadedBy || null,
+        fullScoreFileGroupId: data.fullScoreFileGroupId || null
       };
     }));
   }, onError);
@@ -96,12 +97,22 @@ export function uploadFullScore(storage, pieceId, file, onProgress, cancelToken)
   return uploadResumable(fileRef, file, onProgress, cancelToken);
 }
 
-// 總譜的 URL/上傳者存在曲目文件的頂層欄位（不是陣列元素），只更新這兩個欄位，
-// 不動 title/composer/parts
-export function updateFullScore(db, pieceId, url, uploadedBy) {
+// 一份檔案同時服務多個分部（例如 Horn III/IV 合訂在同一頁）時用這個，固定路徑
+// repertoire/{pieceId}/group-{fileGroupId}.pdf，跟共用它的所有分部（parts[].fileGroupId
+// 相同的那些）綁在一起，取代各自獨立的 {partId}.pdf。fileGroupId 用 randomPartId() 產生，
+// 語意上就是「隨機 hex ID」，跟 partId 共用同一個產生器不需要另外寫一份
+export function uploadGroupSheetMusic(storage, pieceId, fileGroupId, file, onProgress, cancelToken) {
+  var fileRef = ref(storage, "repertoire/" + pieceId + "/group-" + fileGroupId + ".pdf");
+  return uploadResumable(fileRef, file, onProgress, cancelToken);
+}
+
+// 總譜的 URL/上傳者/（選填）共用檔案群組 ID 存在曲目文件的頂層欄位（不是陣列元素），
+// 只更新這幾個欄位，不動 title/composer/parts
+export function updateFullScore(db, pieceId, url, uploadedBy, fileGroupId) {
   return updateDoc(doc(db, "repertoire", pieceId), {
     fullScoreUrl: url,
-    fullScoreUploadedBy: uploadedBy
+    fullScoreUploadedBy: uploadedBy,
+    fullScoreFileGroupId: fileGroupId || null
   });
 }
 

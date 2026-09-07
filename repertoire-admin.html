@@ -198,10 +198,22 @@
     font-family:'Roboto Mono',monospace; font-size:10px; font-weight:700;
     letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft); margin:14px 0 4px;
   }
+  .part-group-head{ display:flex; align-items:center; justify-content:space-between; margin:14px 0 4px; }
+  .part-group-head .part-group-label{ margin:0; }
+  .part-group-move{ display:flex; gap:4px; }
+  .part-move{ display:flex; gap:3px; }
+  .part-move-btn{
+    width:20px; height:20px; border-radius:50%; border:1px solid var(--line); background:var(--paper);
+    color:var(--ink-soft); cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;
+  }
+  .part-move-btn svg{ width:10px; height:10px; }
+  .part-move-btn.group{ border-color:var(--brass); color:var(--brass-deep); background:var(--sage-bg); }
+  .part-move-btn.disabled{ opacity:.35; cursor:default; pointer-events:none; }
   .part-row{ display:flex; align-items:center; gap:10px; padding:8px 2px; border-bottom:1px solid var(--line); }
   .part-row:last-child{ border-bottom:none; }
   .part-label{ flex:1; font-size:12.5px; color:var(--ink); }
   .part-view-meta{ margin-top:3px; font-size:11px; color:var(--ink-soft); font-weight:400; }
+  .part-row-controls{ flex:none; display:flex; align-items:center; gap:8px; }
   .part-remove{
     flex:none; width:22px; height:22px; border-radius:50%; border:none; background:none;
     color:var(--ink-soft); cursor:pointer; font-size:15px; line-height:1;
@@ -337,6 +349,22 @@
   .split-thumb-cell.assigned img{ opacity:.7; }
 
   .split-panel{ width:260px; flex:none; display:flex; flex-direction:column; gap:10px; }
+  .split-target-chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .split-target-chip{
+    display:flex; align-items:center; gap:5px; background:var(--sage-bg); color:var(--sage);
+    border-radius:999px; padding:4px 6px 4px 11px; font-size:12px; font-weight:700;
+  }
+  .split-target-chip button{
+    width:16px; height:16px; border-radius:50%; border:none; background:none; color:var(--sage);
+    font-size:12px; line-height:1; cursor:pointer; padding:0; opacity:.75; font-family:inherit;
+  }
+  .split-target-chip-empty{ font-size:11.5px; color:var(--ink-soft); }
+  .split-target-add-row{ display:flex; gap:6px; }
+  .split-target-add-row .split-target-select{ flex:1; }
+  .split-shared-hint{
+    font-size:11px; color:var(--ink-soft); line-height:1.6; padding:8px 10px;
+    background:var(--paper); border:1px dashed var(--line); border-radius:var(--radius-sm);
+  }
   .split-target-select{
     width:100%; border:1px solid var(--line); background:var(--paper);
     border-radius:var(--radius-sm); padding:9px 10px; font-size:13px; color:var(--ink);
@@ -551,10 +579,20 @@
           </div>
           <div class="split-panel">
             <div class="split-label" id="splitSelectionLabel">點一頁設起點</div>
-            <select class="split-target-select" id="splitTargetSelect"></select>
+            <div class="split-label" style="margin-top:8px;">指定給哪些分部（可複選）</div>
+            <div class="split-target-chips" id="splitTargetChips">
+              <span class="split-target-chip-empty">還沒加入任何分部</span>
+            </div>
+            <div class="split-target-add-row">
+              <select class="split-target-select" id="splitTargetSelect"></select>
+              <button type="button" class="part-sheet-btn" id="splitTargetAddBtn">＋ 加入</button>
+            </div>
             <div class="split-new-part-box" id="splitNewPartBox">
               <select id="splitNewPartInstrument"></select>
               <input type="text" id="splitNewPartLabel" placeholder="例如：單簧管 1st">
+            </div>
+            <div class="split-shared-hint hidden" id="splitSharedHint">
+              這幾個分部之後會共用同一份檔案——之後更換其中一個，其他也會自動換成新內容；移除任一個，全部都會一併移除。
             </div>
             <div class="split-action-row">
               <button type="button" class="part-sheet-btn" id="splitClearBtn">清除選取</button>
@@ -603,7 +641,7 @@
   import { initAccountMenu } from './account-menu.js';
   import {
     subscribeRepertoire, addPiece, updatePiece, deletePiece, randomPartId,
-    uploadPartSheetMusic, deletePartSheetMusic, uploadFullScore, updateFullScore
+    uploadPartSheetMusic, deletePartSheetMusic, uploadFullScore, updateFullScore, uploadGroupSheetMusic
   } from './repertoire.js';
   import { subscribeInstruments, FAMILY_LABELS, FAMILY_ORDER } from './instruments.js';
   import { renderPdfThumbnails, extractPageRanges } from './pdf-split.js';
@@ -694,8 +732,16 @@
     return { byInstrument: byInstrument, order: order };
   }
 
+  // 手繪線條箭頭圖示（比照這個專案「不用表情符號、用單色線條 SVG」的既有慣例），
+  // 上/下移動按鈕共用
+  var PART_MOVE_ARROW_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>';
+  var PART_MOVE_ARROW_DOWN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+
   // 分部欄位依樂器分組顯示（比照 roles-admin.html 樂器清單依 family 分組的做法，這裡是依
-  // instrumentName 分組），組內維持新增順序，不提供排序按鈕——這輪範圍不需要
+  // instrumentName 分組）。9/7 補上排序按鈕：每個分部列左側是「同分類內移動」，分類標題列
+  // 右側是「整個分類移動」——用同一套 groupPartsByInstrument() 分組結果操作，不假設
+  // draftParts 陣列裡同分類的項目本來就相鄰（新增分部是依序 push，不同分類可能穿插），
+  // 兩個 move 函式都是「照分組重新排列、整份 concat 回 draftParts」，不是直接動陣列索引
   function renderPartGroups(){
     var container = document.getElementById('partGroups');
     if (draftParts.length === 0){
@@ -703,19 +749,74 @@
       return;
     }
     var grouped = groupPartsByInstrument(draftParts);
-    container.innerHTML = grouped.order.map(function(instrumentName){
+    container.innerHTML = grouped.order.map(function(instrumentName, groupIdx){
+      var groupParts = grouped.byInstrument[instrumentName];
+      var groupIsFirst = groupIdx === 0;
+      var groupIsLast = groupIdx === grouped.order.length - 1;
       return (
-        '<div class="part-group-label">' + escapeHtml(instrumentName) + '</div>' +
-        grouped.byInstrument[instrumentName].map(function(part){
+        '<div class="part-group-head">' +
+          '<span class="part-group-label">' + escapeHtml(instrumentName) + '</span>' +
+          '<div class="part-group-move">' +
+            '<button type="button" class="part-move-btn group' + (groupIsFirst ? ' disabled' : '') + '"' +
+              ' data-move-group="' + escapeHtml(instrumentName) + '" data-move-direction="up"' + (groupIsFirst ? ' disabled' : '') + ' aria-label="整個分類上移">' + PART_MOVE_ARROW_UP + '</button>' +
+            '<button type="button" class="part-move-btn group' + (groupIsLast ? ' disabled' : '') + '"' +
+              ' data-move-group="' + escapeHtml(instrumentName) + '" data-move-direction="down"' + (groupIsLast ? ' disabled' : '') + ' aria-label="整個分類下移">' + PART_MOVE_ARROW_DOWN + '</button>' +
+          '</div>' +
+        '</div>' +
+        groupParts.map(function(part, i){
+          var isFirst = i === 0;
+          var isLast = i === groupParts.length - 1;
           return (
             '<div class="part-row">' +
               '<span class="part-label">' + escapeHtml(part.label) + '</span>' +
-              '<button type="button" class="part-remove" data-remove-part="' + part.partId + '" aria-label="刪除分部欄位">×</button>' +
+              '<div class="part-row-controls">' +
+                '<div class="part-move">' +
+                  '<button type="button" class="part-move-btn' + (isFirst ? ' disabled' : '') + '"' +
+                    ' data-move-part="' + part.partId + '" data-move-direction="up"' + (isFirst ? ' disabled' : '') + ' aria-label="上移">' + PART_MOVE_ARROW_UP + '</button>' +
+                  '<button type="button" class="part-move-btn' + (isLast ? ' disabled' : '') + '"' +
+                    ' data-move-part="' + part.partId + '" data-move-direction="down"' + (isLast ? ' disabled' : '') + ' aria-label="下移">' + PART_MOVE_ARROW_DOWN + '</button>' +
+                '</div>' +
+                '<button type="button" class="part-remove" data-remove-part="' + part.partId + '" aria-label="刪除分部欄位">×</button>' +
+              '</div>' +
             '</div>'
           );
         }).join('')
       );
     }).join('');
+  }
+
+  // 分類內移動：只交換分類內部的順序，分類先後順序不變
+  function movePartWithinGroup(partId, direction){
+    var part = draftParts.filter(function(x){ return x.partId === partId; })[0];
+    if (!part) return;
+    var grouped = groupPartsByInstrument(draftParts);
+    var groupParts = grouped.byInstrument[part.instrumentName];
+    var pos = groupParts.indexOf(part);
+    var swapPos = direction === 'up' ? pos - 1 : pos + 1;
+    if (swapPos < 0 || swapPos >= groupParts.length) return;
+    var tmp = groupParts[pos];
+    groupParts[pos] = groupParts[swapPos];
+    groupParts[swapPos] = tmp;
+    var newParts = [];
+    grouped.order.forEach(function(name){ newParts = newParts.concat(grouped.byInstrument[name]); });
+    draftParts = newParts;
+    renderPartGroups();
+  }
+
+  // 整個分類移動：交換分類先後順序，分類內部原本的順序原封不動保留
+  function movePartGroup(instrumentName, direction){
+    var grouped = groupPartsByInstrument(draftParts);
+    var order = grouped.order.slice();
+    var pos = order.indexOf(instrumentName);
+    var swapPos = direction === 'up' ? pos - 1 : pos + 1;
+    if (swapPos < 0 || swapPos >= order.length) return;
+    var tmp = order[pos];
+    order[pos] = order[swapPos];
+    order[swapPos] = tmp;
+    var newParts = [];
+    order.forEach(function(name){ newParts = newParts.concat(grouped.byInstrument[name]); });
+    draftParts = newParts;
+    renderPartGroups();
   }
 
   // 8/26 原本設計是「一個樂器一行」（超過一個分部才補一行小字列標籤），這輪因為每個
@@ -799,6 +900,16 @@
   });
 
   document.getElementById('partGroups').addEventListener('click', function(e){
+    var moveBtn = e.target.closest('[data-move-part]');
+    if (moveBtn){
+      movePartWithinGroup(moveBtn.getAttribute('data-move-part'), moveBtn.getAttribute('data-move-direction'));
+      return;
+    }
+    var moveGroupBtn = e.target.closest('[data-move-group]');
+    if (moveGroupBtn){
+      movePartGroup(moveGroupBtn.getAttribute('data-move-group'), moveGroupBtn.getAttribute('data-move-direction'));
+      return;
+    }
     var btn = e.target.closest('[data-remove-part]');
     if (!btn) return;
     var partId = btn.getAttribute('data-remove-part');
@@ -1100,20 +1211,78 @@
     return true;
   }
 
+  // 找出目前這首曲子裡，跟 fileGroupId 共用同一份檔案的所有目標（分部＋可能的總譜，
+  // 總譜也可能被分進同一組，見 applyImmediateBatch() 的一般化處理），excludeKey 是呼叫端
+  // 自己那個目標，通常要從清單裡排除掉（只列出「其他」共用者）
+  function findSharedTargets(p, fileGroupId, excludeKey){
+    var result = [];
+    (p.parts || []).forEach(function(part){
+      if (part.fileGroupId === fileGroupId && part.partId !== excludeKey){
+        result.push({ key: part.partId, label: part.label });
+      }
+    });
+    if (p.fullScoreFileGroupId === fileGroupId && excludeKey !== 'FULL_SCORE'){
+      result.push({ key: 'FULL_SCORE', label: '總譜' });
+    }
+    return result;
+  }
+  function sheetMusicFileGroupId(p, partId){
+    if (partId === 'FULL_SCORE') return p.fullScoreFileGroupId || null;
+    var part = (p.parts || []).filter(function(x){ return x.partId === partId; })[0];
+    return part ? (part.fileGroupId || null) : null;
+  }
+
   // partId 是 'FULL_SCORE' 時代表總譜（曲目層級、不屬於任何分部），跟一般分部共用
-  // 同一套上傳/移除/檔案選擇器，只是實際呼叫的資料層函式跟寫回的欄位不同
+  // 同一套上傳/移除/檔案選擇器，只是實際呼叫的資料層函式跟寫回的欄位不同。
+  // 如果這個目標目前有 fileGroupId（分割上傳時被指定成跟其他分部共用同一份檔案），
+  // 更換會連動更新所有共用者，不會只改到自己那一份、讓內容悄悄分歧
   function uploadSheetMusic(partId, file){
     if (sheetMusicUploadInFlight[partId]) return;
     if (!validateSheetMusicFile(file)) return;
     var targetPieceId = editingPieceId;
     var p = piecesById[targetPieceId];
     if (!p) return;
+
+    var groupId = sheetMusicFileGroupId(p, partId);
+    if (groupId){
+      var siblings = findSharedTargets(p, groupId, partId);
+      var names = siblings.map(function(t){ return t.label; }).join('、');
+      if (!confirm('這份樂譜同時用於 ' + names + '，更換後這些分部都會套用新檔案，確定要繼續嗎？')) return;
+    }
+
     sheetMusicUploadInFlight[partId] = true;
+
+    if (groupId){
+      uploadGroupSheetMusic(storage, targetPieceId, groupId, file).then(function(url){
+        var updatedParts = p.parts.map(function(part){
+          return part.fileGroupId === groupId
+            ? Object.assign({}, part, { sheetMusicUrl: url, sheetMusicUploadedBy: currentAdminUid })
+            : part;
+        });
+        var groupHasFullScore = p.fullScoreFileGroupId === groupId;
+        var writeTask = updatePiece(db, targetPieceId, p.title, p.composer, updatedParts);
+        if (groupHasFullScore){
+          writeTask = writeTask.then(function(){ return updateFullScore(db, targetPieceId, url, currentAdminUid, groupId); });
+        }
+        return writeTask.then(function(){
+          if (editingPieceId === targetPieceId){
+            renderPieceViewParts(updatedParts);
+            if (groupHasFullScore) renderFullScoreViewRow(Object.assign({}, p, { fullScoreUrl: url, fullScoreFileGroupId: groupId }));
+          }
+          showToast('樂譜已上傳（已同步套用到共用這份檔案的分部）', 'success');
+        });
+      }).catch(function(err){
+        showToast('上傳失敗：' + err.code, 'error');
+      }).finally(function(){
+        delete sheetMusicUploadInFlight[partId];
+      });
+      return;
+    }
 
     if (partId === 'FULL_SCORE'){
       uploadFullScore(storage, targetPieceId, file).then(function(url){
-        return updateFullScore(db, targetPieceId, url, currentAdminUid).then(function(){
-          if (editingPieceId === targetPieceId) renderFullScoreViewRow(Object.assign({}, p, { fullScoreUrl: url }));
+        return updateFullScore(db, targetPieceId, url, currentAdminUid, null).then(function(){
+          if (editingPieceId === targetPieceId) renderFullScoreViewRow(Object.assign({}, p, { fullScoreUrl: url, fullScoreFileGroupId: null }));
           showToast('總譜已上傳', 'success');
         });
       }).catch(function(err){
@@ -1127,7 +1296,7 @@
     uploadPartSheetMusic(storage, targetPieceId, partId, file).then(function(url){
       var updatedParts = p.parts.map(function(part){
         return part.partId === partId
-          ? Object.assign({}, part, { sheetMusicUrl: url, sheetMusicUploadedBy: currentAdminUid })
+          ? Object.assign({}, part, { sheetMusicUrl: url, sheetMusicUploadedBy: currentAdminUid, fileGroupId: null })
           : part;
       });
       return updatePiece(db, targetPieceId, p.title, p.composer, updatedParts).then(function(){
@@ -1141,54 +1310,58 @@
     });
   }
 
+  // 移除同樣是分組感知的：有 fileGroupId 就連同所有共用者一起清掉（Storage 檔案只需要
+  // 刪一次），確認訊息在點擊當下（見下面的 confirmSheetMusicRemove()）就會先列出來
   function removeSheetMusic(partId){
     if (sheetMusicUploadInFlight[partId]) return;
     var targetPieceId = editingPieceId;
     var p = piecesById[targetPieceId];
     if (!p) return;
+    var fileUrl = partId === 'FULL_SCORE' ? p.fullScoreUrl : (p.parts.filter(function(x){ return x.partId === partId; })[0] || {}).sheetMusicUrl;
+    if (!fileUrl) return;
+    var groupId = sheetMusicFileGroupId(p, partId);
 
-    if (partId === 'FULL_SCORE'){
-      if (!p.fullScoreUrl) return;
-      sheetMusicUploadInFlight[partId] = true;
-      deletePartSheetMusic(storage, p.fullScoreUrl).catch(function(err){
-        console.error('刪除總譜 Storage 檔案失敗', err);
-      }).then(function(){
-        return updateFullScore(db, targetPieceId, null, null);
-      }).then(function(){
-        if (editingPieceId === targetPieceId) renderFullScoreViewRow(Object.assign({}, p, { fullScoreUrl: null }));
-        showToast('總譜已移除', 'success');
-      }).catch(function(err){
-        showToast('移除失敗：' + err.code, 'error');
-      }).finally(function(){
-        delete sheetMusicUploadInFlight[partId];
-      });
-      return;
-    }
-
-    var part = p.parts.filter(function(x){ return x.partId === partId; })[0];
-    if (!part || !part.sheetMusicUrl) return;
     sheetMusicUploadInFlight[partId] = true;
-    deletePartSheetMusic(storage, part.sheetMusicUrl).catch(function(err){
+    deletePartSheetMusic(storage, fileUrl).catch(function(err){
       // Storage 物件可能已經不存在（例如手動在 Firebase Console 刪過），
       // 不擋住後續的 Firestore 欄位清理
       console.error('刪除 Storage 檔案失敗', err);
     }).then(function(){
       var updatedParts = p.parts.map(function(x){
-        return x.partId === partId
-          ? Object.assign({}, x, { sheetMusicUrl: null, sheetMusicUploadedBy: null })
-          : x;
+        var affected = groupId ? x.fileGroupId === groupId : x.partId === partId;
+        return affected ? Object.assign({}, x, { sheetMusicUrl: null, sheetMusicUploadedBy: null, fileGroupId: null }) : x;
       });
-      return updatePiece(db, targetPieceId, p.title, p.composer, updatedParts);
-    }).then(function(){
-      if (editingPieceId === targetPieceId) renderPieceViewParts(p.parts.map(function(x){
-        return x.partId === partId ? Object.assign({}, x, { sheetMusicUrl: null, sheetMusicUploadedBy: null }) : x;
-      }));
-      showToast('樂譜已移除', 'success');
+      var clearFullScore = groupId ? p.fullScoreFileGroupId === groupId : partId === 'FULL_SCORE';
+      var writeTask = updatePiece(db, targetPieceId, p.title, p.composer, updatedParts);
+      if (clearFullScore){
+        writeTask = writeTask.then(function(){ return updateFullScore(db, targetPieceId, null, null, null); });
+      }
+      return writeTask.then(function(){
+        if (editingPieceId === targetPieceId){
+          renderPieceViewParts(updatedParts);
+          if (clearFullScore) renderFullScoreViewRow(Object.assign({}, p, { fullScoreUrl: null, fullScoreFileGroupId: null }));
+        }
+        showToast('樂譜已移除', 'success');
+      });
     }).catch(function(err){
       showToast('移除失敗：' + err.code, 'error');
     }).finally(function(){
       delete sheetMusicUploadInFlight[partId];
     });
+  }
+
+  // 移除前的確認文字：有共用者就明確列出來（使用者要求的文案：「這份樂譜同時用於
+  // Horn III、Horn IV，確定要移除嗎」），沒有共用就維持原本單純的確認
+  function confirmSheetMusicRemove(partId){
+    var p = piecesById[editingPieceId];
+    if (!p) return false;
+    var groupId = sheetMusicFileGroupId(p, partId);
+    if (groupId){
+      var siblings = findSharedTargets(p, groupId, partId);
+      var names = siblings.map(function(t){ return t.label; }).join('、');
+      return confirm('這份樂譜同時用於 ' + names + '，確定要移除嗎？');
+    }
+    return confirm(partId === 'FULL_SCORE' ? '確定要移除總譜嗎？此動作無法復原。' : '確定要移除這個分部的樂譜檔案嗎？此動作無法復原。');
   }
 
   document.getElementById('pieceViewParts').addEventListener('click', function(e){
@@ -1200,8 +1373,8 @@
     }
     var removeBtn = e.target.closest('[data-sheet-remove]');
     if (removeBtn){
-      var ok = confirm('確定要移除這個分部的樂譜檔案嗎？此動作無法復原。');
-      if (ok) removeSheetMusic(removeBtn.getAttribute('data-sheet-remove'));
+      var partId = removeBtn.getAttribute('data-sheet-remove');
+      if (confirmSheetMusicRemove(partId)) removeSheetMusic(partId);
     }
   });
 
@@ -1212,8 +1385,7 @@
       return;
     }
     if (e.target.closest('[data-full-score-remove]')){
-      var ok = confirm('確定要移除總譜嗎？此動作無法復原。');
-      if (ok) removeSheetMusic('FULL_SCORE');
+      if (confirmSheetMusicRemove('FULL_SCORE')) removeSheetMusic('FULL_SCORE');
     }
   });
 
@@ -1379,12 +1551,18 @@
     renderDraftFilesSummary();
   });
 
+  // mapping 每筆是 { file, targets: [key,...] }（舊呼叫端可能還是傳單數 { file, target }，
+  // 下面用 m.targets || [m.target] 正規化，向下相容）。staged 模式（新增曲目表單）還沒有
+  // pieceId，沒辦法先建立共用檔案的 Storage 路徑，所以多個目標在這裡是各自存一份 Blob
+  // 參照，不是真的共用一份上傳——這是刻意的簡化，見呼叫端註解
   function applyStagedBatch(mapping, newPartDefs){
     (newPartDefs || []).forEach(function(part){ draftParts.push(part); });
     if (newPartDefs && newPartDefs.length > 0) renderPartGroups();
     mapping.forEach(function(m){
-      if (m.target === 'FULL_SCORE') draftFullScoreFile = m.file;
-      else draftPartFiles[m.target] = m.file;
+      (m.targets || [m.target]).forEach(function(key){
+        if (key === 'FULL_SCORE') draftFullScoreFile = m.file;
+        else draftPartFiles[key] = m.file;
+      });
     });
     renderDraftFilesSummary();
   }
@@ -1395,7 +1573,13 @@
   // 的點擊處理。**檔案改成逐一循序上傳（不是平行）**——這樣才有辦法明確講出「正在傳哪一個」，
   // 而且取消語意才單純：目前這個檔案取消掉，後面還沒開始傳的直接不傳，前面已經傳完的
   // 不受影響、照樣正常寫進 Firestore（借用下面本來就有的「部分成功」邏輯，取消對這個函式
-  // 來說只是「提早不繼續傳下一個」而已，跟真的上傳失敗一樣可以放著讓已成功的部分照常生效）
+  // 來說只是「提早不繼續傳下一個」而已，跟真的上傳失敗一樣可以放著讓已成功的部分照常生效）。
+  // mapping 每筆是 { file, targets: [key,...] }（向下相容單數 { file, target }）——
+  // targets 只有一個就跟原本一樣各自上傳到自己的路徑；targets 有兩個以上代表「同一份檔案
+  // 服務多個分部」（例如 Horn III/IV 合訂在一起），這時只上傳一次到共用路徑
+  // （uploadGroupSheetMusic），產生一個 fileGroupId，寫回時所有這些分部都套用同一個
+  // url／fileGroupId。之後「更換」「移除」任一個分部，要連動處理共用同一個 fileGroupId
+  // 的其他分部，見 uploadSheetMusic()／removeSheetMusic() 的分組邏輯
   function applyImmediateBatch(mapping, newPartDefs, options){
     options = options || {};
     var onProgress = options.onProgress;
@@ -1407,74 +1591,95 @@
     // baseParts——不能等 subscribeRepertoire 的 onSnapshot 把新分部同步回來才用，
     // 那是非同步的、時間點不保證趕得上這裡的合併
     var baseParts = p.parts.concat(newPartDefs || []);
+    var totalTargetCount = mapping.reduce(function(sum, m){ return sum + (m.targets || [m.target]).length; }, 0);
 
-    function labelForTarget(target){
-      if (target === 'FULL_SCORE') return '總譜';
-      var part = baseParts.filter(function(pt){ return pt.partId === target; })[0];
-      return part ? part.label : target;
+    function labelForTarget(key){
+      if (key === 'FULL_SCORE') return '總譜';
+      var part = baseParts.filter(function(pt){ return pt.partId === key; })[0];
+      return part ? part.label : key;
     }
 
+    // 一個 target key 一筆（就算好幾個 key 共用同一次上傳，這裡還是各自記一筆，方便後面
+    // 組 updatedParts／fullScoreResult），url／fileGroupId 對同一次上傳的所有 key 都一樣
     var results = [];
     var cancelledEarly = false;
 
-    return mapping.reduce(function(chain, m, i){
+    return mapping.reduce(function(chain, m){
       return chain.then(function(){
-        if (cancelledEarly) return; // 前一個檔案已經被取消，後面的不再繼續傳
+        var targets = m.targets || [m.target];
+        if (cancelledEarly) return;
         // 使用者剛好在兩個檔案交接的瞬間按取消，這時候 .task 還指著上一個「已經傳完」的
         // task（呼叫 .cancel() 對它是無效果的），得另外檢查 .cancelled 旗標才攔得住
         if (cancelToken && cancelToken.cancelled){
           cancelledEarly = true;
-          results.push({ target: m.target, cancelled: true });
+          targets.forEach(function(key){ results.push({ target: key, cancelled: true }); });
           return;
         }
-        var label = labelForTarget(m.target);
+        var isGrouped = targets.length > 1;
+        var label = targets.map(labelForTarget).join('／');
         var fileOnProgress = function(bytesTransferred, bytesTotal){
-          if (onProgress) onProgress(i + 1, mapping.length, label, bytesTransferred, bytesTotal);
+          if (onProgress) onProgress(results.length + 1, totalTargetCount, label, bytesTransferred, bytesTotal);
         };
-        var uploadPromise = m.target === 'FULL_SCORE'
-          ? uploadFullScore(storage, targetPieceId, m.file, fileOnProgress, cancelToken)
-          : uploadPartSheetMusic(storage, targetPieceId, m.target, m.file, fileOnProgress, cancelToken);
+        var uploadPromise;
+        if (isGrouped){
+          var fileGroupId = randomPartId();
+          uploadPromise = uploadGroupSheetMusic(storage, targetPieceId, fileGroupId, m.file, fileOnProgress, cancelToken)
+            .then(function(url){ return { url: url, fileGroupId: fileGroupId }; });
+        } else if (targets[0] === 'FULL_SCORE'){
+          uploadPromise = uploadFullScore(storage, targetPieceId, m.file, fileOnProgress, cancelToken)
+            .then(function(url){ return { url: url, fileGroupId: null }; });
+        } else {
+          uploadPromise = uploadPartSheetMusic(storage, targetPieceId, targets[0], m.file, fileOnProgress, cancelToken)
+            .then(function(url){ return { url: url, fileGroupId: null }; });
+        }
         return uploadPromise
-          .then(function(url){ results.push({ target: m.target, url: url }); })
+          .then(function(r){
+            targets.forEach(function(key){ results.push({ target: key, url: r.url, fileGroupId: r.fileGroupId }); });
+          })
           .catch(function(err){
             if (err && err.isCancelled){
               cancelledEarly = true;
-              results.push({ target: m.target, cancelled: true });
+              targets.forEach(function(key){ results.push({ target: key, cancelled: true }); });
             } else {
-              console.error((m.target === 'FULL_SCORE' ? '總譜' : '分部樂譜') + '上傳失敗：' + m.target, err);
-              results.push({ target: m.target, error: err });
+              console.error('樂譜上傳失敗：' + label, err);
+              targets.forEach(function(key){ results.push({ target: key, error: err }); });
             }
           });
       });
     }, Promise.resolve()).then(function(){
       if (editingPieceId !== targetPieceId) return; // sheet 已經切換到別的曲目，捨棄過期結果
-      var urlByPartId = {};
+      var resultByPartId = {};
       var fullScoreResult = null;
       results.forEach(function(r){
         if (r.target === 'FULL_SCORE' && r.url) fullScoreResult = r;
-        else if (r.url) urlByPartId[r.target] = r.url;
+        else if (r.url) resultByPartId[r.target] = r;
       });
       var updatedParts = baseParts.map(function(part){
-        return urlByPartId[part.partId]
-          ? Object.assign({}, part, { sheetMusicUrl: urlByPartId[part.partId], sheetMusicUploadedBy: currentAdminUid })
+        var r = resultByPartId[part.partId];
+        return r
+          ? Object.assign({}, part, { sheetMusicUrl: r.url, sheetMusicUploadedBy: currentAdminUid, fileGroupId: r.fileGroupId || null })
           : part;
       });
       var writeTask = updatePiece(db, targetPieceId, p.title, p.composer, updatedParts);
       if (fullScoreResult && fullScoreResult.url){
-        writeTask = writeTask.then(function(){ return updateFullScore(db, targetPieceId, fullScoreResult.url, currentAdminUid); });
+        writeTask = writeTask.then(function(){
+          return updateFullScore(db, targetPieceId, fullScoreResult.url, currentAdminUid, fullScoreResult.fileGroupId);
+        });
       }
       return writeTask.then(function(){
         var failedCount = results.filter(function(r){ return r.error; }).length;
         var succeededCount = results.filter(function(r){ return r.url; }).length;
         if (cancelledEarly){
-          showToast('已取消上傳（' + succeededCount + '／' + mapping.length + ' 個檔案已完成上傳）', 'error');
+          showToast('已取消上傳（' + succeededCount + '／' + totalTargetCount + ' 個分部已完成上傳）', 'error');
         } else if (failedCount > 0){
           showToast(failedCount + ' 個檔案上傳失敗，請個別重試', 'error');
         } else {
           showToast('樂譜已上傳', 'success');
         }
         if (editingPieceId === targetPieceId){
-          renderFullScoreViewRow(Object.assign({}, p, fullScoreResult && fullScoreResult.url ? { fullScoreUrl: fullScoreResult.url } : {}));
+          renderFullScoreViewRow(Object.assign({}, p, fullScoreResult && fullScoreResult.url
+            ? { fullScoreUrl: fullScoreResult.url, fullScoreFileGroupId: fullScoreResult.fileGroupId || null }
+            : {}));
           renderPieceViewParts(updatedParts);
         }
       });
@@ -1504,7 +1709,14 @@
   var splitThumbnails = []; // [{pageNum, dataUrl}]
   var splitAnchor = null;   // 選取起點頁碼
   var splitEndPage = null;  // 選取終點頁碼
-  var splitAssignments = []; // [{start, end, target, newInstrument, newLabel}]
+  var splitAssignments = []; // [{start, end, targets:[key,...]}]
+  // key 是 partId／'FULL_SCORE'／或是「這次分割上傳過程中新建立、還沒真的存在」的暫時 key
+  // （'__new__N'，定義存在 splitNewPartDefsByKey），一個 range 可以指定給多個 key——
+  // 這是為了「同一張譜同時是兩個分部」（例如 Horn III/IV 合訂）這種情境，多個目標之後
+  // 會共用同一份上傳的檔案，見 applyImmediateBatch() 的 fileGroupId 邏輯
+  var splitPendingTargets = []; // 目前正在指定範圍時，已按「＋加入」加進來、還沒點「確認選取範圍」的 key
+  var splitNewPartDefsByKey = {}; // { key: {instrumentName, label} }
+  var splitNewPartCounter = 0;
   var splitCancelToken = null; // 讀取 PDF 階段用，{ cancelled:false }，取消按鈕會把它設成 true
 
   // 阻擋式進度彈窗：蓋住整個分割上傳視窗，讀取 PDF（準備預覽）跟確認上傳兩個階段都會用到。
@@ -1571,6 +1783,9 @@
     splitAnchor = null;
     splitEndPage = null;
     splitAssignments = [];
+    splitPendingTargets = [];
+    splitNewPartDefsByKey = {};
+    splitNewPartCounter = 0;
     splitCancelToken = null;
     hideSplitProgress();
     document.getElementById('splitUploadEmpty').classList.remove('hidden');
@@ -1631,6 +1846,9 @@
       splitAnchor = null;
       splitEndPage = null;
       splitAssignments = [];
+      splitPendingTargets = [];
+      splitNewPartDefsByKey = {};
+      splitNewPartCounter = 0;
       document.getElementById('splitFileInfo').textContent = file.name + ' ・ 共 ' + splitPageCount + ' 頁';
       document.getElementById('splitUploadEmpty').classList.add('hidden');
       document.getElementById('splitUploadWorking').classList.remove('hidden');
@@ -1643,6 +1861,7 @@
       }
       renderSplitThumbGrid();
       renderSplitTargetSelect();
+      renderSplitPendingChips();
       renderSplitAssignedList();
     }).catch(function(err){
       hideSplitProgress();
@@ -1664,11 +1883,18 @@
 
   // isSplitReadyToAssign() 放在這裡（不是跟目標下拉選單一起放）是刻意的：
   // updateSplitSelectionUi() 每次點縮圖都會呼叫它，如果定義晚一點才出現，點縮圖選範圍
-  // 當下就會丟出 ReferenceError。目標下拉選單/新增分部欄位這時候還沒被填入選項也沒關係，
-  // 讀到的值就是空字串，這個函式自然回傳 false，「確認選取範圍」按鈕維持反灰，行為正確
+  // 當下就會丟出 ReferenceError。「確認選取範圍」現在看的是「已加入待確認清單」（見
+  // splitPendingTargets），不是下拉選單本身的值——下拉選單只負責「加入」這個動作，
+  // 一個範圍可以加入多個目標（同一份檔案要同時服務多個分部，例如 Horn III/IV 合訂在一起）
   function isSplitReadyToAssign(){
     var range = splitCurrentRange();
     if (!range) return false;
+    return splitPendingTargets.length > 0;
+  }
+
+  // 「＋ 加入」按鈕（把下拉選單目前選的目標，或正在填的新分部定義，加進待確認清單）
+  // 是否可以按——沒選任何目標、或選了「＋新增分部」但欄位沒填完都不能加
+  function isSplitTargetAddReady(){
     var target = document.getElementById('splitTargetSelect').value;
     if (!target) return false;
     if (target === '__new__'){
@@ -1678,13 +1904,46 @@
     }
     return true;
   }
-
-  function splitTargetLabel(assignment){
-    if (assignment.target === '__new__') return assignment.newLabel + '（新分部）';
-    if (assignment.target === 'FULL_SCORE') return '總譜';
-    var part = currentBatchTargetParts().filter(function(p){ return p.partId === assignment.target; })[0];
-    return part ? part.label : assignment.target;
+  function updateSplitTargetAddBtn(){
+    document.getElementById('splitTargetAddBtn').disabled = !isSplitTargetAddReady();
   }
+
+  // 單一目標 key 的顯示文字；splitTargetLabel() 是整個 assignment（可能多個 key）用「、」
+  // 串起來，縮圖下方標籤跟「已指定的範圍」清單都是呼叫這個
+  function splitSingleTargetLabel(key){
+    if (splitNewPartDefsByKey[key]) return splitNewPartDefsByKey[key].label + '（新分部）';
+    if (key === 'FULL_SCORE') return '總譜';
+    var part = currentBatchTargetParts().filter(function(p){ return p.partId === key; })[0];
+    return part ? part.label : key;
+  }
+  function splitTargetLabel(assignment){
+    return assignment.targets.map(splitSingleTargetLabel).join('、');
+  }
+
+  function renderSplitPendingChips(){
+    var container = document.getElementById('splitTargetChips');
+    container.innerHTML = splitPendingTargets.length === 0
+      ? '<span class="split-target-chip-empty">還沒加入任何分部</span>'
+      : splitPendingTargets.map(function(key, i){
+          return '<span class="split-target-chip">' + escapeHtml(splitSingleTargetLabel(key)) +
+            '<button type="button" data-split-pending-remove="' + i + '" aria-label="移除">×</button></span>';
+        }).join('');
+    document.getElementById('splitSharedHint').classList.toggle('hidden', splitPendingTargets.length < 2);
+  }
+  document.getElementById('splitTargetChips').addEventListener('click', function(e){
+    var btn = e.target.closest('[data-split-pending-remove]');
+    if (!btn) return;
+    var idx = Number(btn.getAttribute('data-split-pending-remove'));
+    var removedKey = splitPendingTargets[idx];
+    splitPendingTargets.splice(idx, 1);
+    // 這個「新分部」定義如果沒有其他待確認項目在用了，順便清掉，不留孤兒定義
+    if (splitNewPartDefsByKey[removedKey] && splitPendingTargets.indexOf(removedKey) === -1){
+      delete splitNewPartDefsByKey[removedKey];
+    }
+    renderSplitTargetSelect();
+    renderSplitPendingChips();
+    updateSplitSelectionUi();
+  });
 
   function renderSplitThumbGrid(){
     var range = splitCurrentRange();
@@ -1742,7 +2001,11 @@
   document.getElementById('splitClearBtn').addEventListener('click', function(){
     splitAnchor = null;
     splitEndPage = null;
+    splitPendingTargets.forEach(function(key){ delete splitNewPartDefsByKey[key]; });
+    splitPendingTargets = [];
     renderSplitThumbGrid();
+    renderSplitTargetSelect();
+    renderSplitPendingChips();
     updateSplitSelectionUi();
   });
 
@@ -1751,7 +2014,12 @@
     var currentValue = select.value;
     var grouped = groupPartsByInstrument(currentBatchTargetParts());
     var usedTargets = {};
-    splitAssignments.forEach(function(a){ if (a.target !== '__new__') usedTargets[a.target] = true; });
+    // 已經在「已指定的範圍」清單裡用掉的目標，跟目前這個範圍待確認清單裡已經加入的目標，
+    // 都不能再選一次；'__new__N' 這種暫時 key 天生不會出現在下拉選單的 value 裡，跳過
+    splitAssignments.forEach(function(a){
+      a.targets.forEach(function(key){ if (!splitNewPartDefsByKey[key]) usedTargets[key] = true; });
+    });
+    splitPendingTargets.forEach(function(key){ if (!splitNewPartDefsByKey[key]) usedTargets[key] = true; });
     select.innerHTML =
       '<option value="">請選擇目標…</option>' +
       '<option value="FULL_SCORE"' + (usedTargets.FULL_SCORE ? ' disabled' : '') + '>總譜' + (usedTargets.FULL_SCORE ? '（已指定）' : '') + '</option>' +
@@ -1777,10 +2045,34 @@
     var isNew = this.value === '__new__';
     document.getElementById('splitNewPartBox').style.display = isNew ? 'flex' : 'none';
     if (isNew) renderSplitNewPartInstrumentOptions();
+    updateSplitTargetAddBtn();
+  });
+  document.getElementById('splitNewPartInstrument').addEventListener('change', updateSplitTargetAddBtn);
+  document.getElementById('splitNewPartLabel').addEventListener('input', updateSplitTargetAddBtn);
+
+  // 「＋ 加入」：把下拉選單目前的選擇（既有分部/總譜，或剛填好的新分部定義）加進
+  // splitPendingTargets，不會立刻變成正式的 assignment——要按「確認選取範圍」才會
+  document.getElementById('splitTargetAddBtn').addEventListener('click', function(){
+    if (!isSplitTargetAddReady()) return;
+    var target = document.getElementById('splitTargetSelect').value;
+    if (target === '__new__'){
+      var key = '__new__' + (splitNewPartCounter++);
+      splitNewPartDefsByKey[key] = {
+        instrumentName: document.getElementById('splitNewPartInstrument').value,
+        label: document.getElementById('splitNewPartLabel').value.trim()
+      };
+      splitPendingTargets.push(key);
+      document.getElementById('splitNewPartLabel').value = '';
+      document.getElementById('splitNewPartBox').style.display = 'none';
+    } else {
+      splitPendingTargets.push(target);
+    }
+    document.getElementById('splitTargetSelect').value = '';
+    renderSplitTargetSelect();
+    renderSplitPendingChips();
+    updateSplitTargetAddBtn();
     updateSplitSelectionUi();
   });
-  document.getElementById('splitNewPartInstrument').addEventListener('change', updateSplitSelectionUi);
-  document.getElementById('splitNewPartLabel').addEventListener('input', updateSplitSelectionUi);
 
   function renderSplitAssignedList(){
     var list = document.getElementById('splitAssignedList');
@@ -1801,7 +2093,14 @@
   document.getElementById('splitAssignedList').addEventListener('click', function(e){
     var btn = e.target.closest('[data-split-remove]');
     if (!btn) return;
-    splitAssignments.splice(Number(btn.getAttribute('data-split-remove')), 1);
+    var idx = Number(btn.getAttribute('data-split-remove'));
+    var removed = splitAssignments[idx];
+    splitAssignments.splice(idx, 1);
+    removed.targets.forEach(function(key){
+      if (!splitNewPartDefsByKey[key]) return;
+      var stillUsed = splitAssignments.some(function(a){ return a.targets.indexOf(key) !== -1; });
+      if (!stillUsed) delete splitNewPartDefsByKey[key];
+    });
     renderSplitThumbGrid();
     renderSplitTargetSelect();
     renderSplitAssignedList();
@@ -1809,7 +2108,10 @@
   });
 
   function updateSplitConfirmBtn(){
-    var newPartCount = splitAssignments.filter(function(a){ return a.target === '__new__'; }).length;
+    var newPartCount = 0;
+    splitAssignments.forEach(function(a){
+      a.targets.forEach(function(key){ if (splitNewPartDefsByKey[key]) newPartCount++; });
+    });
     var btn = document.getElementById('splitConfirmUploadBtn');
     btn.textContent = '確認並上傳（' + splitAssignments.length + ' 個檔案，' + newPartCount + ' 個新分部）';
     btn.disabled = splitAssignments.length === 0;
@@ -1818,23 +2120,13 @@
   document.getElementById('splitAssignBtn').addEventListener('click', function(){
     var range = splitCurrentRange();
     if (!range || !isSplitReadyToAssign()) return;
-    var target = document.getElementById('splitTargetSelect').value;
-    if (target === '__new__'){
-      splitAssignments.push({
-        start: range.lo, end: range.hi, target: '__new__',
-        newInstrument: document.getElementById('splitNewPartInstrument').value,
-        newLabel: document.getElementById('splitNewPartLabel').value.trim()
-      });
-      document.getElementById('splitNewPartLabel').value = '';
-      document.getElementById('splitNewPartBox').style.display = 'none';
-    } else {
-      splitAssignments.push({ start: range.lo, end: range.hi, target: target });
-    }
+    splitAssignments.push({ start: range.lo, end: range.hi, targets: splitPendingTargets.slice() });
     splitAnchor = null;
     splitEndPage = null;
-    document.getElementById('splitTargetSelect').value = '';
+    splitPendingTargets = [];
     renderSplitThumbGrid();
     renderSplitTargetSelect();
+    renderSplitPendingChips();
     renderSplitAssignedList();
     updateSplitSelectionUi();
     updateSplitConfirmBtn();
@@ -1844,22 +2136,40 @@
     var sourceFile = splitSourceFile;
     var assignmentsSnapshot = splitAssignments.slice();
 
-    var newPartDefs = assignmentsSnapshot.filter(function(a){ return a.target === '__new__'; }).map(function(a){
-      a.newPartId = randomPartId();
-      return { partId: a.newPartId, instrumentName: a.newInstrument, label: a.newLabel };
+    // 把每個 assignment 裡「＋新增分部」的暫時 key（'__new__N'）換成真正的 partId，
+    // 順便收集 newPartDefs（新分部定義）。keyToRealKey 讓下面組 mapping.targets 時
+    // 可以把暫時 key 換回真正 partId；沒被任何 assignment 用到的定義（理論上不會發生，
+    // 加入待確認清單才會建立定義）不會出現在這裡也沒關係
+    var newPartDefs = [];
+    var keyToRealKey = {};
+    Object.keys(splitNewPartDefsByKey).forEach(function(key){
+      var def = splitNewPartDefsByKey[key];
+      var realPartId = randomPartId();
+      keyToRealKey[key] = realPartId;
+      newPartDefs.push({ partId: realPartId, instrumentName: def.instrumentName, label: def.label });
     });
 
-    var ranges = assignmentsSnapshot.map(function(a){
-      return { key: a.target === '__new__' ? a.newPartId : a.target, startPage: a.start, endPage: a.end };
+    // extractPageRanges() 一個 range（＝一次切割）對應一次上傳，不是一個 target 對應
+    // 一次——同一個 range 指定給多個分部時，只需要切一次、上傳一次，之後在 applyImmediateBatch()
+    // 裡才會依 targets 陣列的長度決定是各自獨立上傳還是共用一份檔案。這裡的 key 用陣列
+    // 索引，之後從 extractPageRanges() 的結果反查回對應的 assignment
+    var ranges = assignmentsSnapshot.map(function(a, i){
+      return { key: i, startPage: a.start, endPage: a.end };
     });
 
     // staged 模式（新增曲目表單）這步只是把切好的 Blob 存進本地草稿，不會真的上傳
     // Firebase（要等曲目真的建立時才上傳），維持單純的阻擋畫面就好，不需要位元組進度／取消。
-    // immediate 模式（既有曲目）才會真的碰 Firebase Storage，才值得做完整的兩步驟進度／取消
+    // 多個目標在這個模式下是各自存一份 Blob 參照（不共用檔案），跟 immediate 模式的
+    // fileGroupId 共用邏輯不同——這是刻意的簡化，新曲目還沒有 pieceId 沒辦法先建立
+    // 共用檔案的 Storage 路徑，之後想要共用可以等曲目建立後再到詳情頁面用「更換」重新指定
     if (batchMode === 'staged'){
       showSplitProgress({ text: '上傳中…' });
       extractPageRanges(sourceFile, ranges).then(function(results){
-        var mapping = results.map(function(r){ return { file: r.blob, target: r.key }; });
+        var mapping = results.map(function(r){
+          var a = assignmentsSnapshot[r.key];
+          var targets = a.targets.map(function(key){ return keyToRealKey[key] || key; });
+          return { file: r.blob, targets: targets };
+        });
         applyStagedBatch(mapping, newPartDefs);
         hideSplitProgress();
         closeSplitUploadOverlay();
@@ -1888,7 +2198,11 @@
         });
       }
     }).then(function(results){
-      var mapping = results.map(function(r){ return { file: r.blob, target: r.key }; });
+      var mapping = results.map(function(r){
+        var a = assignmentsSnapshot[r.key];
+        var targets = a.targets.map(function(key){ return keyToRealKey[key] || key; });
+        return { file: r.blob, targets: targets };
+      });
       return applyImmediateBatch(mapping, newPartDefs, {
         cancelToken: cancelToken,
         onProgress: function(fileIndex, fileCount, label, bytesTransferred, bytesTotal){
