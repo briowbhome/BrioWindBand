@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'brio-v30';
+const CACHE_VERSION = 'brio-v37';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -13,6 +13,8 @@ const CORE_ASSETS = [
   './roles-admin.html',
   './stats-admin.html',
   './checkin-stats-admin.html',
+  './concert-stats-admin.html',
+  './member-stats-admin.html',
   './conductor-admin.html',
   './finance-admin.html',
   './feedback-admin.html',
@@ -24,6 +26,9 @@ const CORE_ASSETS = [
   './auth-service.js',
   './firebase-init.js',
   './account-menu.js',
+  './admin-pages.js',
+  './dialog.js',
+  './messages.js',
   './version.js',
   './event-types.js',
   './instruments.js',

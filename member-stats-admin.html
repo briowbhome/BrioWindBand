@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>布利歐管樂團｜成員統計</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#F2EFE5">
+<link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+<script src="./pwa-register.js" defer></script>
+<script src="./pull-refresh.js" defer></script>
+<style>
+  :root{
+    --ink:#20242F;
+    --ink-soft:#4A4F5C;
+    --paper:#F2EFE5;
+    --paper-raised:#FBFAF4;
+    --line:#DAD3BE;
+    --brass:#B8863A;
+    --brass-deep:#8F6A2C;
+    --burgundy:#7A2331;
+    --burgundy-deep:#5C1A26;
+    --sage:#5F6E58;
+    --sage-bg:#E7EBDF;
+    --radius-lg:20px;
+    --radius-md:14px;
+    --radius-sm:9px;
+    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% -10%, #EFE9D6 0%, transparent 45%),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Noto Sans TC','Noto Sans',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    min-height:100dvh;
+    display:flex;
+    justify-content:center;
+    padding: 0 0 calc(48px + env(safe-area-inset-bottom));
+  }
+
+  button, a{ -webkit-tap-highlight-color: transparent; font-family:inherit; }
+  :focus-visible{ outline:2.5px solid var(--brass-deep); outline-offset:2px; border-radius:6px; }
+
+  .app{
+    width:100%;
+    max-width:460px;
+    min-height:100vh;
+    min-height:100dvh;
+    background:var(--paper);
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .hidden{ display:none !important; }
+
+  /* ---------- Skeleton placeholders ---------- */
+  @keyframes skel-pulse{ 0%,100%{ opacity:.55; } 50%{ opacity:1; } }
+  .skel{ background:var(--line); animation:skel-pulse 1.4s ease-in-out infinite; }
+  .avatar.skel{ animation:skel-pulse 1.4s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce){
+    .skel, .avatar.skel{ animation:none; opacity:.75; }
+  }
+
+  /* ---------- App Bar ---------- */
+  .appbar{ display:flex; align-items:center; gap:12px; padding:18px 20px 14px; }
+  .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
+  .brandtext{ display:flex; flex-direction:column; line-height:1.1; }
+  .brandtext .name{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:19px; letter-spacing:.02em; }
+  .brandtext .sub{ font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.14em; color:var(--ink-soft); margin-top:3px; text-transform:uppercase; }
+  .appbar .spacer{ flex:1; }
+  .back-btn{
+    width:30px; height:30px; flex:none;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--ink); text-decoration:none;
+  }
+  .brand-link{ display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; }
+  .avatar{
+    width:38px; height:38px; border-radius:50%;
+    background:var(--burgundy); color:#F2EFE5;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Noto Serif TC',serif; font-weight:700; font-size:14px;
+    border:2px solid var(--paper-raised); box-shadow:0 0 0 1.5px var(--line);
+    padding:0; cursor:pointer;
+  }
+
+  .staff{
+    height:16px; margin:0 20px 6px;
+    background-image: repeating-linear-gradient(var(--line), var(--line) 1px, transparent 1px, transparent 4px);
+    opacity:.9;
+  }
+
+  .section-label{ display:flex; align-items:baseline; gap:8px; margin:20px 20px 4px; }
+  .section-label .tw{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:15.5px; }
+  .section-label .en{ font-family:'Roboto Mono',monospace; font-size:10px; letter-spacing:.12em; color:var(--ink-soft); text-transform:uppercase; }
+  .lede{ margin:6px 20px 0; font-size:12.5px; line-height:1.6; color:var(--ink-soft); }
+
+  /* ---------- Content ---------- */
+  .total-card{
+    margin:16px 20px 0; background:var(--paper-raised); border:1px solid var(--line);
+    border-radius:var(--radius-lg); box-shadow:var(--shadow-card); padding:22px; text-align:center;
+  }
+  .total-card .num{ font-family:'Roboto Mono',monospace; font-weight:700; font-size:36px; color:var(--sage); }
+  .total-card .lbl{ font-size:12px; color:var(--ink-soft); margin-top:4px; }
+
+  .caption{
+    font-family:'Roboto Mono',monospace; font-size:10px; font-weight:700; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--ink-soft); margin:22px 20px 8px;
+  }
+  .card{
+    margin:0 20px; background:var(--paper-raised); border:1px solid var(--line);
+    border-radius:var(--radius-lg); box-shadow:var(--shadow-card); padding:14px 16px;
+  }
+
+  .instrument-bar-row{ display:grid; grid-template-columns:64px 1fr 22px; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--line); }
+  .instrument-bar-row:last-child{ border-bottom:none; }
+  .instrument-bar-row .l{ font-size:12px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .instrument-bar-track{ height:6px; background:var(--paper); border-radius:3px; overflow:hidden; }
+  .instrument-bar-fill{ height:100%; background:var(--sage); }
+  .instrument-bar-row .n{ font-family:'Roboto Mono',monospace; font-weight:700; font-size:13px; color:var(--ink); text-align:right; }
+
+  .role-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; }
+  .role-item{ background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm); padding:12px 6px; text-align:center; }
+  .role-item .n{ font-family:'Roboto Mono',monospace; font-weight:700; font-size:19px; color:var(--ink); }
+  .role-item .l{ font-size:11px; color:var(--ink-soft); margin-top:3px; }
+
+  /* SVG 預設 overflow:hidden，斜 45 度的日期標籤只要延伸出 viewBox 範圍就會被裁掉，
+     改成 visible 讓文字可以合法畫出邊界一點點，不會截斷 */
+  .chart-svg{ display:block; width:100%; height:auto; overflow:visible; }
+  .empty{ padding:36px 20px; text-align:center; font-size:13px; color:var(--ink-soft); }
+</style>
+</head>
+<body>
+<div class="app" id="appRoot">
+
+  <div class="appbar">
+    <a class="back-btn" href="stats-admin.html" aria-label="回統計首頁">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="m15 5-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <a class="brand-link" href="index.html">
+      <img class="mark" src="assets/BrioLogo.jpg" alt="布利歐管樂團 Logo">
+      <div class="brandtext">
+        <div class="name">布利歐管樂團</div>
+        <div class="sub">Brio Wind Band</div>
+      </div>
+    </a>
+    <div class="spacer"></div>
+    <button class="avatar skel" id="avatarBtn" type="button" aria-label="帳號選單"></button>
+  </div>
+
+  <div class="staff"></div>
+
+  <div class="section-label">
+    <span class="tw">成員統計</span>
+    <span class="en">Member Stats</span>
+  </div>
+  <p class="lede">現況組成分佈跟新增趨勢，只計算已核准團員。</p>
+
+  <div class="total-card">
+    <div class="num skel" id="totalCount">&nbsp;</div>
+    <div class="lbl">全團人數</div>
+  </div>
+
+  <div class="caption">依樂器/聲部分布</div>
+  <div class="card" id="instrumentCard"></div>
+
+  <div class="caption">依角色分布</div>
+  <div class="card">
+    <div class="role-grid">
+      <div class="role-item"><div class="n" id="roleConductor">—</div><div class="l">指揮</div></div>
+      <div class="role-item"><div class="n" id="roleAdmin">—</div><div class="l">幹部</div></div>
+      <div class="role-item"><div class="n" id="roleMember">—</div><div class="l">團員</div></div>
+    </div>
+  </div>
+
+  <div class="caption">新增趨勢（累積人數）</div>
+  <div class="card" id="growthCard"></div>
+
+</div>
+
+<script type="module">
+  import { requireAdmin, peekCachedProfile } from './auth-guard.js';
+  import { db } from './firebase-init.js';
+  import { initAccountMenu } from './account-menu.js';
+  import {
+    collection, getDocs, query, where
+  } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+
+  var cachedProfile = peekCachedProfile();
+  if (cachedProfile && cachedProfile.name){
+    var avatarBtnEl = document.getElementById('avatarBtn');
+    avatarBtnEl.textContent = cachedProfile.name.charAt(0);
+    avatarBtnEl.classList.remove('skel');
+  }
+
+  function renderError(){
+    document.getElementById('instrumentCard').innerHTML = '<div class="empty">讀取失敗，請重新整理再試一次</div>';
+    document.getElementById('growthCard').innerHTML = '<div class="empty">讀取失敗，請重新整理再試一次</div>';
+  }
+
+  function renderInstrumentBars(members){
+    var byName = {};
+    members.forEach(function(m){
+      var insts = m.instruments || [];
+      if (insts.length === 0){
+        byName['未設定樂器'] = (byName['未設定樂器'] || 0) + 1;
+        return;
+      }
+      insts.forEach(function(name){ byName[name] = (byName[name] || 0) + 1; });
+    });
+
+    var names = Object.keys(byName).sort(function(a, b){ return byName[b] - byName[a]; });
+    var card = document.getElementById('instrumentCard');
+    if (names.length === 0){
+      card.innerHTML = '<div class="empty">目前沒有已核准團員</div>';
+      return;
+    }
+    var maxCount = byName[names[0]];
+    card.innerHTML = names.map(function(name){
+      var count = byName[name];
+      var pct = Math.round((count / maxCount) * 100);
+      return (
+        '<div class="instrument-bar-row">' +
+          '<div class="l">' + name + '</div>' +
+          '<div class="instrument-bar-track"><div class="instrument-bar-fill" style="width:' + pct + '%;"></div></div>' +
+          '<div class="n">' + count + '</div>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function renderRoleCounts(members){
+    var conductor = members.filter(function(m){ return m.role === 'conductor'; }).length;
+    // 幹部＝admin 跟 owner 合併計算，跟全站 isAdminTier() 把兩者視為同一管理層級的既有慣例一致，
+    // 全團只有一位 Owner，另外拆一格意義不大
+    var adminTier = members.filter(function(m){ return m.role === 'admin' || m.role === 'owner'; }).length;
+    var member = members.filter(function(m){ return m.role === 'member'; }).length;
+    document.getElementById('roleConductor').textContent = conductor;
+    document.getElementById('roleAdmin').textContent = adminTier;
+    document.getElementById('roleMember').textContent = member;
+  }
+
+  // 累積人數折線圖：依「有異動的日期」各設一個點，不是固定依月份分桶——如果團員是短時間
+  // 內集中核准的（例如這個 App 剛推出時整批註冊），依月份分桶會全部擠在同一個月變成只有一個
+  // 點、折線圖沒有意義，改成依實際日期才能看出當月分批核准的過程；日期分散的情況下這個做法
+  // 一樣適用，沒有壞處。每個點上方標實際人數、下方標日期（斜 45 度避免擠在一起）
+  var CHART_W = 320, CHART_H = 150, PAD_L = 28, PAD_R = 10, PAD_T = 18, PAD_B = 34;
+
+  function fmtDateKey(key){
+    var parts = key.split('-');
+    return Number(parts[1]) + '/' + Number(parts[2]);
+  }
+
+  function renderGrowthChart(members){
+    var byDate = {}; // 'YYYY-MM-DD' -> 當天新增人數
+    members.forEach(function(m){
+      if (!m.approvedAt || !m.approvedAt.toDate) return;
+      var d = m.approvedAt.toDate();
+      var key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      byDate[key] = (byDate[key] || 0) + 1;
+    });
+    var keys = Object.keys(byDate).sort();
+    var card = document.getElementById('growthCard');
+    if (keys.length === 0){
+      card.innerHTML = '<div class="empty">沒有可用的核准時間資料</div>';
+      return;
+    }
+
+    var cumulative = [];
+    var running = 0;
+    keys.forEach(function(key){
+      running += byDate[key];
+      cumulative.push(running);
+    });
+
+    var n = keys.length;
+    var maxV = cumulative[cumulative.length - 1] || 1;
+    var plotW = CHART_W - PAD_L - PAD_R;
+    var plotH = CHART_H - PAD_T - PAD_B;
+    function xFor(i){ return n === 1 ? PAD_L + plotW / 2 : PAD_L + (plotW * i) / (n - 1); }
+    function yFor(v){ return PAD_T + plotH - (v / maxV) * plotH; }
+
+    var gridHtml =
+      '<line x1="' + PAD_L + '" y1="' + yFor(0) + '" x2="' + (CHART_W - PAD_R) + '" y2="' + yFor(0) + '" stroke="var(--line)" stroke-width="1"/>' +
+      '<text x="2" y="' + (yFor(0) + 3) + '" font-size="8" fill="var(--ink-soft)" font-family="Roboto Mono, monospace">0</text>' +
+      '<text x="2" y="' + (yFor(maxV) + 3) + '" font-size="8" fill="var(--ink-soft)" font-family="Roboto Mono, monospace">' + maxV + '</text>';
+
+    var pathD = cumulative.map(function(v, i){ return (i === 0 ? 'M' : 'L') + xFor(i).toFixed(1) + ',' + yFor(v).toFixed(1); }).join(' ');
+    var dotsHtml = cumulative.map(function(v, i){
+      var x = xFor(i).toFixed(1), y = yFor(v).toFixed(1);
+      // 每個點正上方標實際累積人數：中間點對不準 Y 軸刻度的問題，靠這個直接讀數解決，
+      // 比加密集格線更精確也更不占版面
+      return (
+        '<circle cx="' + x + '" cy="' + y + '" r="2.5" fill="var(--sage)"/>' +
+        '<text x="' + x + '" y="' + (yFor(v) - 6) + '" font-size="8" font-weight="700" fill="var(--sage)" font-family="Roboto Mono, monospace" text-anchor="middle">' + v + '</text>'
+      );
+    }).join('');
+
+    // 每個點下面都標日期（不是只標首尾）：斜 45 度＋靠右對齊錨點在該點正下方，
+    // 點一多的時候比水平文字更不容易疊在一起
+    var labelsHtml = keys.map(function(key, i){
+      var x = xFor(i);
+      var y = CHART_H - 12;
+      return '<text x="' + x + '" y="' + y + '" font-size="7.5" fill="var(--ink-soft)" font-family="Roboto Mono, monospace" text-anchor="end" transform="rotate(-45 ' + x + ' ' + y + ')">' + fmtDateKey(key) + '</text>';
+    }).join('');
+
+    card.innerHTML =
+      '<svg class="chart-svg" viewBox="0 0 ' + CHART_W + ' ' + CHART_H + '">' +
+        gridHtml +
+        '<path d="' + pathD + '" fill="none" stroke="var(--sage)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+        dotsHtml + labelsHtml +
+      '</svg>';
+  }
+
+  async function loadStats(){
+    try {
+      var snap = await getDocs(query(collection(db, 'users'), where('status', '==', 'approved')));
+      var members = [];
+      snap.forEach(function(docSnap){ members.push(docSnap.data()); });
+
+      var totalEl = document.getElementById('totalCount');
+      totalEl.textContent = members.length;
+      totalEl.classList.remove('skel');
+
+      renderInstrumentBars(members);
+      renderRoleCounts(members);
+      renderGrowthChart(members);
+    } catch (err) {
+      renderError();
+    }
+  }
+
+  requireAdmin().then(function(result){
+    if (!result) return;
+
+    var avatarBtn = document.getElementById('avatarBtn');
+    avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
+    avatarBtn.classList.remove('skel');
+    initAccountMenu(result.profile.name);
+
+    loadStats();
+  });
+</script>
+</body>
+</html>

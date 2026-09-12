@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>布利歐管樂團｜活動統計</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#F2EFE5">
+<link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+<script src="./pwa-register.js" defer></script>
+<script src="./pull-refresh.js" defer></script>
+<style>
+  :root{
+    --ink:#20242F;
+    --ink-soft:#4A4F5C;
+    --paper:#F2EFE5;
+    --paper-raised:#FBFAF4;
+    --line:#DAD3BE;
+    --brass:#B8863A;
+    --brass-deep:#8F6A2C;
+    --burgundy:#7A2331;
+    --burgundy-deep:#5C1A26;
+    --sage:#5F6E58;
+    --sage-bg:#E7EBDF;
+    --radius-lg:20px;
+    --radius-md:14px;
+    --radius-sm:9px;
+    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% -10%, #EFE9D6 0%, transparent 45%),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Noto Sans TC','Noto Sans',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    min-height:100dvh;
+    display:flex;
+    justify-content:center;
+    padding: 0 0 calc(48px + env(safe-area-inset-bottom));
+  }
+
+  button, a{ -webkit-tap-highlight-color: transparent; font-family:inherit; }
+  :focus-visible{ outline:2.5px solid var(--brass-deep); outline-offset:2px; border-radius:6px; }
+
+  .app{
+    width:100%;
+    max-width:460px;
+    min-height:100vh;
+    min-height:100dvh;
+    background:var(--paper);
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .hidden{ display:none !important; }
+
+  /* ---------- Skeleton placeholders ---------- */
+  @keyframes skel-pulse{ 0%,100%{ opacity:.55; } 50%{ opacity:1; } }
+  .skel{ background:var(--line); animation:skel-pulse 1.4s ease-in-out infinite; }
+  .avatar.skel{ animation:skel-pulse 1.4s ease-in-out infinite; }
+  .skel-bar{ display:inline-block; border-radius:5px; }
+  @media (prefers-reduced-motion: reduce){
+    .skel, .avatar.skel{ animation:none; opacity:.75; }
+  }
+  .ev-skel-lines{ flex:1; display:flex; flex-direction:column; gap:7px; padding:2px 0; }
+
+  /* ---------- App Bar ---------- */
+  .appbar{ display:flex; align-items:center; gap:12px; padding:18px 20px 14px; }
+  .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
+  .brandtext{ display:flex; flex-direction:column; line-height:1.1; }
+  .brandtext .name{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:19px; letter-spacing:.02em; }
+  .brandtext .sub{ font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.14em; color:var(--ink-soft); margin-top:3px; text-transform:uppercase; }
+  .appbar .spacer{ flex:1; }
+  .back-btn{
+    width:30px; height:30px; flex:none;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--ink); text-decoration:none;
+  }
+  .brand-link{ display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; }
+  .avatar{
+    width:38px; height:38px; border-radius:50%;
+    background:var(--burgundy); color:#F2EFE5;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Noto Serif TC',serif; font-weight:700; font-size:14px;
+    border:2px solid var(--paper-raised); box-shadow:0 0 0 1.5px var(--line);
+    padding:0; cursor:pointer;
+  }
+
+  .staff{
+    height:16px; margin:0 20px 6px;
+    background-image: repeating-linear-gradient(var(--line), var(--line) 1px, transparent 1px, transparent 4px);
+    opacity:.9;
+  }
+
+  .section-label{ display:flex; align-items:baseline; gap:8px; margin:20px 20px 4px; }
+  .section-label .tw{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:15.5px; }
+  .section-label .en{ font-family:'Roboto Mono',monospace; font-size:10px; letter-spacing:.12em; color:var(--ink-soft); text-transform:uppercase; }
+  .lede{ margin:6px 20px 14px; font-size:12.5px; line-height:1.6; color:var(--ink-soft); }
+
+  /* ---------- Concert list ---------- */
+  .list{
+    margin:0 20px 24px;
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-card);
+    overflow:hidden;
+  }
+  .concert-item{ display:flex; align-items:center; gap:12px; padding:14px 16px; width:100%; text-align:left; background:none; border:none; cursor:pointer; }
+  .concert-item + .concert-item{ border-top:1px solid var(--line); }
+  .concert-item:active{ background:var(--sage-bg); }
+  .concert-body{ flex:1; min-width:0; }
+  .concert-title{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:14px; color:var(--ink); }
+  .concert-dates{ margin-top:3px; font-size:11px; color:var(--ink-soft); font-family:'Roboto Mono',monospace; }
+  .concert-count{ flex:none; text-align:right; }
+  .concert-count .num{ font-family:'Roboto Mono',monospace; font-weight:700; font-size:18px; color:var(--sage); }
+  .concert-count .lbl{ font-size:9.5px; color:var(--ink-soft); margin-top:1px; }
+  .concert-arrow{ flex:none; color:var(--ink-soft); }
+
+  .empty{ padding:36px 20px; text-align:center; font-size:13px; color:var(--ink-soft); }
+
+  /* ---------- Detail view ---------- */
+  .detail-back{
+    display:flex; align-items:center; gap:4px; margin:0 20px 14px;
+    font-size:12.5px; font-weight:700; color:var(--brass-deep);
+    background:none; border:none; cursor:pointer; padding:0;
+  }
+  .concert-header{ margin:0 20px 16px; }
+  .concert-header .title{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:17px; }
+  .concert-header .sub{ font-size:12px; color:var(--ink-soft); margin-top:4px; }
+
+  .metric-toggle{ display:flex; gap:8px; margin:0 20px 12px; }
+  .toggle-chip{
+    padding:7px 14px; border-radius:999px; border:1px solid var(--line);
+    background:var(--paper-raised); font-size:12.5px; font-weight:700;
+    color:var(--ink-soft); cursor:pointer;
+  }
+  .toggle-chip.active{ background:var(--ink); color:var(--paper); border-color:var(--ink); }
+
+  .compare-controls{ margin:0 20px 14px; }
+  .compare-label{ font-size:11px; color:var(--ink-soft); margin:10px 0 6px; }
+  .compare-label:first-child{ margin-top:0; }
+  .chip-row{ display:flex; flex-wrap:wrap; gap:7px; }
+  .chip{
+    padding:6px 12px; border-radius:999px; border:1px solid var(--line);
+    background:var(--paper-raised); font-size:12px; color:var(--ink-soft); cursor:pointer;
+  }
+  .chip.selected{ background:var(--sage-bg); color:var(--sage); border-color:var(--sage); font-weight:700; }
+
+  .chart-card{
+    margin:0 20px 20px; background:var(--paper-raised); border:1px solid var(--line);
+    border-radius:var(--radius-lg); box-shadow:var(--shadow-card); padding:16px 10px 10px;
+  }
+  .chart-hint{ margin:0 6px 10px; font-size:11px; color:var(--ink-soft); line-height:1.6; }
+  .chart-legend{ display:flex; flex-wrap:wrap; gap:12px; padding:0 6px 12px; }
+  .legend-item{ display:flex; align-items:center; gap:5px; font-size:11px; color:var(--ink-soft); }
+  .legend-dot{ width:8px; height:8px; border-radius:50%; flex:none; }
+  .chart-svg{ display:block; width:100%; height:auto; }
+  .chart-pt{ cursor:pointer; }
+  .chart-empty{ padding:30px 8px; text-align:center; font-size:12.5px; color:var(--ink-soft); }
+
+  /* ---------- Rehearsal detail bottom sheet（沿用 checkin-stats-admin.html 同一套） ---------- */
+  .sheet-overlay{
+    position:fixed; inset:0;
+    background:rgba(32,36,47,.45);
+    display:none;
+    align-items:flex-end;
+    justify-content:center;
+    z-index:50;
+  }
+  .sheet-overlay.active{ display:flex; }
+  .sheet{
+    width:100%; max-width:460px;
+    max-height:80vh;
+    background:var(--paper-raised);
+    border-radius:20px 20px 0 0;
+    display:flex; flex-direction:column;
+    box-shadow:0 -10px 30px rgba(32,36,47,.3);
+  }
+  .sheet-handle{ width:36px; height:4px; background:var(--line); border-radius:999px; margin:10px auto 2px; }
+  .sheet-header{ padding:6px 20px 10px; }
+  .sheet-header .tw{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:15.5px; }
+  .sheet-header .hint{ margin-top:3px; font-size:11.5px; color:var(--ink-soft); }
+  .sheet-tab-row{ display:flex; gap:8px; margin-top:10px; }
+  .sheet-tab{
+    padding:6px 13px; border-radius:999px; border:1px solid var(--line);
+    background:var(--paper); font-size:12px; font-weight:700; color:var(--ink-soft); cursor:pointer;
+  }
+  .sheet-tab.active{ background:var(--ink); color:var(--paper); border-color:var(--ink); }
+  .status-badge{ font-family:'Roboto Mono',monospace; font-size:10px; font-weight:700; flex:none; }
+  .status-badge.attending{ color:var(--sage); }
+  .status-badge.leave{ color:var(--burgundy); }
+  .status-badge.notReported{ color:var(--ink-soft); }
+  .sheet-body{ overflow-y:auto; padding:0 20px 8px; border-top:1px solid var(--line); }
+  .sheet-caption{
+    font-family:'Roboto Mono',monospace; font-size:10px; font-weight:700;
+    letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft);
+    margin:14px 0 8px;
+  }
+  .sheet-caption:first-child{ margin-top:0; }
+  .sheet-summary{ display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
+  .sheet-summary-item{ background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm); padding:8px 6px; text-align:center; }
+  .sheet-summary-item .n{ font-family:'Roboto Mono',monospace; font-weight:700; font-size:15px; color:var(--sage); white-space:nowrap; }
+  .sheet-summary-item .l{ font-size:9.5px; color:var(--ink-soft); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sheet-group{ margin-top:16px; }
+  .sheet-group-label{
+    display:flex; align-items:baseline; gap:6px;
+    font-family:'Roboto Mono',monospace; font-size:10px; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--ink-soft); margin-bottom:6px;
+  }
+  .sheet-group-label .cnt{ color:var(--sage); font-weight:700; font-size:11px; }
+  .sheet-name-row{
+    padding:7px 0; font-size:12.5px; color:var(--ink);
+    display:flex; justify-content:space-between; gap:8px; border-bottom:1px solid var(--line);
+  }
+  .sheet-name-row:last-child{ border-bottom:none; }
+  .sheet-name-row .acc{ color:var(--ink-soft); font-family:'Roboto Mono',monospace; font-size:10.5px; }
+  .sheet-group-empty{ font-size:11.5px; color:var(--ink-soft); padding:4px 0 10px; }
+  .sheet-footer{ padding:14px 20px calc(14px + env(safe-area-inset-bottom)); border-top:1px solid var(--line); }
+  .sheet-close-btn{
+    width:100%; background:var(--brass); color:var(--ink); border:none;
+    border-radius:var(--radius-md); padding:12px; font-weight:700; font-size:13.5px; cursor:pointer;
+  }
+</style>
+</head>
+<body>
+<div class="app" id="appRoot">
+
+  <div class="appbar">
+    <a class="back-btn" href="stats-admin.html" aria-label="回統計首頁">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="m15 5-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <a class="brand-link" href="index.html">
+      <img class="mark" src="assets/BrioLogo.jpg" alt="布利歐管樂團 Logo">
+      <div class="brandtext">
+        <div class="name">布利歐管樂團</div>
+        <div class="sub">Brio Wind Band</div>
+      </div>
+    </a>
+    <div class="spacer"></div>
+    <button class="avatar skel" id="avatarBtn" type="button" aria-label="帳號選單"></button>
+  </div>
+
+  <div class="staff"></div>
+
+  <div class="section-label">
+    <span class="tw">活動統計</span>
+    <span class="en">Concert Stats</span>
+  </div>
+  <p class="lede">以音樂會為單位，查看參與人數跟整個籌備週期的出席狀況。</p>
+
+  <div id="concertListView">
+    <div class="list" id="concertList"></div>
+  </div>
+
+  <div id="concertDetailView" class="hidden">
+    <button type="button" class="detail-back" id="detailBackBtn">‹ 返回音樂會列表</button>
+    <div class="concert-header">
+      <div class="title" id="detailConcertTitle"></div>
+      <div class="sub" id="detailConcertSub"></div>
+    </div>
+
+    <div class="metric-toggle">
+      <button type="button" class="toggle-chip active" data-mode="overall">全團</button>
+      <button type="button" class="toggle-chip" data-mode="compare">依樂器比較</button>
+    </div>
+
+    <div class="compare-controls hidden" id="compareControls">
+      <p class="compare-label">先選一個指標</p>
+      <div class="chip-row" id="metricChips">
+        <button type="button" class="chip" data-metric="report">出缺席回報率</button>
+        <button type="button" class="chip" data-metric="checkin">簽到率</button>
+      </div>
+      <p class="compare-label">再選要比較的樂器（可複選）</p>
+      <div class="chip-row" id="instrumentChips"></div>
+    </div>
+
+    <div class="chart-card">
+      <p class="chart-hint">由左到右依團練時間排序，點資料點可以看該次的詳細名單</p>
+      <div class="chart-legend" id="chartLegend"></div>
+      <div id="chartWrap"></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="sheet-overlay" id="detailSheetOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="tw" id="detailSheetTitle">團練明細</div>
+      <div class="hint" id="detailSheetHint">依樂器分組，只計算已核准團員</div>
+      <div class="sheet-tab-row">
+        <button type="button" class="sheet-tab active" data-sheet-view="report">出缺席回報</button>
+        <button type="button" class="sheet-tab" data-sheet-view="checkin">簽到</button>
+      </div>
+    </div>
+    <div class="sheet-body" id="detailSheetBody"></div>
+    <div class="sheet-footer">
+      <button type="button" class="sheet-close-btn" id="detailSheetClose">關閉</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { requireAdmin, peekCachedProfile } from './auth-guard.js';
+  import { db } from './firebase-init.js';
+  import { initAccountMenu } from './account-menu.js';
+  import {
+    collection, getDocs, query, where, doc, getDoc
+  } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+
+  var SERIES_COLORS = ['#B8863A', '#7A2331', '#5F6E58', '#33507D', '#7C3F6C', '#2E7268', '#8F6D12', '#9C4A5C'];
+
+  var cachedProfile = peekCachedProfile();
+  if (cachedProfile && cachedProfile.name){
+    var avatarBtnEl = document.getElementById('avatarBtn');
+    avatarBtnEl.textContent = cachedProfile.name.charAt(0);
+    avatarBtnEl.classList.remove('skel');
+  }
+
+  var concertListEl = document.getElementById('concertList');
+  var concertListView = document.getElementById('concertListView');
+  var concertDetailView = document.getElementById('concertDetailView');
+
+  var SKELETON_ROWS_HTML = [1, 2].map(function(){
+    return (
+      '<div class="concert-item">' +
+        '<div class="ev-skel-lines">' +
+          '<span class="skel skel-bar" style="width:55%;height:14px;"></span>' +
+          '<span class="skel skel-bar" style="width:35%;height:10px;"></span>' +
+        '</div>' +
+      '</div>'
+    );
+  }).join('');
+  concertListEl.innerHTML = SKELETON_ROWS_HTML;
+
+  function fmtDate(d){
+    return (d.getMonth() + 1) + '/' + d.getDate();
+  }
+
+  // ---------- 音樂會清單 ----------
+  var concertsCache = []; // [{id, title, startDate, endDate, rosterCount}]
+
+  function renderConcertList(){
+    if (concertsCache.length === 0){
+      concertListEl.innerHTML = '<div class="empty">目前還沒有任何音樂會</div>';
+      return;
+    }
+    concertListEl.innerHTML = concertsCache.map(function(c){
+      var dateLabel = c.endDate && c.endDate.getTime() !== c.startDate.getTime()
+        ? fmtDate(c.startDate) + '–' + fmtDate(c.endDate)
+        : fmtDate(c.startDate);
+      var countHtml = c.rosterCount == null
+        ? '<div class="concert-count"><div class="num">—</div><div class="lbl">未建立名單</div></div>'
+        : '<div class="concert-count"><div class="num">' + c.rosterCount + '</div><div class="lbl">人參與</div></div>';
+      return (
+        '<button type="button" class="concert-item" data-concert="' + c.id + '">' +
+          '<div class="concert-body">' +
+            '<div class="concert-title">' + c.title + '</div>' +
+            '<div class="concert-dates">' + dateLabel + '</div>' +
+          '</div>' +
+          countHtml +
+          '<svg class="concert-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+        '</button>'
+      );
+    }).join('');
+  }
+
+  async function loadConcertList(){
+    concertListEl.innerHTML = SKELETON_ROWS_HTML;
+    try {
+      var snap = await getDocs(collection(db, 'concerts'));
+      var concerts = [];
+      snap.forEach(function(docSnap){
+        var data = docSnap.data();
+        var start = data.startDate && data.startDate.toDate ? data.startDate.toDate() : null;
+        if (!start) return;
+        var end = data.endDate && data.endDate.toDate ? data.endDate.toDate() : start;
+        concerts.push({ id: docSnap.id, title: data.title, startDate: start, endDate: end });
+      });
+      concerts.sort(function(a, b){ return b.startDate.getTime() - a.startDate.getTime(); });
+
+      var rosterSnaps = await Promise.all(concerts.map(function(c){
+        return getDoc(doc(db, 'concertRosters', c.id));
+      }));
+      concerts.forEach(function(c, i){
+        var rSnap = rosterSnaps[i];
+        c.rosterCount = rSnap.exists() ? (rSnap.data().members || []).length : null;
+      });
+
+      concertsCache = concerts;
+      renderConcertList();
+    } catch (err) {
+      concertListEl.innerHTML = '<div class="empty">讀取失敗，請重新整理再試一次</div>';
+    }
+  }
+
+  concertListEl.addEventListener('click', function(e){
+    var item = e.target.closest('[data-concert]');
+    if (!item) return;
+    openConcertDetail(item.getAttribute('data-concert'));
+  });
+
+  // ---------- 單場音樂會詳情 ----------
+  var currentConcertId = null;
+  var currentRehearsals = []; // [{id, title, date, rosterCount, reportAttending, checkinCount}]（依日期舊到新）
+  var checkinsByEvent = {};   // eventId -> [{uid, name, account}]
+  var rostersByEvent = {};    // eventId -> { members: [uid...] }
+  var reportsByEvent = {};    // eventId -> [{uid, name, account, status}]
+  var eventTitleById = {};
+  var instrumentByUid = {};   // uid -> string（這場音樂會的樂器身分，來自 concertRosters）
+  var nameByUid = {};         // uid -> name（來自 concertRosters，補「未回報」名單沒有 attendanceReports 文件可以取名字的情況）
+  var accountByUid = {};      // uid -> account，同上
+  var availableInstruments = []; // 這場音樂會 roster 裡實際出現過的樂器，依 settings/instruments 清單順序
+  var instrumentsList = null; // settings/instruments 清單，第一次進詳情頁才抓、抓過快取
+
+  var chartMode = 'overall'; // 'overall' | 'compare'
+  var compareMetric = 'report'; // 'report' | 'checkin'
+  var selectedInstruments = [];
+  var sheetView = 'report'; // 'report' | 'checkin'，明細 sheet 目前顯示哪一種內容，預設出缺席回報
+
+  async function ensureInstrumentsList(){
+    if (instrumentsList) return instrumentsList;
+    var snap = await getDoc(doc(db, 'settings', 'instruments'));
+    instrumentsList = snap.exists() ? (snap.data().list || []) : [];
+    return instrumentsList;
+  }
+
+  function computeRehearsalStats(eventId){
+    var roster = rostersByEvent[eventId];
+    var reports = reportsByEvent[eventId] || [];
+    var checkins = checkinsByEvent[eventId] || [];
+    var attendingUids = reports.filter(function(r){ return r.status === 'attending'; }).map(function(r){ return r.uid; });
+    var rosterCount = roster ? roster.members.length : null;
+    var checkinCount = checkins.length;
+    return {
+      rosterCount: rosterCount,
+      reportAttendingCount: attendingUids.length,
+      attendingUids: attendingUids,
+      checkinCount: checkinCount
+    };
+  }
+
+  // uids 選填：只算屬於這個 uid 清單裡的人（依樂器比較模式用），不傳就是全團
+  function rateFor(eventId, metric, uidsFilter){
+    var stats = computeRehearsalStats(eventId);
+    var reports = (reportsByEvent[eventId] || []).filter(function(r){ return r.status === 'attending'; });
+    var checkins = checkinsByEvent[eventId] || [];
+    var roster = rostersByEvent[eventId];
+
+    if (uidsFilter){
+      var uidSet = {}; uidsFilter.forEach(function(uid){ uidSet[uid] = true; });
+      reports = reports.filter(function(r){ return uidSet[r.uid]; });
+      checkins = checkins.filter(function(c){ return uidSet[c.uid]; });
+      roster = roster ? { members: roster.members.filter(function(uid){ return uidSet[uid]; }) } : null;
+    }
+
+    if (metric === 'report'){
+      if (!roster || roster.members.length === 0) return null;
+      return reports.length / roster.members.length;
+    }
+    // 簽到率：簽到人數 ÷ 回報出席人數（分母是「說要來的人」，不是應到名單）
+    if (reports.length === 0) return null;
+    return checkins.length / reports.length;
+  }
+
+  function uidsForInstrument(instName){
+    return Object.keys(instrumentByUid).filter(function(uid){ return instrumentByUid[uid] === instName; });
+  }
+
+  async function loadConcertDetail(concertId){
+    var concert = concertsCache.filter(function(c){ return c.id === concertId; })[0];
+    document.getElementById('detailConcertTitle').textContent = concert ? concert.title : '';
+    document.getElementById('detailConcertSub').textContent = concert
+      ? (concert.rosterCount == null ? '尚未建立名單' : concert.rosterCount + ' 人參與')
+      : '';
+    document.getElementById('chartWrap').innerHTML = '<div class="chart-empty">載入中…</div>';
+
+    try {
+      var eventsSnap = await getDocs(query(collection(db, 'events'), where('concertId', '==', concertId)));
+      var rehearsalIds = {};
+      var rehearsals = [];
+      eventsSnap.forEach(function(docSnap){
+        var data = docSnap.data();
+        var d = data.date && data.date.toDate ? data.date.toDate() : null;
+        if (!d) return;
+        rehearsalIds[docSnap.id] = true;
+        eventTitleById[docSnap.id] = data.title;
+        rehearsals.push({ id: docSnap.id, title: data.title, date: d });
+      });
+      rehearsals.sort(function(a, b){ return a.date.getTime() - b.date.getTime(); });
+
+      var rosterSnap = await getDoc(doc(db, 'concertRosters', concertId));
+      instrumentByUid = {};
+      nameByUid = {};
+      accountByUid = {};
+      if (rosterSnap.exists()){
+        (rosterSnap.data().members || []).forEach(function(m){
+          var inst = (m.instruments && m.instruments[0]) || null;
+          if (inst) instrumentByUid[m.uid] = inst;
+          nameByUid[m.uid] = m.name;
+          accountByUid[m.uid] = m.account;
+        });
+      }
+      await ensureInstrumentsList();
+      var usedNames = {};
+      Object.keys(instrumentByUid).forEach(function(uid){ usedNames[instrumentByUid[uid]] = true; });
+      availableInstruments = instrumentsList
+        .map(function(inst){ return inst.name; })
+        .filter(function(name){ return usedNames[name]; });
+
+      // 整份撈回來、用交集篩：eventRosters/attendanceReports 沒有跟活動日期對應的時間欄位可以
+      // 做伺服器端範圍篩選，比照 checkin-stats-admin.html「全部」情境的既有做法
+      var rostersSnap = await getDocs(collection(db, 'eventRosters'));
+      var reportsSnap = await getDocs(collection(db, 'attendanceReports'));
+      var checkinsSnap = await getDocs(collection(db, 'checkins'));
+
+      rostersByEvent = {};
+      rostersSnap.forEach(function(docSnap){
+        if (!rehearsalIds[docSnap.id]) return;
+        rostersByEvent[docSnap.id] = { members: docSnap.data().members || [] };
+      });
+      reportsByEvent = {};
+      reportsSnap.forEach(function(docSnap){
+        var data = docSnap.data();
+        if (!rehearsalIds[data.eventId]) return;
+        if (!reportsByEvent[data.eventId]) reportsByEvent[data.eventId] = [];
+        reportsByEvent[data.eventId].push({ uid: data.uid, name: data.name, account: data.account, status: data.status });
+      });
+      checkinsByEvent = {};
+      checkinsSnap.forEach(function(docSnap){
+        var data = docSnap.data();
+        if (!rehearsalIds[data.eventId]) return;
+        if (!checkinsByEvent[data.eventId]) checkinsByEvent[data.eventId] = [];
+        checkinsByEvent[data.eventId].push({ uid: data.uid, name: data.name, account: data.account });
+      });
+
+      currentConcertId = concertId;
+      currentRehearsals = rehearsals;
+      chartMode = 'overall';
+      compareMetric = 'report';
+      selectedInstruments = [];
+      document.querySelectorAll('.toggle-chip').forEach(function(btn){
+        btn.classList.toggle('active', btn.getAttribute('data-mode') === 'overall');
+      });
+      document.querySelectorAll('#metricChips .chip').forEach(function(c){
+        c.classList.toggle('selected', c.getAttribute('data-metric') === 'report');
+      });
+      document.getElementById('compareControls').classList.add('hidden');
+      renderInstrumentChips();
+      renderChart();
+    } catch (err) {
+      document.getElementById('chartWrap').innerHTML = '<div class="chart-empty">讀取失敗，請重新整理再試一次</div>';
+    }
+  }
+
+  function openConcertDetail(concertId){
+    concertListView.classList.add('hidden');
+    concertDetailView.classList.remove('hidden');
+    loadConcertDetail(concertId);
+  }
+
+  document.getElementById('detailBackBtn').addEventListener('click', function(){
+    concertDetailView.classList.add('hidden');
+    concertListView.classList.remove('hidden');
+  });
+
+  document.querySelectorAll('.toggle-chip').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      chartMode = btn.getAttribute('data-mode');
+      document.querySelectorAll('.toggle-chip').forEach(function(b){ b.classList.toggle('active', b === btn); });
+      document.getElementById('compareControls').classList.toggle('hidden', chartMode !== 'compare');
+      renderChart();
+    });
+  });
+
+  document.getElementById('metricChips').addEventListener('click', function(e){
+    var chip = e.target.closest('[data-metric]');
+    if (!chip) return;
+    compareMetric = chip.getAttribute('data-metric');
+    document.querySelectorAll('#metricChips .chip').forEach(function(c){ c.classList.toggle('selected', c === chip); });
+    renderChart();
+  });
+
+  function renderInstrumentChips(){
+    var chipsEl = document.getElementById('instrumentChips');
+    if (availableInstruments.length === 0){
+      chipsEl.innerHTML = '<span style="font-size:11.5px;color:var(--ink-soft);">這場音樂會名單還沒有登記任何樂器身分</span>';
+      return;
+    }
+    chipsEl.innerHTML = availableInstruments.map(function(name){
+      return '<button type="button" class="chip" data-instrument="' + name + '">' + name + '</button>';
+    }).join('');
+  }
+
+  document.getElementById('instrumentChips').addEventListener('click', function(e){
+    var chip = e.target.closest('[data-instrument]');
+    if (!chip) return;
+    var name = chip.getAttribute('data-instrument');
+    var idx = selectedInstruments.indexOf(name);
+    if (idx === -1) selectedInstruments.push(name);
+    else selectedInstruments.splice(idx, 1);
+    chip.classList.toggle('selected', idx === -1);
+    renderChart();
+  });
+
+  var METRIC_LABEL = { report: '出缺席回報率', checkin: '簽到率' };
+
+  function buildSeries(){
+    if (chartMode === 'overall'){
+      return [
+        { name: '出缺席回報率', color: SERIES_COLORS[2], values: currentRehearsals.map(function(r){ return rateFor(r.id, 'report'); }) },
+        { name: '簽到率', color: SERIES_COLORS[0], values: currentRehearsals.map(function(r){ return rateFor(r.id, 'checkin'); }) }
+      ];
+    }
+    return selectedInstruments.map(function(name, i){
+      var uids = uidsForInstrument(name);
+      return {
+        name: name + '・' + METRIC_LABEL[compareMetric],
+        color: SERIES_COLORS[i % SERIES_COLORS.length],
+        values: currentRehearsals.map(function(r){ return rateFor(r.id, compareMetric, uids); })
+      };
+    });
+  }
+
+  // ---------- SVG 折線圖 ----------
+  var CHART_W = 320, CHART_H = 150, PAD_L = 30, PAD_R = 10, PAD_T = 10, PAD_B = 10;
+
+  function renderChart(){
+    var legendEl = document.getElementById('chartLegend');
+    var wrapEl = document.getElementById('chartWrap');
+
+    if (currentRehearsals.length === 0){
+      legendEl.innerHTML = '';
+      wrapEl.innerHTML = '<div class="chart-empty">這場音樂會目前沒有關聯任何團練活動</div>';
+      return;
+    }
+    var series = buildSeries();
+    if (series.length === 0){
+      legendEl.innerHTML = '';
+      wrapEl.innerHTML = '<div class="chart-empty">選一個樂器才會顯示比較線</div>';
+      return;
+    }
+
+    legendEl.innerHTML = series.map(function(s){
+      return '<span class="legend-item"><span class="legend-dot" style="background:' + s.color + ';"></span>' + s.name + '</span>';
+    }).join('');
+
+    var n = currentRehearsals.length;
+    var plotW = CHART_W - PAD_L - PAD_R;
+    var plotH = CHART_H - PAD_T - PAD_B;
+    function xFor(i){ return n === 1 ? PAD_L + plotW / 2 : PAD_L + (plotW * i) / (n - 1); }
+    function yFor(v){ return PAD_T + plotH - v * plotH; }
+
+    var gridHtml =
+      '<line x1="' + PAD_L + '" y1="' + yFor(0) + '" x2="' + (CHART_W - PAD_R) + '" y2="' + yFor(0) + '" stroke="var(--line)" stroke-width="1"/>' +
+      '<line x1="' + PAD_L + '" y1="' + yFor(.5) + '" x2="' + (CHART_W - PAD_R) + '" y2="' + yFor(.5) + '" stroke="var(--line)" stroke-width="1" stroke-dasharray="2,3"/>' +
+      '<line x1="' + PAD_L + '" y1="' + yFor(1) + '" x2="' + (CHART_W - PAD_R) + '" y2="' + yFor(1) + '" stroke="var(--line)" stroke-width="1"/>' +
+      '<text x="2" y="' + (yFor(0) + 3) + '" font-size="8" fill="var(--ink-soft)" font-family="Roboto Mono, monospace">0%</text>' +
+      '<text x="2" y="' + (yFor(.5) + 3) + '" font-size="8" fill="var(--ink-soft)" font-family="Roboto Mono, monospace">50%</text>' +
+      '<text x="2" y="' + (yFor(1) + 3) + '" font-size="8" fill="var(--ink-soft)" font-family="Roboto Mono, monospace">100%</text>';
+
+    var seriesHtml = series.map(function(s){
+      var segments = [];
+      var current = [];
+      s.values.forEach(function(v, i){
+        if (v == null){
+          if (current.length) segments.push(current);
+          current = [];
+          return;
+        }
+        current.push([xFor(i), yFor(Math.min(v, 1))]);
+      });
+      if (current.length) segments.push(current);
+
+      var pathsHtml = segments.map(function(pts){
+        var d = pts.map(function(p, i){ return (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ');
+        return '<path d="' + d + '" fill="none" stroke="' + s.color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+      }).join('');
+
+      var dotsHtml = s.values.map(function(v, i){
+        if (v == null) return '';
+        var x = xFor(i), y = yFor(Math.min(v, 1));
+        return (
+          '<g class="chart-pt" data-event="' + currentRehearsals[i].id + '">' +
+            '<circle cx="' + x + '" cy="' + y + '" r="9" fill="transparent"/>' +
+            '<circle cx="' + x + '" cy="' + y + '" r="3" fill="' + s.color + '"/>' +
+          '</g>'
+        );
+      }).join('');
+
+      return pathsHtml + dotsHtml;
+    }).join('');
+
+    wrapEl.innerHTML =
+      '<svg class="chart-svg" viewBox="0 0 ' + CHART_W + ' ' + CHART_H + '">' +
+        gridHtml + seriesHtml +
+      '</svg>';
+  }
+
+  document.getElementById('chartWrap').addEventListener('click', function(e){
+    var pt = e.target.closest('[data-event]');
+    if (!pt) return;
+    openDetailSheet(pt.getAttribute('data-event'));
+  });
+
+  // ---------- 單次團練明細 sheet（沿用 checkin-stats-admin.html 的分組邏輯） ----------
+  function groupByInstrument(list){
+    var byName = {};
+    availableInstruments.forEach(function(name){ byName[name] = []; });
+    list.forEach(function(p){
+      var name = instrumentByUid[p.uid] || '未設定樂器';
+      if (!byName[name]) byName[name] = [];
+      byName[name].push(p);
+    });
+    var names = availableInstruments.slice();
+    if (byName['未設定樂器']) names.push('未設定樂器');
+    return names.map(function(name){ return { name: name, people: byName[name] }; });
+  }
+
+  var STATUS_LABEL = { attending: '出席', leave: '請假', notReported: '未回報' };
+
+  // 依樂器分組，每人帶出缺席回報狀態（出席／請假／未回報）——應到名單裡沒有對應
+  // attendanceReports 文件的人算「未回報」，名字從 concertRosters 的快照補（nameByUid/accountByUid）
+  function groupReportStatusByInstrument(eventId){
+    var roster = rostersByEvent[eventId];
+    if (!roster) return null;
+    var reportByUid = {};
+    (reportsByEvent[eventId] || []).forEach(function(r){ reportByUid[r.uid] = r; });
+
+    var byName = {};
+    availableInstruments.forEach(function(name){ byName[name] = []; });
+    roster.members.forEach(function(uid){
+      var r = reportByUid[uid];
+      var status = r ? r.status : 'notReported';
+      var name = (r && r.name) || nameByUid[uid];
+      var account = (r && r.account) || accountByUid[uid];
+      var instName = instrumentByUid[uid] || '未設定樂器';
+      if (!byName[instName]) byName[instName] = [];
+      byName[instName].push({ uid: uid, name: name, account: account, status: status });
+    });
+
+    var names = availableInstruments.slice();
+    if (byName['未設定樂器']) names.push('未設定樂器');
+    return names.map(function(name){ return { name: name, people: byName[name] }; });
+  }
+
+  function renderCheckinSheetBody(eventId){
+    var checkinGroups = groupByInstrument(checkinsByEvent[eventId] || []);
+    var attendingGroups = groupByInstrument((reportsByEvent[eventId] || []).filter(function(r){ return r.status === 'attending'; }));
+    var attendingByName = {};
+    attendingGroups.forEach(function(g){ attendingByName[g.name] = g.people.length; });
+
+    var summaryHtml = '<div class="sheet-caption">各分部簽到數量（／回報出席）</div>' +
+      '<div class="sheet-summary">' + checkinGroups.map(function(g){
+        return '<div class="sheet-summary-item"><div class="n">' + g.people.length + '<span style="font-size:11px;font-weight:600;color:var(--ink-soft);margin-left:1px;">／' + (attendingByName[g.name] || 0) + '</span></div><div class="l">' + g.name + '</div></div>';
+      }).join('') + '</div>';
+
+    var detailHtml = '<div class="sheet-caption">詳細名單（簽到）</div>' + checkinGroups.map(function(g){
+      var namesHtml = g.people.length === 0
+        ? '<div class="sheet-group-empty">尚無人簽到</div>'
+        : g.people.map(function(p){
+            return '<div class="sheet-name-row"><span>' + (p.name || p.account || '未知') + '</span><span class="acc">' + (p.account || '') + '</span></div>';
+          }).join('');
+      return '<div class="sheet-group"><div class="sheet-group-label">' + g.name + ' <span class="cnt">' + g.people.length + ' 人</span></div>' + namesHtml + '</div>';
+    }).join('');
+
+    return summaryHtml + detailHtml;
+  }
+
+  function renderReportSheetBody(eventId){
+    var groups = groupReportStatusByInstrument(eventId);
+    if (!groups){
+      return '<div class="empty">這次團練尚未建立應到名單</div>';
+    }
+
+    var summaryHtml = '<div class="sheet-caption">各分部出席人數（出席／應到）</div>' +
+      '<div class="sheet-summary">' + groups.map(function(g){
+        var attending = g.people.filter(function(p){ return p.status === 'attending'; }).length;
+        return (
+          '<div class="sheet-summary-item">' +
+            '<div class="n">' + attending + '<span style="font-size:11px;font-weight:600;color:var(--ink-soft);margin-left:1px;">／' + g.people.length + '</span></div>' +
+            '<div class="l">' + g.name + '</div>' +
+          '</div>'
+        );
+      }).join('') + '</div>';
+
+    var detailHtml = '<div class="sheet-caption">詳細名單（出缺席回報）</div>' + groups.map(function(g){
+      var namesHtml = g.people.length === 0
+        ? '<div class="sheet-group-empty">應到名單裡沒有這個分部的人</div>'
+        : g.people.map(function(p){
+            return (
+              '<div class="sheet-name-row"><span>' + (p.name || p.account || '未知') + '</span>' +
+              '<span class="status-badge ' + p.status + '">' + STATUS_LABEL[p.status] + '</span></div>'
+            );
+          }).join('');
+      return '<div class="sheet-group"><div class="sheet-group-label">' + g.name + ' <span class="cnt">' + g.people.length + ' 人</span></div>' + namesHtml + '</div>';
+    }).join('');
+
+    return summaryHtml + detailHtml;
+  }
+
+  function renderDetailSheet(eventId){
+    document.getElementById('detailSheetTitle').textContent = eventTitleById[eventId] || '團練明細';
+    var reportRate = rateFor(eventId, 'report');
+    var checkinRate = rateFor(eventId, 'checkin');
+    document.getElementById('detailSheetHint').textContent =
+      '回報率 ' + (reportRate == null ? '—' : Math.round(reportRate * 100) + '%') +
+      '・簽到率 ' + (checkinRate == null ? '—' : Math.round(checkinRate * 100) + '%');
+
+    document.getElementById('detailSheetBody').innerHTML = sheetView === 'checkin'
+      ? renderCheckinSheetBody(eventId)
+      : renderReportSheetBody(eventId);
+  }
+
+  var detailSheetOverlay = document.getElementById('detailSheetOverlay');
+  var currentSheetEventId = null;
+  function openDetailSheet(eventId){
+    currentSheetEventId = eventId;
+    sheetView = 'report';
+    document.querySelectorAll('.sheet-tab').forEach(function(btn){
+      btn.classList.toggle('active', btn.getAttribute('data-sheet-view') === sheetView);
+    });
+    detailSheetOverlay.classList.add('active');
+    renderDetailSheet(eventId);
+  }
+  function closeDetailSheet(){
+    detailSheetOverlay.classList.remove('active');
+  }
+  document.getElementById('detailSheetClose').addEventListener('click', closeDetailSheet);
+  detailSheetOverlay.addEventListener('click', function(e){
+    if (e.target === detailSheetOverlay) closeDetailSheet();
+  });
+  document.querySelectorAll('.sheet-tab').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      sheetView = btn.getAttribute('data-sheet-view');
+      document.querySelectorAll('.sheet-tab').forEach(function(b){ b.classList.toggle('active', b === btn); });
+      if (currentSheetEventId) renderDetailSheet(currentSheetEventId);
+    });
+  });
+
+  requireAdmin().then(function(result){
+    if (!result) return;
+
+    var avatarBtn = document.getElementById('avatarBtn');
+    avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
+    avatarBtn.classList.remove('skel');
+    initAccountMenu(result.profile.name);
+
+    loadConcertList();
+  });
+</script>
+</body>
+</html>
