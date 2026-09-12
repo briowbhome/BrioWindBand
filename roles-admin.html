@@ -456,6 +456,8 @@
 <script type="module">
   import { initAdminNav } from './admin-nav.js';
   import { showToast } from './toast.js';
+  import { showConfirm } from './dialog.js';
+  import { MESSAGES } from './messages.js';
   import { requireAdmin, peekCachedProfile } from './auth-guard.js';
   import { db, functions } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
@@ -962,7 +964,7 @@
     });
   });
 
-  instList.addEventListener('click', function(e){
+  instList.addEventListener('click', async function(e){
     var upBtn = e.target.closest('[data-inst-up]');
     var downBtn = e.target.closest('[data-inst-down]');
     if (upBtn){ moveInstrument(Number(upBtn.getAttribute('data-inst-up')), 'up'); return; }
@@ -973,7 +975,7 @@
     var idx = Number(btn.getAttribute('data-inst-remove'));
     var target = instrumentsList[idx];
     if (!target) return;
-    var ok = confirm('確定要刪除「' + target.name + '」嗎？已經選這個樂器的成員資料不會被清掉，只是清單裡不會再出現這個選項。');
+    var ok = await showConfirm(MESSAGES.deleteInstrument(target.name), { danger: true });
     if (!ok) return;
     removeInstrument(db, target).catch(function(err){
       showToast('刪除失敗：' + err.code, 'error');
@@ -1119,7 +1121,7 @@
     });
   });
 
-  seatList.addEventListener('click', function(e){
+  seatList.addEventListener('click', async function(e){
     var upBtn = e.target.closest('[data-seat-up]');
     var downBtn = e.target.closest('[data-seat-down]');
     if (upBtn){ moveSeatSection(Number(upBtn.getAttribute('data-seat-up')), 'up'); return; }
@@ -1130,7 +1132,7 @@
     var idx = Number(btn.getAttribute('data-seat-remove'));
     var target = seatSectionsList[idx];
     if (!target) return;
-    var ok = confirm('確定要刪除這個分區嗎？');
+    var ok = await showConfirm(MESSAGES.deleteSeatingSection(), { danger: true });
     if (!ok) return;
     var newList = seatSectionsList.slice();
     newList.splice(idx, 1);

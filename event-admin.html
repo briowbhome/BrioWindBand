@@ -946,6 +946,8 @@
 <script type="module">
   import { initAdminNav } from './admin-nav.js';
   import { showToast } from './toast.js';
+  import { showConfirm } from './dialog.js';
+  import { MESSAGES } from './messages.js';
   import { requireAdmin, peekCachedProfile } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
@@ -1296,16 +1298,12 @@
     showConcertInfoView();
   });
 
-  concertList.addEventListener('click', function(e){
+  concertList.addEventListener('click', async function(e){
     var deleteBtn = e.target.closest('[data-delete-concert]');
     if (!deleteBtn) return;
     var concertId = deleteBtn.getAttribute('data-delete-concert');
     var c = concertsById[concertId];
-    var ok = confirm(
-      '確定要刪除「' + (c ? c.title : '這場音樂會') + '」嗎？\n' +
-      '底下的曲目/分部指派/參與名單資料也會一併找不到（不會自動清除，只是沒有入口存取）。\n' +
-      '此動作無法復原。'
-    );
+    var ok = await showConfirm(MESSAGES.deleteConcert(c ? c.title : ''), { danger: true });
     if (!ok) return;
     deleteBtn.disabled = true;
     // 先刪音樂會本身，成功後才刪參與名單：兩個一起併發送出的話，萬一 concerts 刪除失敗
@@ -1537,7 +1535,7 @@
     });
   });
 
-  document.getElementById('concertPiecesSlot').addEventListener('click', function(e){
+  document.getElementById('concertPiecesSlot').addEventListener('click', async function(e){
     var openBtn = e.target.closest('[data-open-concert-piece]');
     if (openBtn){
       showPieceDetailView(openBtn.getAttribute('data-open-concert-piece'));
@@ -1547,10 +1545,7 @@
     if (!removeBtn) return;
     var pieceId = removeBtn.getAttribute('data-remove-concert-piece');
     var piece = repertoireById[pieceId];
-    var ok = confirm(
-      '確定要把「' + (piece ? piece.title : '這首曲子') + '」從這場音樂會移除嗎？\n' +
-      '已經指派過的分部資料不會被清掉，只是沒有入口存取。'
-    );
+    var ok = await showConfirm(MESSAGES.removePieceFromConcert(piece ? piece.title : ''), { danger: true, confirmText: '移除' });
     if (!ok) return;
     removeBtn.disabled = true;
     deleteDoc(doc(db, 'concerts', openConcertId, 'pieces', pieceId)).then(function(){
@@ -2038,7 +2033,7 @@
 
   // ---------- 套用/重新套用名單範本（複製範本的 uid 清單，樂器身分預設沿用既有值，
   // 新加入的人抓個人資料第一筆樂器；跟 eventRosters 的 applyTemplateToRoster 同一種
-  // 「整份覆蓋、confirm() 顯示差異」設計） ----------
+  // 「整份覆蓋、showConfirm() 顯示差異」設計） ----------
   async function applyTemplateToConcertRoster(concertId, templateId){
     var template = rosterTemplatesById[templateId];
     if (!template) return;
@@ -2089,7 +2084,7 @@
     document.getElementById('concertRosterTemplateConfirmBtn').disabled = !e.target.value;
   });
 
-  document.getElementById('concertRosterTemplateConfirmBtn').addEventListener('click', function(){
+  document.getElementById('concertRosterTemplateConfirmBtn').addEventListener('click', async function(){
     var concertId = openConcertId;
     var templateId = document.getElementById('concertRosterTemplateSelect').value;
     var template = rosterTemplatesById[templateId];
@@ -2101,10 +2096,8 @@
     var added = template.members.filter(function(uid){ return !curSet[uid]; }).length;
     var removed = currentMembers.filter(function(m){ return !newSet[m.uid]; }).length;
 
-    var msg = '套用「' + template.name + '」將把參與名單的人員設為範本目前的內容';
-    msg += (added || removed) ? ('：新增 ' + added + ' 人、移除 ' + removed + ' 人') : '（人員跟目前名單相同）';
-    msg += '。每個人的樂器身分預設沿用目前已設定的值，新加入的人預設抓個人資料第一筆樂器。確定要套用嗎？';
-    if (!confirm(msg)) return;
+    var msg = MESSAGES.applyConcertRosterTemplateDiff(template.name, added, removed);
+    if (!(await showConfirm(msg, { confirmText: '套用' }))) return;
 
     var confirmBtn = document.getElementById('concertRosterTemplateConfirmBtn');
     confirmBtn.disabled = true;
@@ -2285,7 +2278,7 @@
     }).join('');
   }
 
-  eventList.addEventListener('click', function(e){
+  eventList.addEventListener('click', async function(e){
     var openBtn = e.target.closest('[data-open-event]');
     var deleteBtn = e.target.closest('[data-delete]');
 
@@ -2295,11 +2288,7 @@
     if (deleteBtn){
       var eventId = deleteBtn.getAttribute('data-delete');
       var evt = eventsById[eventId];
-      var ok = confirm(
-        '確定要刪除「' + (evt ? evt.title : '這場活動') + '」嗎？\n' +
-        '如果這場活動已經有簽到紀錄，刪除後將找不到對應的活動資料。\n' +
-        '此動作無法復原。'
-      );
+      var ok = await showConfirm(MESSAGES.deleteEvent(evt ? evt.title : ''), { danger: true });
       if (!ok) return;
       deleteBtn.disabled = true;
       Promise.all([
@@ -2571,7 +2560,7 @@
     rosterTemplateConfirmBtn.disabled = !rosterTemplateSelect.value;
   });
 
-  rosterTemplateConfirmBtn.addEventListener('click', function(){
+  rosterTemplateConfirmBtn.addEventListener('click', async function(){
     var eventId = openRosterEventId;
     var templateId = rosterTemplateSelect.value;
     var template = rosterTemplatesById[templateId];
@@ -2583,10 +2572,8 @@
     var added = template.members.filter(function(uid){ return !curSet[uid]; }).length;
     var removed = currentMembers.filter(function(uid){ return !newSet[uid]; }).length;
 
-    var msg = '套用「' + template.name + '」將把名單設為範本目前的內容';
-    msg += (added || removed) ? ('：新增 ' + added + ' 人、移除 ' + removed + ' 人') : '（內容跟目前名單相同）';
-    msg += '。確定要套用嗎？';
-    if (!confirm(msg)) return;
+    var msg = MESSAGES.applyEventRosterTemplateDiff(template.name, added, removed);
+    if (!(await showConfirm(msg, { confirmText: '套用' }))) return;
 
     rosterTemplateConfirmBtn.disabled = true;
     applyTemplateToRoster(eventId, templateId).then(function(){
@@ -2824,7 +2811,7 @@
     }
   }
 
-  checkinSessionSlot.addEventListener('click', function(e){
+  checkinSessionSlot.addEventListener('click', async function(e){
     var eventId = openRosterEventId;
     if (!eventId) return;
 
@@ -2838,7 +2825,7 @@
     var startBtn = e.target.closest('#checkinStartBtn');
     if (startBtn){
       var evt = eventsById[eventId];
-      var ok = confirm('確定要幫「' + (evt ? evt.title : '這場活動') + '」開啟簽到嗎？');
+      var ok = await showConfirm(MESSAGES.openCheckin(evt ? evt.title : ''), { confirmText: '開啟' });
       if (!ok) return;
       startBtn.disabled = true;
       startCheckinSession(eventId).then(function(){
@@ -2962,14 +2949,14 @@
     });
   }
 
-  checkinListSlot.addEventListener('click', function(e){
+  checkinListSlot.addEventListener('click', async function(e){
     var eventId = openRosterEventId;
     if (!eventId) return;
 
     var removeBtn = e.target.closest('[data-checkin-remove]');
     if (removeBtn){
       var checkinId = removeBtn.getAttribute('data-checkin-remove');
-      var ok = confirm('確定要移除這筆簽到紀錄嗎？此動作無法復原。');
+      var ok = await showConfirm(MESSAGES.removeCheckinRecord(), { danger: true, confirmText: '移除' });
       if (!ok) return;
       removeBtn.disabled = true;
       deleteDoc(doc(db, 'checkins', checkinId)).then(function(){
@@ -3340,7 +3327,7 @@
     }
   });
 
-  rosterReportsSlot.addEventListener('click', function(e){
+  rosterReportsSlot.addEventListener('click', async function(e){
     var editBtn = e.target.closest('[data-edit-report]');
     var deleteBtn = e.target.closest('[data-delete-report]');
     var statusBtn = e.target.closest('[data-edit-status]');
@@ -3357,7 +3344,7 @@
       if (!eventIdForDelete) return;
       var reportsForDelete = reportsByEvent[eventIdForDelete] || [];
       var reportToDelete = reportsForDelete.find(function(x){ return x.uid === deleteUid; });
-      var ok = confirm('確定要刪除「' + (reportToDelete ? (reportToDelete.name || reportToDelete.account) : '這筆') + '」的出缺席回報嗎？此動作無法復原。');
+      var ok = await showConfirm(MESSAGES.deleteAttendanceReport(reportToDelete ? (reportToDelete.name || reportToDelete.account) : ''), { danger: true });
       if (!ok) return;
       deleteBtn.disabled = true;
       deleteDoc(doc(db, 'attendanceReports', eventIdForDelete + '_' + deleteUid)).then(function(){
@@ -3501,7 +3488,7 @@
     }).join('');
   }
 
-  document.getElementById('typesList').addEventListener('click', function(e){
+  document.getElementById('typesList').addEventListener('click', async function(e){
     var editBtn = e.target.closest('[data-edit-type]');
     var deleteBtn = e.target.closest('[data-delete-type]');
 
@@ -3520,10 +3507,7 @@
     if (deleteBtn){
       var delId = deleteBtn.getAttribute('data-delete-type');
       var delType = eventTypesById[delId];
-      var ok = confirm(
-        '確定要刪除「' + (delType ? delType.label : '這個類型') + '」嗎？\n' +
-        '如果還有活動使用這個類型，畫面會顯示找不到對應名稱，不會自動改到別的類型。'
-      );
+      var ok = await showConfirm(MESSAGES.deleteEventType(delType ? delType.label : ''), { danger: true });
       if (!ok) return;
       deleteDoc(doc(db, 'eventTypes', delId)).then(function(){
         if (editingTypeId === delId) enterTypeCreateMode();

@@ -310,6 +310,8 @@
 <script type="module">
   import { initAdminNav } from './admin-nav.js';
   import { showToast } from './toast.js';
+  import { showConfirm } from './dialog.js';
+  import { MESSAGES } from './messages.js';
   import { requireAdmin, peekCachedProfile } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
@@ -551,14 +553,10 @@
     });
   });
 
-  templateDeleteBtn.addEventListener('click', function(){
+  templateDeleteBtn.addEventListener('click', async function(){
     if (!editingTemplateId) return;
     var t = templatesById[editingTemplateId];
-    var ok = confirm(
-      '確定要刪除「' + (t ? t.name : '這份名單') + '」嗎？\n' +
-      '已經套用過這份名單的活動不受影響（活動名單是套用當下的複製快照），只是往後那些活動會顯示「來源名單已刪除」。\n' +
-      '此動作無法復原。'
-    );
+    var ok = await showConfirm(MESSAGES.deleteRosterTemplate(t ? t.name : ''), { danger: true });
     if (!ok) return;
     templateDeleteBtn.disabled = true;
     deleteDoc(doc(db, 'rosterTemplates', editingTemplateId)).then(function(){

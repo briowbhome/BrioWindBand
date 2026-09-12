@@ -1172,6 +1172,8 @@
 
 <script type="module">
   import { showToast } from './toast.js';
+  import { showConfirm } from './dialog.js';
+  import { MESSAGES } from './messages.js';
   import { subscribeRemittanceAccounts } from './finance.js';
   import { resolveMemberAccess, peekCachedProfile } from './auth-guard.js';
   import { subscribeEventTypes } from './event-types.js';
@@ -1999,7 +2001,7 @@
       });
     });
 
-    document.getElementById('concertNotesList').addEventListener('click', function(e){
+    document.getElementById('concertNotesList').addEventListener('click', async function(e){
       var editBtn = e.target.closest('[data-concert-note-edit-btn]');
       if (editBtn){
         var editId = editBtn.getAttribute('data-concert-note-edit-btn');
@@ -2037,7 +2039,7 @@
       var deleteBtn = e.target.closest('[data-concert-note-delete]');
       if (deleteBtn){
         var delId = deleteBtn.getAttribute('data-concert-note-delete');
-        var ok = confirm('確定要刪除這則筆記嗎？');
+        var ok = await showConfirm(MESSAGES.deleteNote(), { danger: true });
         if (!ok) return;
         var concertId = activeNotesConcertId;
         deleteConcertNote(concertId, delId).then(function(){

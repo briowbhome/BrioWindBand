@@ -637,6 +637,8 @@
 <script type="module">
   import { initAdminNav } from './admin-nav.js';
   import { showToast } from './toast.js';
+  import { showConfirm } from './dialog.js';
+  import { MESSAGES } from './messages.js';
   import { requireAdminOrSheetMusicManager, peekCachedProfile } from './auth-guard.js';
   import { db, storage } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
@@ -1162,14 +1164,10 @@
     });
   });
 
-  pieceDeleteBtn.addEventListener('click', function(){
+  pieceDeleteBtn.addEventListener('click', async function(){
     if (!editingPieceId) return;
     var p = piecesById[editingPieceId];
-    var ok = confirm(
-      '確定要刪除「' + (p ? p.title : '這首曲目') + '」嗎？\n' +
-      '已經在某場音樂會引用過這首曲子的資料不會被清掉，只是往後那場音樂會的曲目管理會顯示「（曲目已刪除）」。\n' +
-      '此動作無法復原。'
-    );
+    var ok = await showConfirm(MESSAGES.deletePiece(p ? p.title : ''), { danger: true });
     if (!ok) return;
     pieceDeleteBtn.disabled = true;
     var sheetMusicUrls = ((p && p.parts) || []).map(function(part){ return part.sheetMusicUrl; }).filter(function(url){ return url; });
@@ -1237,7 +1235,7 @@
   // 同一套上傳/移除/檔案選擇器，只是實際呼叫的資料層函式跟寫回的欄位不同。
   // 如果這個目標目前有 fileGroupId（分割上傳時被指定成跟其他分部共用同一份檔案），
   // 更換會連動更新所有共用者，不會只改到自己那一份、讓內容悄悄分歧
-  function uploadSheetMusic(partId, file){
+  async function uploadSheetMusic(partId, file){
     if (sheetMusicUploadInFlight[partId]) return;
     if (!validateSheetMusicFile(file)) return;
     var targetPieceId = editingPieceId;
@@ -1248,7 +1246,7 @@
     if (groupId){
       var siblings = findSharedTargets(p, groupId, partId);
       var names = siblings.map(function(t){ return t.label; }).join('、');
-      if (!confirm('這份樂譜同時用於 ' + names + '，更換後這些分部都會套用新檔案，確定要繼續嗎？')) return;
+      if (!(await showConfirm(MESSAGES.replaceSharedSheetMusic(names), { confirmText: '繼續' }))) return;
     }
 
     sheetMusicUploadInFlight[partId] = true;
@@ -1353,19 +1351,19 @@
 
   // 移除前的確認文字：有共用者就明確列出來（使用者要求的文案：「這份樂譜同時用於
   // Horn III、Horn IV，確定要移除嗎」），沒有共用就維持原本單純的確認
-  function confirmSheetMusicRemove(partId){
+  async function confirmSheetMusicRemove(partId){
     var p = piecesById[editingPieceId];
     if (!p) return false;
     var groupId = sheetMusicFileGroupId(p, partId);
     if (groupId){
       var siblings = findSharedTargets(p, groupId, partId);
       var names = siblings.map(function(t){ return t.label; }).join('、');
-      return confirm('這份樂譜同時用於 ' + names + '，確定要移除嗎？');
+      return showConfirm(MESSAGES.removeSharedSheetMusic(names), { danger: true, confirmText: '移除' });
     }
-    return confirm(partId === 'FULL_SCORE' ? '確定要移除總譜嗎？此動作無法復原。' : '確定要移除這個分部的樂譜檔案嗎？此動作無法復原。');
+    return showConfirm(MESSAGES.removeSheetMusic(partId === 'FULL_SCORE'), { danger: true, confirmText: '移除' });
   }
 
-  document.getElementById('pieceViewParts').addEventListener('click', function(e){
+  document.getElementById('pieceViewParts').addEventListener('click', async function(e){
     var uploadBtn = e.target.closest('[data-sheet-upload]');
     if (uploadBtn){
       pendingSheetPartId = uploadBtn.getAttribute('data-sheet-upload');
@@ -1375,18 +1373,18 @@
     var removeBtn = e.target.closest('[data-sheet-remove]');
     if (removeBtn){
       var partId = removeBtn.getAttribute('data-sheet-remove');
-      if (confirmSheetMusicRemove(partId)) removeSheetMusic(partId);
+      if (await confirmSheetMusicRemove(partId)) removeSheetMusic(partId);
     }
   });
 
-  document.getElementById('fullScoreViewRow').addEventListener('click', function(e){
+  document.getElementById('fullScoreViewRow').addEventListener('click', async function(e){
     if (e.target.closest('[data-full-score-upload]')){
       pendingSheetPartId = 'FULL_SCORE';
       sheetMusicFileInput.click();
       return;
     }
     if (e.target.closest('[data-full-score-remove]')){
-      if (confirmSheetMusicRemove('FULL_SCORE')) removeSheetMusic('FULL_SCORE');
+      if (await confirmSheetMusicRemove('FULL_SCORE')) removeSheetMusic('FULL_SCORE');
     }
   });
 

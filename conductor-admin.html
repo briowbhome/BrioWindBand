@@ -317,6 +317,8 @@
 
 <script type="module">
   import { showToast } from './toast.js';
+  import { showConfirm } from './dialog.js';
+  import { MESSAGES } from './messages.js';
   import { initAdminNav } from './admin-nav.js';
   import { requireAdminOrConductor, peekCachedProfile } from './auth-guard.js';
   import { db } from './firebase-init.js';
@@ -802,7 +804,7 @@
     });
   });
 
-  notesListEl.addEventListener('click', function(e){
+  notesListEl.addEventListener('click', async function(e){
     var editBtn = e.target.closest('[data-note-edit-btn]');
     if (editBtn){
       var id = editBtn.getAttribute('data-note-edit-btn');
@@ -838,7 +840,7 @@
     var deleteBtn = e.target.closest('[data-note-delete]');
     if (deleteBtn){
       var delId = deleteBtn.getAttribute('data-note-delete');
-      var ok = confirm('確定要刪除這則筆記嗎？');
+      var ok = await showConfirm(MESSAGES.deleteNote(), { danger: true });
       if (!ok) return;
       deleteDoc(doc(db, 'conductorNotes', delId)).then(function(){
         return loadNotes();

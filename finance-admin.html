@@ -483,6 +483,8 @@
 <script type="module">
   import { initAdminNav } from './admin-nav.js';
   import { showToast } from './toast.js';
+  import { showConfirm } from './dialog.js';
+  import { MESSAGES } from './messages.js';
   import { requireAdminOrFinanceManager, peekCachedProfile } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
@@ -578,7 +580,7 @@
     }).join('');
   }
 
-  document.getElementById('categoriesList').addEventListener('click', function (e) {
+  document.getElementById('categoriesList').addEventListener('click', async function (e) {
     var renameBtn = e.target.closest('[data-rename-cat]');
     if (renameBtn) {
       var renameId = renameBtn.getAttribute('data-rename-cat');
@@ -597,7 +599,7 @@
     if (delBtn) {
       var delId = delBtn.getAttribute('data-del-cat');
       var delCat = categoriesById[delId];
-      var ok = confirm('確定要刪除分類「' + (delCat ? delCat.label : '') + '」嗎？已經用這個分類的帳目不會被清掉，只是分類名稱之後會顯示「（分類已刪除）」。此動作無法復原。');
+      var ok = await showConfirm(MESSAGES.deleteFinanceCategory(delCat ? delCat.label : ''), { danger: true });
       if (!ok) return;
       deleteFinanceCategory(db, delId).catch(function (err) {
         showToast('刪除失敗：' + err.message, 'error');
@@ -791,12 +793,12 @@
     });
   });
 
-  document.getElementById('accountsList').addEventListener('click', function (e) {
+  document.getElementById('accountsList').addEventListener('click', async function (e) {
     var delBtn = e.target.closest('[data-del-account]');
     if (delBtn) {
       var delId = delBtn.getAttribute('data-del-account');
       var acct = remittanceAccountsList.filter(function (a) { return a.id === delId; })[0];
-      var ok = confirm('確定要刪除帳戶「' + (acct ? acct.label : '') + '」嗎？已經套用過這個帳戶的應繳項目不會被清掉，只是這份帳戶庫少一個可以選的選項，套用過的項目也會查不到 QR Code。此動作無法復原。');
+      var ok = await showConfirm(MESSAGES.deleteFinanceAccount(acct ? acct.label : ''), { danger: true });
       if (!ok) return;
       deleteRemittanceAccount(db, delId).then(function () {
         if (editingAccountId === delId) resetAccountForm();
@@ -1061,10 +1063,10 @@
     }
   });
 
-  document.getElementById('dueVoidBtn').addEventListener('click', function () {
+  document.getElementById('dueVoidBtn').addEventListener('click', async function () {
     if (!openDueDetailId) return;
     var due = feeDuesList.filter(function (d) { return d.id === openDueDetailId; })[0];
-    var ok = confirm('確定要作廢「' + (due ? due.title : '') + '」這個應繳項目嗎？\n已經繳過的紀錄不會被清掉，只是這批不再視為應繳項目。\n此動作無法復原。');
+    var ok = await showConfirm(MESSAGES.voidDue(due ? due.title : ''), { danger: true });
     if (!ok) return;
     voidFeeDue(db, openDueDetailId, currentAdminUid).catch(function (err) {
       showToast('作廢失敗：' + err.code, 'error');
@@ -1146,9 +1148,9 @@
     });
   });
 
-  document.getElementById('paymentVoidBtn').addEventListener('click', function () {
+  document.getElementById('paymentVoidBtn').addEventListener('click', async function () {
     if (!openDueDetailId || !currentPaymentTargetUid) return;
-    var ok = confirm('確定要作廢這筆繳費紀錄嗎？記帳本裡對應的收入明細也會一併作廢。此動作無法復原。');
+    var ok = await showConfirm(MESSAGES.voidPayment(), { danger: true });
     if (!ok) return;
     var btn = document.getElementById('paymentVoidBtn');
     btn.disabled = true;
@@ -1269,9 +1271,9 @@
     });
   });
 
-  document.getElementById('ledgerVoidBtn').addEventListener('click', function () {
+  document.getElementById('ledgerVoidBtn').addEventListener('click', async function () {
     if (!editingLedgerEntryId) return;
-    var ok = confirm('確定要作廢這筆帳目嗎？作廢後不會從清單消失，但不再計入結餘。此動作無法復原。');
+    var ok = await showConfirm(MESSAGES.voidLedgerEntry(), { danger: true });
     if (!ok) return;
     var btn = document.getElementById('ledgerVoidBtn');
     btn.disabled = true;

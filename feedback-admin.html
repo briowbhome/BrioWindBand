@@ -193,6 +193,8 @@
 <script type="module">
   import { initAdminNav } from './admin-nav.js';
   import { showToast } from './toast.js';
+  import { showConfirm } from './dialog.js';
+  import { MESSAGES } from './messages.js';
   import { requireAdmin } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
@@ -312,7 +314,7 @@
 
   var shotZoomOverlay = document.getElementById('shotZoomOverlay');
   var shotZoomImg = document.getElementById('shotZoomImg');
-  document.getElementById('feedbackList').addEventListener('click', function(e){
+  document.getElementById('feedbackList').addEventListener('click', async function(e){
     var img = e.target.closest('[data-shot-zoom]');
     if (img){
       shotZoomImg.src = img.src;
@@ -321,7 +323,7 @@
     }
     var delBtn = e.target.closest('[data-delete]');
     if (delBtn){
-      var ok = confirm('確定要刪除這筆回報嗎？');
+      var ok = await showConfirm(MESSAGES.deleteFeedbackReport(), { danger: true });
       if (!ok) return;
       var id = delBtn.getAttribute('data-delete');
       deleteFeedbackItem(id).then(function(){

@@ -1,5 +1,7 @@
 import { logout } from './auth-guard.js';
 import { APP_VERSION } from './version.js';
+import { showConfirm } from './dialog.js';
+import { MESSAGES } from './messages.js';
 
 const STYLE_ID = 'acct-menu-style';
 
@@ -75,8 +77,8 @@ export function initAccountMenu(name, adminHref, conductorHref) {
     if (e.key === 'Escape') closeMenu();
   });
 
-  menu.querySelector('[data-action="logout"]').addEventListener('click', function () {
+  menu.querySelector('[data-action="logout"]').addEventListener('click', async function () {
     closeMenu();
-    if (confirm('確定要登出嗎？')) logout();
+    if (await showConfirm(MESSAGES.logout())) logout();
   });
 }

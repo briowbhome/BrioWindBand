@@ -573,6 +573,8 @@
 <script type="module">
   import { resolveMemberAccess, peekCachedProfile, logout } from './auth-guard.js';
   import { showToast } from './toast.js';
+  import { showConfirm } from './dialog.js';
+  import { MESSAGES } from './messages.js';
   import { db, auth } from './firebase-init.js';
   import {
     collection, query, where, orderBy, limit, onSnapshot,
@@ -1210,8 +1212,8 @@
     }
     document.getElementById('adminLinks').innerHTML = linksHtml;
 
-    document.getElementById('logoutBtn').addEventListener('click', function(){
-      if (confirm('確定要登出嗎？')) logout('profile.html');
+    document.getElementById('logoutBtn').addEventListener('click', async function(){
+      if (await showConfirm(MESSAGES.logout())) logout('profile.html');
     });
 
     // ---------- 通知開關 ----------
