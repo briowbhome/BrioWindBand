@@ -18,6 +18,24 @@
   var pulling = false;
   var triggered = false;
   var indicator = null;
+  var scrollParent = null;
+
+  // 判斷某元素本身是否為「可獨立捲動」的容器（例如 Bottom Sheet / Modal 內層清單），
+  // 而不只是頁面本身的捲動位置——避免手指其實在 sheet 內容裡捲動，卻被誤判成在頁面頂端下拉。
+  function isScrollable(el) {
+    if (!el || el.nodeType !== 1) return false;
+    var overflowY = window.getComputedStyle(el).overflowY;
+    return (overflowY === 'auto' || overflowY === 'scroll') && el.scrollHeight > el.clientHeight;
+  }
+
+  function findScrollParent(el) {
+    var node = el;
+    while (node && node !== document.body && node !== document.documentElement) {
+      if (isScrollable(node)) return node;
+      node = node.parentElement;
+    }
+    return document.scrollingElement || document.documentElement;
+  }
 
   function ensureIndicator() {
     if (indicator) return indicator;
@@ -44,7 +62,9 @@
   }
 
   document.addEventListener('touchstart', function (e) {
-    if (document.scrollingElement.scrollTop > 0 || e.touches.length !== 1) { startY = null; return; }
+    if (e.touches.length !== 1) { startY = null; return; }
+    scrollParent = findScrollParent(e.target);
+    if (scrollParent.scrollTop > 0) { startY = null; return; }
     startY = e.touches[0].clientY;
     pulling = false;
     triggered = false;
@@ -53,7 +73,7 @@
   document.addEventListener('touchmove', function (e) {
     if (startY == null) return;
     var delta = e.touches[0].clientY - startY;
-    if (delta <= 0 || document.scrollingElement.scrollTop > 0) { startY = null; return; }
+    if (delta <= 0 || (scrollParent && scrollParent.scrollTop > 0)) { startY = null; return; }
 
     pulling = true;
     e.preventDefault(); // 蓋掉原生彈跳效果，改用自己的視覺回饋
