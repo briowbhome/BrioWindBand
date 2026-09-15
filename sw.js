@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'brio-v37';
+const CACHE_VERSION = 'brio-v38';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -31,6 +31,7 @@ const CORE_ASSETS = [
   './messages.js',
   './version.js',
   './event-types.js',
+  './data-cache.js',
   './instruments.js',
   './seating-chart.js',
   './finance.js',
