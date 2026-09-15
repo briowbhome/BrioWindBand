@@ -367,14 +367,18 @@
 
   // ---------- 找可切換的團練清單（跟首頁「下一次◯◯」同一套判斷：homeHighlight 類型），
   // 範圍只到未來（含現在），不含過去——8/24 討論定案，指揮只需要往後看已排定的場次，
-  // 不需要回頭看歷史資料，查詢維持跟原本「找下一場」同一個 where 條件，範圍沒有變大 ----------
+  // 不需要回頭看歷史資料。9/15 討論定案：下界改用「今天 00:00」而不是 Timestamp.now()，
+  // 跟首頁團練資訊同一套規則——活動一開始不該馬上從清單消失，要撐到當天結束（跨到隔天
+  // 00:00）才換下一場，原本用 Timestamp.now() 會讓活動一開始就被查詢排除、報表整個消失
   var eventTypesById = {};
   var typesLoaded = false;
 
   async function loadUpcomingHighlightEvents(){
+    var todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
     var snap = await getDocs(query(
       collection(db, 'events'),
-      where('date', '>=', Timestamp.now()),
+      where('date', '>=', Timestamp.fromDate(todayStart)),
       orderBy('date', 'asc'),
       limit(20)
     ));

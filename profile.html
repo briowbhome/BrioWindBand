@@ -576,8 +576,9 @@
   import { showConfirm } from './dialog.js';
   import { MESSAGES } from './messages.js';
   import { db, auth } from './firebase-init.js';
+  import { cachedThenFresh } from './data-cache.js';
   import {
-    collection, query, where, orderBy, limit, onSnapshot,
+    collection, query, where, orderBy, limit, onSnapshot, getDocs,
     doc, getDoc, setDoc, serverTimestamp
   } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
   import {
@@ -1126,20 +1127,36 @@
       location.href = 'index.html';
     });
 
-    onSnapshot(query(collection(db, 'announcements'), orderBy('createdAt', 'desc'), limit(5)), function(snap){
-      latestAnnouncements = snap.docs.map(function(docSnap){
-        var data = docSnap.data();
-        return {
-          content: data.content,
-          createdAt: data.createdAt && data.createdAt.toDate ? data.createdAt.toDate() : new Date()
-        };
+    // 這幾種都是幹部異動才會變、下拉重整＝整頁 reload 就能拿到最新資料的清單，改成一次性
+    // 讀取＋sessionStorage 快取（理由跟 index.html 同一套，key 併入 uid 避免同裝置換人殘留）
+    cachedThenFresh('brio_cache_announcements_mini', function(){
+      return getDocs(query(collection(db, 'announcements'), orderBy('createdAt', 'desc'), limit(5))).then(function(snap){
+        return snap.docs.map(function(docSnap){
+          var data = docSnap.data();
+          return {
+            content: data.content,
+            createdAt: data.createdAt && data.createdAt.toDate ? data.createdAt.toDate() : new Date()
+          };
+        });
       });
+    }, function(items){
+      latestAnnouncements = items;
       renderNotifDot();
       renderNotifSheet();
-    });
+    }, function(list){
+      return list.map(function(item){
+        return Object.assign({}, item, {
+          createdAt: item.createdAt instanceof Date ? item.createdAt : new Date(item.createdAt)
+        });
+      });
+    }).catch(function(err){ console.error('announcements 讀取失敗', err); });
 
-    onSnapshot(query(collection(db, 'eventRosters'), where('members', 'array-contains', result.uid)), function(snap){
-      rsvpRosterEventIds = snap.docs.filter(function(d){ return d.data().surveyOpenedAt; }).map(function(d){ return d.id; });
+    cachedThenFresh('brio_cache_eventRosters_' + result.uid, function(){
+      return getDocs(query(collection(db, 'eventRosters'), where('members', 'array-contains', result.uid))).then(function(snap){
+        return snap.docs.filter(function(d){ return d.data().surveyOpenedAt; }).map(function(d){ return d.id; });
+      });
+    }, function(ids){
+      rsvpRosterEventIds = ids;
       rsvpRosterEventIds.forEach(function(id){
         ensureRsvpEventInfo(id).then(function(){
           renderNotifDot();
@@ -1148,17 +1165,22 @@
       });
       renderNotifDot();
       renderNotifSheet();
-    }, function(err){ console.error('eventRosters 監聽失敗', err); });
+    }).catch(function(err){ console.error('eventRosters 讀取失敗', err); });
 
-    onSnapshot(query(collection(db, 'attendanceReports'), where('uid', '==', result.uid)), function(snap){
-      rsvpReportsByEvent = {};
-      snap.forEach(function(d){
-        var data = d.data();
-        rsvpReportsByEvent[data.eventId] = { status: data.status, reason: data.reason };
+    cachedThenFresh('brio_cache_attendanceReports_' + result.uid, function(){
+      return getDocs(query(collection(db, 'attendanceReports'), where('uid', '==', result.uid))).then(function(snap){
+        var byEvent = {};
+        snap.forEach(function(d){
+          var data = d.data();
+          byEvent[data.eventId] = { status: data.status, reason: data.reason };
+        });
+        return byEvent;
       });
+    }, function(byEvent){
+      rsvpReportsByEvent = byEvent;
       renderNotifDot();
       renderNotifSheet();
-    }, function(err){ console.error('attendanceReports 監聽失敗', err); });
+    }).catch(function(err){ console.error('attendanceReports 讀取失敗', err); });
 
     onSnapshot(doc(db, 'users', result.uid), function(snap){
       var data = snap.data() || {};
@@ -1194,11 +1216,15 @@
     // 團員審核待辦：只有 admin/owner 訂閱，理由跟 index.html 同一套（conductor 沒有審核權限、
     // firestore.rules 的 users list 也只放行 admin-tier）
     if (isAdmin){
-      onSnapshot(query(collection(db, 'users'), where('status', '==', 'pending')), function(snap){
-        pendingReviewCount = snap.size;
+      cachedThenFresh('brio_cache_pendingReviewCount_' + result.uid, function(){
+        return getDocs(query(collection(db, 'users'), where('status', '==', 'pending'))).then(function(snap){
+          return snap.size;
+        });
+      }, function(count){
+        pendingReviewCount = count;
         renderNotifDot();
         renderNotifSheet();
-      }, function(err){ console.error('pending 團員審核監聽失敗', err); });
+      }).catch(function(err){ console.error('pending 團員審核讀取失敗', err); });
     }
     var linksHtml = '';
     if (isAdmin){

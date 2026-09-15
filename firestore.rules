@@ -94,6 +94,10 @@ service cloud.firestore {
       // 幹部層級可以讀取／列出所有團員資料（審核畫面用）
       allow get, list: if isAdminTier();
 
+      // 指揮專用頁面（conductor-admin.html）唯讀查看團員名單（姓名/樂器對照應到名單用），
+      // 不開放建立/修改/刪除——之前漏了這條，指揮角色的使用者進頁面就會卡在「讀取資料失敗」
+      allow get, list: if isConductor();
+
       // 註冊：只能建立「自己」的文件，且狀態一定要是待審核、一般團員角色
       // 防止有人自己把自己設成 approved 或 admin
       allow create: if request.auth != null

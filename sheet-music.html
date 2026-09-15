@@ -254,7 +254,17 @@
   // 逐一查各自的 pieces 子集合再合併，跟 concerts 集合既有的 hasProfile() 規則一致，
   // 也是這個專案其他讀取端（例如 index.html 的 loadMyConcerts()）已經在用的查詢模式
   async function loadSheetMusicFolder(uid, profile){
-    var repertoireSnap = await getDocs(collection(db, 'repertoire'));
+    // repertoire／concerts／concertRosters 這三份彼此不相依，原本依序 await 要多等兩趟，
+    // 改成平行發出去
+    var topSnaps = await Promise.all([
+      getDocs(collection(db, 'repertoire')),
+      getDocs(collection(db, 'concerts')),
+      getDocs(collection(db, 'concertRosters'))
+    ]);
+    var repertoireSnap = topSnaps[0];
+    var allConcertsSnap = topSnaps[1];
+    var rosterSnap = topSnaps[2];
+
     var repertoireById = {};
     var repertoireList = [];
     repertoireSnap.forEach(function(d){
@@ -263,14 +273,12 @@
       repertoireList.push(data);
     });
 
-    var allConcertsSnap = await getDocs(collection(db, 'concerts'));
     var usedPieceIds = {};
     await Promise.all(allConcertsSnap.docs.map(async function(concertDoc){
       var piecesSnap = await getDocs(collection(db, 'concerts', concertDoc.id, 'pieces'));
       piecesSnap.forEach(function(d){ usedPieceIds[d.id] = true; });
     }));
 
-    var rosterSnap = await getDocs(collection(db, 'concertRosters'));
     var myEntries = [];
     rosterSnap.forEach(function(docSnap){
       var members = docSnap.data().members || [];

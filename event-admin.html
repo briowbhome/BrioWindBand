@@ -2687,7 +2687,9 @@
   // ---------- 簽到分頁（原 checkin-admin.html，併入後只服務目前開啟的這一場活動，
   // 不再監聽整個 checkinSessions collection——sheet 開啟/切分頁時才一次性抓當下這場活動的資料，
   // 操作後重新抓一次同一份文件重繪，不需要處理監聽器的訂閱/取消訂閱生命週期） ----------
-  var CHECKIN_WINDOW_MINUTES = 30;
+  // 原本 30 分鐘常常因為還要開放給遲到的人簽到，幹部得一直重新開啟，9/15 討論定案改成
+  // 固定拉長時限、當作單純開關用——「結束」按鈕本來就能隨時手動關閉，不需要另外做開關概念
+  var CHECKIN_WINDOW_MINUTES = 720; // 12 小時，涵蓋一整個團練/演出日綽綽有餘
   // 簽到名單的遲到門檻，之後想調整標準改這兩個數字就好（跟原本 checkin-admin.html 的門檻一致）
   var CHECKIN_LATE_MINUTES = 15;
   var CHECKIN_VERY_LATE_MINUTES = 30;
@@ -2752,7 +2754,7 @@
             '<div class="qr-wrap"><img src="' + qrDataUrl(checkinUrl(eventId, session.code)) + '" alt="簽到 QR Code"></div>'
           ) +
           '<div class="qr-actions">' +
-            '<button type="button" class="btn-reopen" data-checkin-reopen>重設 30 分鐘</button>' +
+            '<button type="button" class="btn-reopen" data-checkin-reopen>重新開放 ' + (CHECKIN_WINDOW_MINUTES / 60) + ' 小時</button>' +
             '<button type="button" class="btn-regen" data-checkin-regen>產生新的 QR</button>' +
             '<button type="button" class="btn-end" data-checkin-end>✕ 結束</button>' +
           '</div>' +

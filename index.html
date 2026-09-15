@@ -1176,7 +1176,8 @@
   import { MESSAGES } from './messages.js';
   import { subscribeRemittanceAccounts } from './finance.js';
   import { resolveMemberAccess, peekCachedProfile } from './auth-guard.js';
-  import { subscribeEventTypes } from './event-types.js';
+  import { loadEventTypesOnce } from './event-types.js';
+  import { cachedThenFresh } from './data-cache.js';
   import { db } from './firebase-init.js';
   import { VAPID_PUBLIC_KEY } from './push-config.js';
   import {
@@ -1486,30 +1487,45 @@
       programEmpty.classList.remove('hidden');
     }
 
-    subscribeEventTypes(db, function(types){
+    // eventTypes/events 都幾乎不會頻繁變動（幹部才會異動），改成「進頁一次性讀取＋
+    // sessionStorage 快取秒開」取代 onSnapshot 常駐監聽——下拉重整本來就是整頁 reload，
+    // reload 自然會重新查一次最新資料，不會因此看不到更新，只是不再「停留頁面時自動跳新」
+    function reviveEventList(list){
+      return list.map(function(evt){
+        return Object.assign({}, evt, {
+          date: evt.date instanceof Date ? evt.date : new Date(evt.date),
+          endTime: evt.endTime ? (evt.endTime instanceof Date ? evt.endTime : new Date(evt.endTime)) : null
+        });
+      });
+    }
+
+    cachedThenFresh('brio_cache_eventTypes', function(){ return loadEventTypesOnce(db); }, function(types){
       eventTypesById = {};
       types.forEach(function(t){ eventTypesById[t.id] = t; });
       typesLoaded = true;
       renderEventsSection();
-    }, undefined, renderEventsError);
+    }).catch(renderEventsError);
 
-    onSnapshot(upcomingQuery, function(snap){
-      latestEvents = snap.docs.map(function(docSnap){
-        var data = docSnap.data();
-        return {
-          id: docSnap.id,
-          title: data.title,
-          type: data.type,
-          date: data.date.toDate(),
-          allDay: !!data.allDay,
-          endTime: data.endTime && data.endTime.toDate ? data.endTime.toDate() : null,
-          location: data.location,
-          repertoire: Array.isArray(data.repertoire) ? data.repertoire : []
-        };
+    cachedThenFresh('brio_cache_events', function(){
+      return getDocs(upcomingQuery).then(function(snap){
+        return snap.docs.map(function(docSnap){
+          var data = docSnap.data();
+          return {
+            id: docSnap.id,
+            title: data.title,
+            type: data.type,
+            date: data.date.toDate(),
+            allDay: !!data.allDay,
+            endTime: data.endTime && data.endTime.toDate ? data.endTime.toDate() : null,
+            location: data.location,
+            repertoire: Array.isArray(data.repertoire) ? data.repertoire : []
+          };
+        });
       });
-
+    }, function(events){
+      latestEvents = reviveEventList(events);
       renderEventsSection();
-    }, renderEventsError);
+    }, reviveEventList).catch(renderEventsError);
 
     // 公告：接 announcements collection，最新一則當標題，其餘展開成清單
     function formatRelativeTime(date){
@@ -1558,19 +1574,31 @@
     // 8/31 公告分類：category 'urgent'（含沒有這個欄位的舊資料）/'event'/'update'。
     // limit 從 5 拉高到 20——appbar 常駐區塊只挑 category==='urgent' 的最新一則，如果
     // 活動/更新公告發得比較密集，臨時公告可能不在最新 5 筆之內，拉高上限確保撈得到
-    onSnapshot(query(collection(db, 'announcements'), orderBy('createdAt', 'desc'), limit(20)), function(snap){
-      var items = snap.docs.map(function(docSnap){
-        var data = docSnap.data();
-        return {
-          id: docSnap.id,
-          content: data.content,
-          category: data.category || 'urgent',
-          items: Array.isArray(data.items) ? data.items : null,
-          showPrompt: data.showPrompt !== false, // 只有 category==='update' 才有意義，預設 true
-          createdAt: data.createdAt && data.createdAt.toDate ? data.createdAt.toDate() : new Date()
-        };
+    function reviveAnnouncements(list){
+      return list.map(function(item){
+        return Object.assign({}, item, {
+          createdAt: item.createdAt instanceof Date ? item.createdAt : new Date(item.createdAt)
+        });
       });
+    }
 
+    // 公告異動頻率不高，改成一次性讀取＋快取（理由跟上面 eventTypes/events 一樣）；
+    // 唯一的取捨是「停留頁面時剛好有新公告發布」不會自動跳出，要下拉重整或重新整理才看得到
+    cachedThenFresh('brio_cache_announcements', function(){
+      return getDocs(query(collection(db, 'announcements'), orderBy('createdAt', 'desc'), limit(20))).then(function(snap){
+        return snap.docs.map(function(docSnap){
+          var data = docSnap.data();
+          return {
+            id: docSnap.id,
+            content: data.content,
+            category: data.category || 'urgent',
+            items: Array.isArray(data.items) ? data.items : null,
+            showPrompt: data.showPrompt !== false, // 只有 category==='update' 才有意義，預設 true
+            createdAt: data.createdAt && data.createdAt.toDate ? data.createdAt.toDate() : new Date()
+          };
+        });
+      });
+    }, function(items){
       latestAnnouncements = items;
       renderNotifDot();
       renderNotifSheet();
@@ -1607,7 +1635,7 @@
           '</div>'
         );
       }).join('');
-    });
+    }, reviveAnnouncements).catch(function(err){ console.error('announcements 讀取失敗', err); });
 
     // ---------- 團務總覽「公告」區塊：活動／更新公告（臨時公告不重複顯示） ----------
     function renderUpdateItemsHtml(items){
@@ -2288,8 +2316,13 @@
     // 篩出「包含我」的文件，這裡整份撈回來前端過濾（跟 checkin-stats-admin.html 撈整份
     // collection 再篩選同一種模式，資料量小，全團音樂會數量不會多）
     async function loadMyConcerts(uid){
-      var rosterSnap = await getDocs(collection(db, 'concertRosters'));
-      var repertoireSnap = await getDocs(collection(db, 'repertoire'));
+      // 這兩份彼此不相依，原本依序 await 會多等一趟，改成平行發出去
+      var snaps = await Promise.all([
+        getDocs(collection(db, 'concertRosters')),
+        getDocs(collection(db, 'repertoire'))
+      ]);
+      var rosterSnap = snaps[0];
+      var repertoireSnap = snaps[1];
 
       var repertoireById = {};
       repertoireSnap.forEach(function(d){ repertoireById[d.id] = Object.assign({ id: d.id }, d.data()); });
@@ -2878,8 +2911,15 @@
       // 只有已經「發起調查」（surveyOpenedAt 有值）的活動才算待辦，名單存在不等於調查已發起。
       // pending 結構上不會出現在任何名單裡（名單只能從已核准會員裡勾選），這裡維持同一套訂閱邏輯，
       // 不用另外寫，監聽結果自然是空的
-      onSnapshot(query(collection(db, 'eventRosters'), where('members', 'array-contains', viewerUid)), function(snap){
-        rsvpRosterEventIds = snap.docs.filter(function(d){ return d.data().surveyOpenedAt; }).map(function(d){ return d.id; });
+      // 以下這幾種都是「幹部異動才會變、下拉重整＝整頁 reload 就能拿到最新資料」的個人化
+      // 清單，改成一次性讀取＋sessionStorage 快取（key 併入 viewerUid，避免同裝置換人
+      // 登入時看到上一位使用者的殘留資料），不再常駐 onSnapshot 監聽
+      cachedThenFresh('brio_cache_eventRosters_' + viewerUid, function(){
+        return getDocs(query(collection(db, 'eventRosters'), where('members', 'array-contains', viewerUid))).then(function(snap){
+          return snap.docs.filter(function(d){ return d.data().surveyOpenedAt; }).map(function(d){ return d.id; });
+        });
+      }, function(ids){
+        rsvpRosterEventIds = ids;
         rsvpRosterEventIds.forEach(function(id){
           ensureRsvpEventInfo(id).then(function(){
             renderRsvpBanner();
@@ -2890,44 +2930,58 @@
         renderRsvpBanner();
         renderNotifDot();
         renderNotifSheet();
-      }, function(err){ console.error('eventRosters 監聽失敗', err); });
+      }).catch(function(err){ console.error('eventRosters 讀取失敗', err); });
 
-      onSnapshot(query(collection(db, 'attendanceReports'), where('uid', '==', viewerUid)), function(snap){
-        rsvpReportsByEvent = {};
-        snap.forEach(function(d){
-          var data = d.data();
-          rsvpReportsByEvent[data.eventId] = { status: data.status, reason: data.reason };
+      cachedThenFresh('brio_cache_attendanceReports_' + viewerUid, function(){
+        return getDocs(query(collection(db, 'attendanceReports'), where('uid', '==', viewerUid))).then(function(snap){
+          var byEvent = {};
+          snap.forEach(function(d){
+            var data = d.data();
+            byEvent[data.eventId] = { status: data.status, reason: data.reason };
+          });
+          return byEvent;
         });
+      }, function(byEvent){
+        rsvpReportsByEvent = byEvent;
         renderRsvpBanner();
         renderNotifDot();
         renderNotifSheet();
         renderEventsSection(); // 團練卡片跟活動卡條上的「已回報」標籤也要跟著更新
-      }, function(err){ console.error('attendanceReports 監聽失敗', err); });
+      }).catch(function(err){ console.error('attendanceReports 讀取失敗', err); });
 
       // 團費待辦：自己在 memberIds 名單內、且未作廢的應繳項目，跟 eventRosters 同一套
-      // array-contains 查詢寫法。這裡是 eager 訂閱（不走 setOverviewLazyLoad），因為橫幅／
+      // array-contains 查詢寫法。這裡是 eager 讀取（不走 setOverviewLazyLoad），因為橫幅／
       // 通知中心一進首頁就要看到，不能等使用者真的切到「團務總覽」才載入
-      onSnapshot(query(collection(db, 'feeDues'), where('memberIds', 'array-contains', viewerUid)), function(snap){
-        myFeeDuesList = snap.docs
-          .map(function(d){ return Object.assign({ id: d.id }, d.data()); })
-          .filter(function(d){ return !d.voided; });
-        renderFeeDueBanner();
-        renderNotifDot();
-        renderNotifSheet();
-        renderMyFeeDues();
-      }, function(err){ console.error('feeDues 監聽失敗', err); });
-
-      onSnapshot(query(collection(db, 'feePayments'), where('uid', '==', viewerUid)), function(snap){
-        myFeePaymentsByDueId = {};
-        snap.forEach(function(d){
-          var data = d.data();
-          if (!data.voided) myFeePaymentsByDueId[data.dueId] = data;
+      cachedThenFresh('brio_cache_feeDues_' + viewerUid, function(){
+        return getDocs(query(collection(db, 'feeDues'), where('memberIds', 'array-contains', viewerUid))).then(function(snap){
+          return snap.docs
+            .map(function(d){ return Object.assign({ id: d.id }, d.data()); })
+            .filter(function(d){ return !d.voided; });
         });
+      }, function(list){
+        myFeeDuesList = list;
         renderFeeDueBanner();
         renderNotifDot();
         renderNotifSheet();
         renderMyFeeDues();
-      }, function(err){ console.error('feePayments 監聽失敗', err); });
+      }).catch(function(err){ console.error('feeDues 讀取失敗', err); });
+
+      cachedThenFresh('brio_cache_feePayments_' + viewerUid, function(){
+        return getDocs(query(collection(db, 'feePayments'), where('uid', '==', viewerUid))).then(function(snap){
+          var byDueId = {};
+          snap.forEach(function(d){
+            var data = d.data();
+            if (!data.voided) byDueId[data.dueId] = data;
+          });
+          return byDueId;
+        });
+      }, function(byDueId){
+        myFeePaymentsByDueId = byDueId;
+        renderFeeDueBanner();
+        renderNotifDot();
+        renderNotifSheet();
+        renderMyFeeDues();
+      }).catch(function(err){ console.error('feePayments 讀取失敗', err); });
 
       // 匯款帳戶庫：只用來即時查應繳項目連結的帳戶目前最新的 QR Code（不是複製快照，
       // 帳戶之後換圖不用回頭改每一筆歷史應繳項目，這是使用者定案的刻意例外）
@@ -2954,11 +3008,15 @@
       // firestore.rules 對 users collection 的 list 也只放行 admin-tier，這裡的角色判斷
       // 只是避免非 admin-tier 白打一次一定會被拒絕的查詢
       if (viewerProfile.role === 'admin' || viewerProfile.role === 'owner'){
-        onSnapshot(query(collection(db, 'users'), where('status', '==', 'pending')), function(snap){
-          pendingReviewCount = snap.size;
+        cachedThenFresh('brio_cache_pendingReviewCount_' + viewerUid, function(){
+          return getDocs(query(collection(db, 'users'), where('status', '==', 'pending'))).then(function(snap){
+            return snap.size;
+          });
+        }, function(count){
+          pendingReviewCount = count;
           renderNotifDot();
           renderNotifSheet();
-        }, function(err){ console.error('pending 團員審核監聽失敗', err); });
+        }).catch(function(err){ console.error('pending 團員審核讀取失敗', err); });
       }
     });
 </script>

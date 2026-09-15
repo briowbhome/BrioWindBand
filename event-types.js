@@ -1,5 +1,5 @@
 import {
-  collection, query, orderBy, onSnapshot, doc, setDoc, serverTimestamp
+  collection, query, orderBy, onSnapshot, getDocs, doc, setDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 // 固定的十種徽章顏色主題，不開放自訂色碼，維持視覺統一
@@ -61,6 +61,22 @@ export function subscribeEventTypes(db, callback, seedIfEmptyUid, onError) {
       };
     }));
   }, onError);
+}
+
+// 不需要即時監聽、只是進頁時讀一次的場合用（例如 index.html/profile.html 首頁），
+// 跟 subscribeEventTypes() 共用同一份轉換邏輯，回傳的資料形狀完全一樣
+export async function loadEventTypesOnce(db) {
+  var snap = await getDocs(query(collection(db, "eventTypes"), orderBy("order", "asc")));
+  return snap.docs.map(function (docSnap) {
+    var data = docSnap.data();
+    return {
+      id: docSnap.id,
+      label: data.label,
+      colorKey: data.colorKey,
+      order: data.order,
+      homeHighlight: !!data.homeHighlight
+    };
+  });
 }
 
 export function badgeStyle(colorKey) {
