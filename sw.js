@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'brio-v38';
+const CACHE_VERSION = 'brio-v39';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -70,13 +70,34 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// 快取優先＋背景更新：先用本機已有的版本立即回應（不受當下網路好壞影響），
-// 背景同時打一次網路把快取更新成最新版，下次載入才會是新的。取捨是部署新版本後
-// 使用者要再重整一次才看得到（pwa-register.js 的更新提示 banner 會告知並讓他手動觸發）
+// 整頁導頁（mode:'navigate'，也就是點連結/從主畫面圖示開 App 這種請求）不能套用下面
+// 「快取優先，背景偷偷更新」那套：iOS Safari 遇到 service worker 用一個網路沒抓完整的
+// response（訊號差、App 切到背景導致連線中斷）去回應導頁請求時，不會走一般的載入失敗重試，
+// 而是把這份殘缺內容當成無法辨識的檔案，跳出「下載/在其他 App 開啟」的畫面，而不是渲染
+// 網頁——2026-09 起陸續有 iOS 使用者反應點功能卡沒有正確跳轉、卻跳出檔案下載畫面，
+// 疑似就是這個情境。所以導頁請求改成單純「先打網路，
+// 失敗才退回快取／首頁」，不要把還在賭網路一定會抓完整的 response 直接拿去 respond
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
 
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).then((response) => {
+        caches.open(CACHE_VERSION).then((cache) => cache.put(event.request, response.clone()));
+        return response;
+      }).catch(() =>
+        caches.open(CACHE_VERSION).then((cache) =>
+          cache.match(event.request).then((cached) => cached || cache.match('./index.html'))
+        )
+      )
+    );
+    return;
+  }
+
+  // 快取優先＋背景更新：先用本機已有的版本立即回應（不受當下網路好壞影響），
+  // 背景同時打一次網路把快取更新成最新版，下次載入才會是新的。取捨是部署新版本後
+  // 使用者要再重整一次才看得到（pwa-register.js 的更新提示 banner 會告知並讓他手動觸發）
   event.respondWith(
     caches.open(CACHE_VERSION).then((cache) =>
       cache.match(event.request).then((cached) => {

@@ -224,10 +224,23 @@
 
   .event-top{ display:flex; align-items:flex-start; gap:10px; }
   .event-date{
-    flex:none; width:44px; text-align:center;
+    flex:none; width:34px; text-align:center; padding-top:2px;
+    font-family:'Noto Serif TC',serif; font-weight:900; font-size:21px; line-height:1.05; color:var(--ink);
   }
-  .event-date .d{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:19px; line-height:1.05; color:var(--ink); }
-  .event-date .m{ font-family:'Roboto Mono',monospace; font-size:9.5px; color:var(--ink-soft); letter-spacing:.05em; }
+  .event-date .wd{
+    display:block; font-family:'Roboto Mono',monospace; font-weight:600; font-size:8.5px;
+    color:var(--ink-soft); letter-spacing:.04em; margin-top:2px;
+  }
+
+  /* ---------- 月份區塊標題：活動清單改成依月份分組，月份只在換月時印一次，
+     卡片上只留日期數字（原本兩行「日期大字+月份小字」在跨月時不好看出是幾月，見開發路線圖說明） ---------- */
+  .month-group{ margin:0 20px; } /* 跟 .section-label／.list 同一份左右留白，讓月份標題對齊「所有活動」標題 */
+  .month-group + .month-group{ margin-top:16px; }
+  .month-group .list{ margin:0 0 24px; } /* 蓋掉 .list 原本自帶的左右留白，避免跟 .month-group 疊加成雙倍 */
+  .month-header{ display:flex; align-items:baseline; gap:7px; padding:0 0 8px; }
+  .month-header .num{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:15px; color:var(--brass-deep); }
+  .month-header .rule{ flex:1; height:1px; background:var(--line); }
+  .month-header .count{ font-family:'Roboto Mono',monospace; font-size:10px; color:var(--ink-soft); }
 
   .event-body{ flex:1; min-width:0; }
   .event-title{ font-weight:700; font-size:13.5px; color:var(--ink); display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
@@ -610,7 +623,7 @@
     <button type="button" class="add-btn" id="createEventBtn">＋ 建立活動</button>
   </div>
 
-  <div class="list" id="eventList"></div>
+  <div id="eventList"></div>
 
   </div>
 
@@ -1043,7 +1056,7 @@
   var eventSubmitBtn = document.getElementById('eventSubmitBtn');
   var eventCancelBtn = document.getElementById('eventCancelBtn');
   var eventList = document.getElementById('eventList');
-  eventList.innerHTML = SKELETON_ROWS_HTML(3);
+  eventList.innerHTML = '<div class="list">' + SKELETON_ROWS_HTML(3) + '</div>';
   document.getElementById('typesList').innerHTML = SKELETON_ROWS_HTML(2);
 
   function showEventFormError(message){
@@ -2234,14 +2247,41 @@
 
   // 網路壅塞等原因導致監聽失敗時呼叫，清掉骨架屏並明確告知，不要讓畫面卡住不動
   function renderEventsAdminError(){
-    eventList.innerHTML = '<div class="empty">讀取失敗，請重新整理再試一次</div>';
+    eventList.innerHTML = '<div class="list"><div class="empty">讀取失敗，請重新整理再試一次</div></div>';
     document.getElementById('typesList').innerHTML = '<div class="empty">讀取失敗，請重新整理再試一次</div>';
+  }
+
+  var WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
+
+  function eventItemHtml(eventId){
+    var evt = eventsById[eventId];
+    var d = evt.date;
+    var roster = rostersById[eventId];
+    var rosterMeta = roster ? ('名單 ' + roster.members.length + ' 人') : '尚未建立名單';
+    return (
+      '<div class="event-item" data-event="' + eventId + '">' +
+        '<button type="button" class="event-open" data-open-event="' + eventId + '">' +
+          '<div class="event-top">' +
+            '<div class="event-date">' + (d ? d.getDate() : '—') +
+              (d ? '<span class="wd">週' + WEEKDAY_LABELS[d.getDay()] + '</span>' : '') +
+            '</div>' +
+            '<div class="event-body">' +
+              '<div class="event-title">' + evt.title + typeBadge(evt.type) + '</div>' +
+              '<div class="event-meta">' + formatEventTime(evt) + (evt.location ? ' · ' + evt.location : '') + ' · ' + rosterMeta + '</div>' +
+            '</div>' +
+          '</div>' +
+        '</button>' +
+        '<button type="button" class="btn-delete-icon" data-delete="' + eventId + '" aria-label="刪除活動">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0-1 13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+        '</button>' +
+      '</div>'
+    );
   }
 
   function render(){
     var ids = Object.keys(eventsById);
     if (ids.length === 0){
-      eventList.innerHTML = '<div class="empty">目前沒有任何活動</div>';
+      eventList.innerHTML = '<div class="list"><div class="empty">目前沒有任何活動</div></div>';
       return;
     }
 
@@ -2251,28 +2291,29 @@
       return db_ - da;
     });
 
-    eventList.innerHTML = ids.map(function(eventId){
-      var evt = eventsById[eventId];
-      var d = evt.date;
-      var roster = rostersById[eventId];
-      var rosterMeta = roster ? ('名單 ' + roster.members.length + ' 人') : '尚未建立名單';
+    // 依月份分組：清單本來就照日期排序，同月的活動天生就會排在一起，這裡只是把既有排序
+    // 視覺化成分段標題，不用另外調整排序邏輯（沒有日期的活動歸在同一組「日期未定」）
+    var groups = [];
+    ids.forEach(function(eventId){
+      var d = eventsById[eventId].date;
+      var key = d ? (d.getFullYear() + '-' + d.getMonth()) : 'undated';
+      var g = groups.length ? groups[groups.length - 1] : null;
+      if (!g || g.key !== key){
+        g = { key: key, label: d ? ((d.getMonth() + 1) + '月') : '日期未定', ids: [] };
+        groups.push(g);
+      }
+      g.ids.push(eventId);
+    });
+
+    eventList.innerHTML = groups.map(function(g){
       return (
-        '<div class="event-item" data-event="' + eventId + '">' +
-          '<button type="button" class="event-open" data-open-event="' + eventId + '">' +
-            '<div class="event-top">' +
-              '<div class="event-date">' +
-                '<div class="d">' + (d ? d.getDate() : '—') + '</div>' +
-                '<div class="m">' + (d ? (d.getMonth() + 1) + '月' : '') + '</div>' +
-              '</div>' +
-              '<div class="event-body">' +
-                '<div class="event-title">' + evt.title + typeBadge(evt.type) + '</div>' +
-                '<div class="event-meta">' + formatEventTime(evt) + (evt.location ? ' · ' + evt.location : '') + ' · ' + rosterMeta + '</div>' +
-              '</div>' +
-            '</div>' +
-          '</button>' +
-          '<button type="button" class="btn-delete-icon" data-delete="' + eventId + '" aria-label="刪除活動">' +
-            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0-1 13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
-          '</button>' +
+        '<div class="month-group">' +
+          '<div class="month-header">' +
+            '<span class="num">' + g.label + '</span>' +
+            '<span class="rule"></span>' +
+            '<span class="count">' + g.ids.length + ' 場</span>' +
+          '</div>' +
+          '<div class="list">' + g.ids.map(eventItemHtml).join('') + '</div>' +
         '</div>'
       );
     }).join('');
