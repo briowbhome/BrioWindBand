@@ -230,7 +230,7 @@
     display:flex; align-items:baseline; gap:6px;
   }
   .update-item-title::before{ content:''; width:5px; height:5px; border-radius:50%; background:var(--brass); flex:none; }
-  .update-item-desc{ font-size:12px; color:var(--ink-soft); line-height:1.6; margin-top:4px; }
+  .update-item-desc{ font-size:12px; color:var(--ink-soft); line-height:1.6; margin-top:4px; white-space:pre-wrap; }
 
   /* ---------- 更新公告彈窗：視覺語言比照既有 notif-prompt-overlay/notif-prompt-card
      （推播通知開關推廣提示），獨立新元件、不共用同一個彈窗改內容。標題（圖示+發布
