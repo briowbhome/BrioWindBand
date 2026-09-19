@@ -1,6 +1,6 @@
 import {
   collection, doc, addDoc, updateDoc, setDoc, getDoc,
-  onSnapshot, serverTimestamp, writeBatch
+  onSnapshot, serverTimestamp, writeBatch, query, where
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 var FEE_CATEGORY_ID = 'fee';
@@ -81,15 +81,15 @@ export async function deleteFinanceCategory(db, categoryId) {
 // 異動不會回頭影響已經套用過的項目），但 QR Code 圖片刻意不複製——feeDues 只存
 // remittanceAccountId 參照，畫面上永遠即時去帳戶庫查目前最新的 QR Code（使用者定案：
 // 換一張乾淨的 QR 圖不用回頭改所有歷史項目）
-export function subscribeRemittanceAccounts(db, onData, onError) {
-  return onSnapshot(doc(db, 'settings', 'financeRemittanceAccounts'), function (snap) {
+export function subscribeRemittanceAccounts(db, team, onData, onError) {
+  return onSnapshot(doc(db, 'settings', 'financeRemittanceAccounts_' + team), function (snap) {
     var accounts = (snap.exists() && Array.isArray(snap.data().accounts)) ? snap.data().accounts : [];
     onData(accounts);
   }, onError);
 }
 
-export async function addRemittanceAccount(db, fields) {
-  var ref = doc(db, 'settings', 'financeRemittanceAccounts');
+export async function addRemittanceAccount(db, team, fields) {
+  var ref = doc(db, 'settings', 'financeRemittanceAccounts_' + team);
   var snap = await getDoc(ref);
   var accounts = (snap.exists() && Array.isArray(snap.data().accounts)) ? snap.data().accounts : [];
   var newAccount = {
@@ -101,8 +101,8 @@ export async function addRemittanceAccount(db, fields) {
   return newAccount.id;
 }
 
-export async function updateRemittanceAccount(db, accountId, fields) {
-  var ref = doc(db, 'settings', 'financeRemittanceAccounts');
+export async function updateRemittanceAccount(db, team, accountId, fields) {
+  var ref = doc(db, 'settings', 'financeRemittanceAccounts_' + team);
   var snap = await getDoc(ref);
   var accounts = (snap.exists() && Array.isArray(snap.data().accounts)) ? snap.data().accounts : [];
   var next = accounts.map(function (a) {
@@ -115,30 +115,30 @@ export async function updateRemittanceAccount(db, accountId, fields) {
   await setDoc(ref, { accounts: next }, { merge: true });
 }
 
-export async function deleteRemittanceAccount(db, accountId) {
-  var ref = doc(db, 'settings', 'financeRemittanceAccounts');
+export async function deleteRemittanceAccount(db, team, accountId) {
+  var ref = doc(db, 'settings', 'financeRemittanceAccounts_' + team);
   var snap = await getDoc(ref);
   var accounts = (snap.exists() && Array.isArray(snap.data().accounts)) ? snap.data().accounts : [];
   var next = accounts.filter(function (a) { return a.id !== accountId; });
   await setDoc(ref, { accounts: next }, { merge: true });
 }
 
-export function subscribeFinanceSettings(db, onData, onError) {
-  return onSnapshot(doc(db, 'settings', 'financeSettings'), function (snap) {
+export function subscribeFinanceSettings(db, team, onData, onError) {
+  return onSnapshot(doc(db, 'settings', 'financeSettings_' + team), function (snap) {
     onData(snap.exists() ? snap.data() : { openingBalance: 0 });
   }, onError);
 }
 
-export async function updateOpeningBalance(db, uid, amount) {
-  await setDoc(doc(db, 'settings', 'financeSettings'), {
+export async function updateOpeningBalance(db, team, uid, amount) {
+  await setDoc(doc(db, 'settings', 'financeSettings_' + team), {
     openingBalance: amount,
     openingBalanceUpdatedAt: serverTimestamp(),
     openingBalanceUpdatedBy: uid
   }, { merge: true });
 }
 
-export function subscribeLedgerEntries(db, onData, onError) {
-  return onSnapshot(collection(db, 'ledgerEntries'), function (snap) {
+export function subscribeLedgerEntries(db, team, onData, onError) {
+  return onSnapshot(query(collection(db, 'ledgerEntries'), where('team', '==', team)), function (snap) {
     var list = [];
     snap.forEach(function (docSnap) {
       list.push(Object.assign({ id: docSnap.id }, docSnap.data()));
@@ -152,13 +152,14 @@ export function subscribeLedgerEntries(db, onData, onError) {
   }, onError);
 }
 
-export async function addLedgerEntry(db, uid, fields) {
+export async function addLedgerEntry(db, team, uid, fields) {
   await addDoc(collection(db, 'ledgerEntries'), {
     type: fields.type,
     categoryId: fields.categoryId,
     amount: fields.amount,
     date: fields.date,
     note: fields.note || '',
+    team: team,
     recordedBy: uid,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -195,8 +196,8 @@ export function computeBalance(openingBalance, entries) {
   return total;
 }
 
-export function subscribeFeeDues(db, onData, onError) {
-  return onSnapshot(collection(db, 'feeDues'), function (snap) {
+export function subscribeFeeDues(db, team, onData, onError) {
+  return onSnapshot(query(collection(db, 'feeDues'), where('team', '==', team)), function (snap) {
     var list = [];
     snap.forEach(function (docSnap) {
       list.push(Object.assign({ id: docSnap.id }, docSnap.data()));
@@ -210,7 +211,7 @@ export function subscribeFeeDues(db, onData, onError) {
   }, onError);
 }
 
-export async function addFeeDue(db, uid, fields) {
+export async function addFeeDue(db, team, uid, fields) {
   var ref = await addDoc(collection(db, 'feeDues'), {
     title: fields.title,
     amount: fields.amount,
@@ -222,6 +223,7 @@ export async function addFeeDue(db, uid, fields) {
     remittanceHolder: fields.remittanceHolder || '',
     remittanceNote: fields.remittanceNote || '',
     remittanceAccountId: fields.remittanceAccountId || null,
+    team: team,
     createdAt: serverTimestamp(),
     createdBy: uid,
     voided: false
@@ -253,8 +255,8 @@ export async function voidFeeDue(db, dueId, uid) {
   });
 }
 
-export function subscribeFeePayments(db, onData, onError) {
-  return onSnapshot(collection(db, 'feePayments'), function (snap) {
+export function subscribeFeePayments(db, team, onData, onError) {
+  return onSnapshot(query(collection(db, 'feePayments'), where('team', '==', team)), function (snap) {
     var list = [];
     snap.forEach(function (docSnap) {
       list.push(Object.assign({ id: docSnap.id }, docSnap.data()));
@@ -263,6 +265,9 @@ export function subscribeFeePayments(db, onData, onError) {
   }, onError);
 }
 
+// fields.team：這筆繳費對應的 feeDues 文件本身的 team，由呼叫端從 feeDuesList 裡找出來傳進來，
+// 不是重新讀「目前頁面在管理哪一團」——理論上兩者必然一致（列表本來就已經依 activeTeam
+// 過濾過），但直接沿用來源文件的欄位可以完全避免任何時序上的不一致風險
 export async function recordFeePayment(db, fields) {
   var paymentRef = doc(db, 'feePayments', fields.dueId + '_' + fields.uid);
   var ledgerRef = doc(collection(db, 'ledgerEntries'));
@@ -275,6 +280,7 @@ export async function recordFeePayment(db, fields) {
     paidAt: fields.paidAt,
     method: fields.method || null,
     note: fields.note || '',
+    team: fields.team,
     recordedBy: fields.recordedBy,
     createdAt: serverTimestamp(),
     linkedLedgerEntryId: ledgerRef.id,
@@ -286,6 +292,7 @@ export async function recordFeePayment(db, fields) {
     amount: fields.amountPaid,
     date: fields.paidAt,
     note: fields.note || '',
+    team: fields.team,
     recordedBy: fields.recordedBy,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),

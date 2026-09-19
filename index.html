@@ -14,24 +14,8 @@
 <script src="./pull-refresh.js" defer></script>
 <script src="./ios-install.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" defer></script>
+<link rel="stylesheet" href="./theme.css">
 <style>
-  :root{
-    --ink:#20242F;
-    --ink-soft:#4A4F5C;
-    --paper:#F2EFE5;
-    --paper-raised:#FBFAF4;
-    --line:#DAD3BE;
-    --brass:#B8863A;
-    --brass-deep:#8F6A2C;
-    --burgundy:#7A2331;
-    --burgundy-deep:#5C1A26;
-    --sage:#5F6E58;
-    --sage-bg:#E7EBDF;
-    --radius-lg:20px;
-    --radius-md:14px;
-    --radius-sm:9px;
-    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
-  }
 
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -234,9 +218,11 @@
   }
   .ov-ann-badge.event{ background:rgba(184,134,58,.14); color:var(--brass-deep); }
   .ov-ann-badge.update{ background:var(--sage-bg); color:var(--sage); }
-  .ov-ann-title{ font-size:12.5px; font-weight:700; color:var(--ink); flex:1; }
+  .ov-ann-title{ font-size:12.5px; font-weight:700; color:var(--ink); flex:1; white-space:pre-wrap; }
   .ov-ann-meta{ font-size:10.5px; color:var(--ink-soft); margin-top:2px; }
   .ov-ann-expand{ flex:none; background:none; border:none; color:var(--ink-soft); font-size:11px; cursor:pointer; padding:2px 4px; }
+  .ov-ann-more{ display:block; width:100%; background:none; border:none; text-align:center; padding:11px 14px; font-size:12.5px; font-weight:700; color:var(--brass-deep); cursor:pointer; }
+  .ov-ann-more:active{ background:var(--paper); }
   .update-item{ margin-top:8px; padding-top:8px; border-top:1px solid var(--line); }
   .update-item:first-child{ margin-top:8px; }
   .update-item-title{
@@ -675,7 +661,7 @@
   .notif-row .dot{ flex:none; width:7px; height:7px; border-radius:50%; background:var(--burgundy); }
   .notif-row .dot.dot-read{ background:var(--line); }
   .notif-row .body{ flex:1; min-width:0; }
-  .notif-row .title{ font-size:12.5px; color:var(--ink); font-weight:700; }
+  .notif-row .title{ font-size:12.5px; color:var(--ink); font-weight:700; white-space:pre-wrap; }
   .notif-row .meta{ font-size:11px; color:var(--ink-soft); margin-top:2px; }
   .notif-row .chev{ flex:none; color:var(--brass-deep); }
   .notif-empty{ font-size:12px; color:var(--ink-soft); padding:6px 2px 14px; }
@@ -843,6 +829,7 @@
       <div class="sub">Brio Wind Band</div>
     </div>
     <div class="spacer"></div>
+    <span class="team-badge hidden" id="teamBadge"></span>
     <a class="bell-btn hidden" id="conductorBtn" href="conductor-admin.html" aria-label="指揮後台">
       <svg width="21" height="21" viewBox="0 0 24 24" fill="none"><path d="M8.5 16.5 18.5 6.5" stroke="#20242F" stroke-width="1.5" stroke-linecap="round"/><path d="M8.3 16.8C9.455 20.52 10.4 22.5 10.4 23A2.1 2.1 0 1 1 6.2 23C6.2 22.5 7.145 20.52 8.3 16.8Z" fill="#20242F" transform="rotate(45 8.3 16.8)"/></svg>
     </a>
@@ -1175,13 +1162,14 @@
   import { showConfirm } from './dialog.js';
   import { MESSAGES } from './messages.js';
   import { subscribeRemittanceAccounts } from './finance.js';
-  import { resolveMemberAccess, peekCachedProfile } from './auth-guard.js';
+  import { resolveMemberAccess, peekCachedProfile, getActiveTeam, getSectionLeaderInstruments } from './auth-guard.js';
+  import { initTeamSwitcher } from './team-switcher.js';
   import { loadEventTypesOnce } from './event-types.js';
   import { cachedThenFresh } from './data-cache.js';
   import { db } from './firebase-init.js';
   import { VAPID_PUBLIC_KEY } from './push-config.js';
   import {
-    collection, query, where, orderBy, limit, onSnapshot, Timestamp,
+    collection, query, where, or, orderBy, limit, onSnapshot, Timestamp,
     doc, getDoc, getDocs, setDoc, deleteDoc, serverTimestamp
   } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
@@ -1424,8 +1412,15 @@
     // 而是照使用者定案的規則撐到當天結束（切到隔天 00:00）才換下一場
     var todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
+    // 這段程式碼在 resolveMemberAccess() 解析完成前就會先發出查詢（訪客也看得到「下次團練」），
+    // 這時候還不知道真正的 activeTeam，用 peekCachedProfile()（跟骨架畫面同一份 sessionStorage
+    // 快取）做樂觀猜測；沒有快取（全新裝置/訪客）預設校友團。已知限制：校內團真的有成員後，
+    // 該團成員在全新裝置第一次造訪、快取還沒建立前，有機會短暫看到校友團的活動卡片，
+    // 等下一次載入快取命中就會恢復正確——這是跟骨架屏姓名縮寫閃爍同一類已知限制，不特別處理
+    var activeTeam = getActiveTeam(peekCachedProfile());
     var upcomingQuery = query(
       collection(db, 'events'),
+      where('team', 'array-contains', activeTeam),
       where('date', '>=', Timestamp.fromDate(todayStart)),
       orderBy('date', 'asc'),
       limit(20)
@@ -1556,6 +1551,8 @@
     var latestAnnouncements = [];
     var notificationsReadAt = null;
     var NOTIF_ANNOUNCE_LIMIT = 3;
+    var OVERVIEW_ANNOUNCE_LIMIT = 5; // 團務總覽「公告」區塊預設只顯示這麼多則，超過才顯示「查看更多」
+    var overviewAnnounceExpanded = false;
 
     // 公告清單每一列的紅點：跟鈴鐺數字徽章（renderNotifDot）不同，這裡要凍結成「這次打開
     // 通知中心當下」的未讀快照，而不是每次重繪都重新比對即時的 notificationsReadAt——
@@ -1584,8 +1581,12 @@
 
     // 公告異動頻率不高，改成一次性讀取＋快取（理由跟上面 eventTypes/events 一樣）；
     // 唯一的取捨是「停留頁面時剛好有新公告發布」不會自動跳出，要下拉重整或重新整理才看得到
+    // 9/19 追加修正：「更新」分類公告（App 軟體版本異動）跟團別無關，用 or() 讓它不受
+    // activeTeam 過濾，臨時/活動兩類維持只看目前團別
     cachedThenFresh('brio_cache_announcements', function(){
-      return getDocs(query(collection(db, 'announcements'), orderBy('createdAt', 'desc'), limit(20))).then(function(snap){
+      return getDocs(query(collection(db, 'announcements'),
+        or(where('team', '==', activeTeam), where('category', '==', 'update')),
+        orderBy('createdAt', 'desc'), limit(20))).then(function(snap){
         return snap.docs.map(function(docSnap){
           var data = docSnap.data();
           return {
@@ -1659,7 +1660,8 @@
       }
       wrap.classList.remove('hidden');
       updateOverviewEmptyState();
-      document.getElementById('overviewAnnounceSlot').innerHTML = overviewItems.map(function(item){
+      var shownItems = overviewAnnounceExpanded ? overviewItems : overviewItems.slice(0, OVERVIEW_ANNOUNCE_LIMIT);
+      var rowsHtml = shownItems.map(function(item){
         var badgeLabel = item.category === 'update' ? '更新' : '活動';
         var expandHtml = item.category === 'update'
           ? '<button type="button" class="ov-ann-expand" data-ov-ann-expand="' + item.id + '">展開 ▾</button>'
@@ -1679,9 +1681,19 @@
           '</div>'
         );
       }).join('');
+      var remaining = overviewItems.length - shownItems.length;
+      var moreHtml = remaining > 0
+        ? '<button type="button" class="ov-ann-more" id="overviewAnnounceMoreBtn">查看更多（還有 ' + remaining + ' 則）</button>'
+        : '';
+      document.getElementById('overviewAnnounceSlot').innerHTML = rowsHtml + moreHtml;
     }
 
     document.getElementById('overviewAnnounceSlot').addEventListener('click', function(e){
+      if (e.target.closest('#overviewAnnounceMoreBtn')){
+        overviewAnnounceExpanded = true;
+        renderOverviewAnnouncements();
+        return;
+      }
       var btn = e.target.closest('[data-ov-ann-expand]');
       if (!btn) return;
       var id = btn.getAttribute('data-ov-ann-expand');
@@ -2226,16 +2238,25 @@
       var submitBtn = document.getElementById('rsvpSubmitBtn');
       submitBtn.disabled = true;
       var eventId = rsvpOpenEventId;
+      var status = rsvpSelectedStatus;
       setDoc(doc(db, 'attendanceReports', eventId + '_' + viewerUid), {
         eventId: eventId,
         uid: viewerUid,
         account: viewerProfile.account,
         name: viewerProfile.name,
-        status: rsvpSelectedStatus,
-        reason: rsvpSelectedStatus === 'leave' ? reason : '',
+        status: status,
+        reason: status === 'leave' ? reason : '',
         respondedAt: serverTimestamp()
       }).then(function(){
         submitBtn.disabled = false;
+        // 9/19 修正：這份資料已經不是常駐 onSnapshot 監聽（見下方 cachedThenFresh 那段
+        // 說明），自己送出的回報不會自動同步回來，要自己更新本地狀態並重繪，不然橫幅／
+        // 通知中心角標／卡片上的「已回報」標籤都要等下一次整頁重整才會消失
+        rsvpReportsByEvent[eventId] = { status: status, reason: status === 'leave' ? reason : '' };
+        renderRsvpBanner();
+        renderNotifDot();
+        renderNotifSheet();
+        renderEventsSection();
         closeRsvpSheet();
       }).catch(function(err){
         submitBtn.disabled = false;
@@ -2538,7 +2559,7 @@
     function canDeleteConcertNote(n){
       if (viewerProfile.role === 'admin' || viewerProfile.role === 'owner') return true;
       if (n.authorUid === viewerUid) return true;
-      return (viewerProfile.sectionLeaderFor || []).indexOf(n.instrumentName) !== -1;
+      return getSectionLeaderInstruments(viewerProfile).indexOf(n.instrumentName) !== -1;
     }
 
     function renderConcertNoteItem(n){
@@ -2728,6 +2749,8 @@
     // 跟「我的音樂會」不同：這裡的資料同時餵給首頁橫幅／通知中心（兩者一進首頁就要看到），
     // 所以訂閱本身是 eager（身分驗證完成就掛），不走 setOverviewLazyLoad 那套延遲載入，
     // 這個函式只是把已經在記憶體裡的資料畫出來，不會另外發查詢
+    var FEE_DUE_TEAM_LABELS = { alumni: '校友團', school: '校內團' };
+
     function renderMyFeeDues(){
       var wrap = document.getElementById('myFeeDuesWrap');
       if (myFeeDuesList.length === 0){
@@ -2737,6 +2760,9 @@
       }
       wrap.classList.remove('hidden');
       updateOverviewEmptyState();
+      // 只有雙團籍成員（teamIds 有兩個值）才顯示團別標籤——單團籍成員清單裡每一筆
+      // 一定是同一團，標籤只會是雜訊
+      var showTeamTag = viewerProfile && Array.isArray(viewerProfile.teamIds) && viewerProfile.teamIds.length > 1;
       document.getElementById('myFeeDuesSlot').innerHTML = myFeeDuesList.map(function(due){
         var payment = myFeePaymentsByDueId[due.id];
         var dateVal = payment && payment.paidAt && payment.paidAt.toDate ? payment.paidAt.toDate() : null;
@@ -2744,7 +2770,11 @@
         var statusText = payment
           ? '已繳 $' + payment.amountPaid.toLocaleString('zh-Hant') + (dateText ? '・' + dateText : '')
           : '未繳 $' + feeDueAmountForMe(due).toLocaleString('zh-Hant');
+        var teamTagHtml = showTeamTag
+          ? '<div style="margin-bottom:4px;"><span style="font-family:\'Roboto Mono\',monospace;font-size:10px;font-weight:700;letter-spacing:.06em;background:var(--sage-bg);color:var(--ink-soft);border-radius:999px;padding:2px 8px;">' + (FEE_DUE_TEAM_LABELS[due.team] || due.team) + '</span></div>'
+          : '';
         var rowHtml = (
+          teamTagHtml +
           '<div class="overview-list-row-top">' +
             '<span class="k">' + escapeHtmlForOverview(due.title) + '</span>' +
             '<span class="v">' + statusText + '</span>' +
@@ -2798,6 +2828,7 @@
       viewerState = access.state;
       viewerUid = access.uid;
       viewerProfile = access.profile;
+      if (viewerProfile) initTeamSwitcher(viewerProfile);
       overviewLocked = (viewerState === 'guest');
 
       // tabbar「我的」：不論身分一律連到 profile.html——訪客點進去要先看到「登入」按鈕，
@@ -2953,7 +2984,11 @@
       // array-contains 查詢寫法。這裡是 eager 讀取（不走 setOverviewLazyLoad），因為橫幅／
       // 通知中心一進首頁就要看到，不能等使用者真的切到「團務總覽」才載入
       cachedThenFresh('brio_cache_feeDues_' + viewerUid, function(){
-        return getDocs(query(collection(db, 'feeDues'), where('memberIds', 'array-contains', viewerUid))).then(function(snap){
+        return getDocs(query(
+          collection(db, 'feeDues'),
+          where('memberIds', 'array-contains', viewerUid),
+          where('team', 'in', viewerProfile.teamIds)
+        )).then(function(snap){
           return snap.docs
             .map(function(d){ return Object.assign({ id: d.id }, d.data()); })
             .filter(function(d){ return !d.voided; });
@@ -2967,7 +3002,11 @@
       }).catch(function(err){ console.error('feeDues 讀取失敗', err); });
 
       cachedThenFresh('brio_cache_feePayments_' + viewerUid, function(){
-        return getDocs(query(collection(db, 'feePayments'), where('uid', '==', viewerUid))).then(function(snap){
+        return getDocs(query(
+          collection(db, 'feePayments'),
+          where('uid', '==', viewerUid),
+          where('team', 'in', viewerProfile.teamIds)
+        )).then(function(snap){
           var byDueId = {};
           snap.forEach(function(d){
             var data = d.data();
@@ -2984,12 +3023,17 @@
       }).catch(function(err){ console.error('feePayments 讀取失敗', err); });
 
       // 匯款帳戶庫：只用來即時查應繳項目連結的帳戶目前最新的 QR Code（不是複製快照，
-      // 帳戶之後換圖不用回頭改每一筆歷史應繳項目，這是使用者定案的刻意例外）
-      subscribeRemittanceAccounts(db, function(accounts){
-        remittanceAccountsById = {};
-        accounts.forEach(function(a){ remittanceAccountsById[a.id] = a; });
-        renderMyFeeDues();
-      }, function(err){ console.error('匯款帳戶監聽失敗', err); });
+      // 帳戶之後換圖不用回頭改每一筆歷史應繳項目，這是使用者定案的刻意例外）。9/18 分團：
+      // 依 teamIds 各自訂閱對應團別的帳戶庫文件，合併進同一份查找表——雙團籍成員需要
+      // 同時查得到兩團各自的帳戶，remittanceAccountsById 先清空一次、讓兩個監聽各自累加
+      // 進來，不要在每個監聽的回呼裡各自清空（否則後回來的那個團會把先前的結果洗掉）
+      remittanceAccountsById = {};
+      (viewerProfile.teamIds || []).forEach(function(team){
+        subscribeRemittanceAccounts(db, team, function(accounts){
+          accounts.forEach(function(a){ remittanceAccountsById[a.id] = a; });
+          renderMyFeeDues();
+        }, function(err){ console.error('匯款帳戶監聽失敗', err); });
+      });
 
       // notificationsReadAt 即時監聽（不透過 auth-guard.js 的快取 profile，見上方原因說明）。
       // setDoc 寫入 serverTimestamp() 後，本地端在伺服器確認前會先收到一次 null（Firestore 對

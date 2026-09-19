@@ -13,24 +13,8 @@
 <script src="./pwa-register.js" defer></script>
 <script src="./pull-refresh.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js" defer></script>
+<link rel="stylesheet" href="./theme.css">
 <style>
-  :root{
-    --ink:#20242F;
-    --ink-soft:#4A4F5C;
-    --paper:#F2EFE5;
-    --paper-raised:#FBFAF4;
-    --line:#DAD3BE;
-    --brass:#B8863A;
-    --brass-deep:#8F6A2C;
-    --burgundy:#7A2331;
-    --burgundy-deep:#5C1A26;
-    --sage:#5F6E58;
-    --sage-bg:#E7EBDF;
-    --radius-lg:20px;
-    --radius-md:14px;
-    --radius-sm:9px;
-    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
-  }
 
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -456,6 +440,7 @@
     <button type="button" class="rp-layout-toggle" id="rpLayoutToggleBtn" title="切換手機版／電腦版排版" aria-label="切換手機版／電腦版排版">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M9 4v16" stroke="currentColor" stroke-width="1.8"/></svg>
     </button>
+    <span class="team-badge hidden" id="teamBadge"></span>
     <button class="avatar skel" id="avatarBtn" type="button" aria-label="帳號選單"></button>
   </div>
 
@@ -642,6 +627,7 @@
   import { requireAdminOrSheetMusicManager, peekCachedProfile } from './auth-guard.js';
   import { db, storage } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
+  import { initTeamSwitcher } from './team-switcher.js';
   import {
     subscribeRepertoire, addPiece, updatePiece, deletePiece, randomPartId,
     uploadPartSheetMusic, deletePartSheetMusic, uploadFullScore, updateFullScore, uploadGroupSheetMusic
@@ -2242,6 +2228,7 @@
     // （會被那頁的 requireAdmin() 擋下），比照 conductor-admin.html 既有的雙模式寫法
     var isAdmin = result.profile.role === 'admin' || result.profile.role === 'owner';
     initAccountMenu(result.profile.name, isAdmin ? 'admin-index.html' : null, null);
+    initTeamSwitcher(result.profile);
     if (isAdmin) {
       document.getElementById('adminNavBtn').classList.remove('hidden');
       initAdminNav('repertoire');

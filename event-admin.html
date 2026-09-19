@@ -13,24 +13,8 @@
 <script src="./pwa-register.js" defer></script>
 <script src="./pull-refresh.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<link rel="stylesheet" href="./theme.css">
 <style>
-  :root{
-    --ink:#20242F;
-    --ink-soft:#4A4F5C;
-    --paper:#F2EFE5;
-    --paper-raised:#FBFAF4;
-    --line:#DAD3BE;
-    --brass:#B8863A;
-    --brass-deep:#8F6A2C;
-    --burgundy:#7A2331;
-    --burgundy-deep:#5C1A26;
-    --sage:#5F6E58;
-    --sage-bg:#E7EBDF;
-    --radius-lg:20px;
-    --radius-md:14px;
-    --radius-sm:9px;
-    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
-  }
 
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -574,6 +558,7 @@
       </div>
     </a>
     <div class="spacer"></div>
+    <span class="team-badge hidden" id="teamBadge"></span>
     <button class="avatar skel" id="avatarBtn" type="button" aria-label="帳號選單"></button>
   </div>
 
@@ -656,6 +641,13 @@
             <label>音樂會名稱</label>
             <input type="text" id="concertTitle" placeholder="例如：2026 校友團公演" required>
           </div>
+          <div class="field">
+            <label>所屬團別</label>
+            <select id="concertTeam">
+              <option value="alumni">校友團</option>
+              <option value="school">校內團</option>
+            </select>
+          </div>
           <div class="field-row">
             <div class="field">
               <label>開始日期</label>
@@ -701,6 +693,13 @@
           <div class="field">
             <label>活動標題</label>
             <input type="text" id="eventTitle" placeholder="例如：團練、重奏演出" required>
+          </div>
+          <div class="field">
+            <label>所屬團別</label>
+            <select id="eventTeam">
+              <option value="alumni">校友團</option>
+              <option value="school">校內團</option>
+            </select>
           </div>
           <div class="field">
             <label>類型</label>
@@ -961,9 +960,10 @@
   import { showToast } from './toast.js';
   import { showConfirm } from './dialog.js';
   import { MESSAGES } from './messages.js';
-  import { requireAdmin, peekCachedProfile } from './auth-guard.js';
+  import { requireAdmin, peekCachedProfile, getActiveTeam, hasTeamPermission } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
+  import { initTeamSwitcher } from './team-switcher.js';
   import { subscribeEventTypes, COLOR_THEMES, badgeStyle } from './event-types.js';
   import { subscribeRepertoire } from './repertoire.js';
   import { subscribeInstruments } from './instruments.js';
@@ -1095,6 +1095,7 @@
   function enterCreateMode(){
     editingId = null;
     eventForm.reset();
+    document.getElementById('eventTeam').value = activeTeam; // reset() 管不到動態預設值，另外設定
     setEventConcertSelectValue(document.getElementById('eventConcertId'), ''); // 順便把上一次編輯留下的「找不到這場音樂會」暫時選項清掉
     document.getElementById('createRosterTemplate').value = ''; // 不在 #eventForm 節點裡，reset() 管不到，另外重置
     setDefaultEventDate();
@@ -1110,6 +1111,7 @@
     if (!evt) return;
     editingId = eventId;
     document.getElementById('eventTitle').value = evt.title || '';
+    document.getElementById('eventTeam').value = (evt.team && evt.team[0]) || activeTeam;
     document.getElementById('eventType').value = evt.type || 'rehearsal';
     document.getElementById('eventDate').value = evt.date ? toDateValue(evt.date) : '';
     document.getElementById('eventAllDay').checked = !!evt.allDay;
@@ -1203,6 +1205,7 @@
   function enterConcertCreateMode(){
     editingConcertId = null;
     concertForm.reset();
+    document.getElementById('concertTeam').value = activeTeam;
     concertSubmitBtn.disabled = false;
     concertSubmitBtn.textContent = '建立音樂會';
     document.getElementById('concertCancelBtn').classList.add('hidden');
@@ -1214,6 +1217,7 @@
     if (!c) return;
     editingConcertId = concertId;
     document.getElementById('concertTitle').value = c.title || '';
+    document.getElementById('concertTeam').value = (c.team && c.team[0]) || activeTeam;
     document.getElementById('concertStartDate').value = c.startDate ? toDateValue(c.startDate) : '';
     document.getElementById('concertEndDate').value = c.endDate ? toDateValue(c.endDate) : '';
     document.getElementById('concertDescription').value = c.description || '';
@@ -1265,7 +1269,8 @@
       title: title,
       startDate: Timestamp.fromDate(startDateObj),
       endDate: endDateObj ? Timestamp.fromDate(endDateObj) : null,
-      description: description
+      description: description,
+      team: [document.getElementById('concertTeam').value]
     };
 
     var task = wasEditing
@@ -2162,7 +2167,8 @@
       endTime: (!allDay && endTimeVal) ? Timestamp.fromDate(new Date(dateVal + 'T' + endTimeVal)) : null,
       location: location,
       repertoire: repertoire,
-      concertId: document.getElementById('eventConcertId').value || null
+      concertId: document.getElementById('eventConcertId').value || null,
+      team: [document.getElementById('eventTeam').value]
     };
 
     var task = wasEditing
@@ -3561,19 +3567,23 @@
   });
 
   var currentAdminUid = null;
+  var activeTeam = null;
 
   requireAdmin().then(function(result){
     if (!result) return;
     currentAdminUid = result.uid;
+    activeTeam = getActiveTeam(result.profile);
 
     var avatarBtn = document.getElementById('avatarBtn');
     avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
     avatarBtn.classList.remove('skel');
     initAccountMenu(result.profile.name);
+    initTeamSwitcher(result.profile);
     initAdminNav('event');
 
     var canManageTypes = result.profile.role === 'owner' ||
-      (result.profile.permissions && result.profile.permissions.canManageEventTypes === true);
+      (result.profile.permissions && result.profile.permissions.canManageEventTypes === true) ||
+      hasTeamPermission(result.profile, 'canManageEventTypes');
 
     if (canManageTypes){
       document.getElementById('typesSectionLabel').classList.remove('hidden');
@@ -3604,7 +3614,7 @@
       maybeRender();
     }, canManageTypes ? currentAdminUid : null, renderEventsAdminError);
 
-    onSnapshot(collection(db, 'events'), function(snap){
+    onSnapshot(query(collection(db, 'events'), where('team', 'array-contains', activeTeam)), function(snap){
       eventsById = {};
       snap.forEach(function(docSnap){
         var data = docSnap.data();
@@ -3616,14 +3626,15 @@
           endTime: data.endTime && data.endTime.toDate ? data.endTime.toDate() : null,
           location: data.location,
           repertoire: data.repertoire || [],
-          concertId: data.concertId || null
+          concertId: data.concertId || null,
+          team: data.team || ['alumni']
         };
       });
       eventsLoaded = true;
       maybeRender();
     }, renderEventsAdminError);
 
-    onSnapshot(collection(db, 'concerts'), function(snap){
+    onSnapshot(query(collection(db, 'concerts'), where('team', 'array-contains', activeTeam)), function(snap){
       concertsById = {};
       concertsList = [];
       snap.forEach(function(docSnap){
@@ -3633,7 +3644,8 @@
           title: data.title,
           startDate: data.startDate && data.startDate.toDate ? data.startDate.toDate() : null,
           endDate: data.endDate && data.endDate.toDate ? data.endDate.toDate() : null,
-          description: data.description || ''
+          description: data.description || '',
+          team: data.team || ['alumni']
         };
         concertsById[docSnap.id] = c;
         concertsList.push(c);
@@ -3664,6 +3676,9 @@
     onSnapshot(collection(db, 'eventRosters'), function(snap){
       rostersById = {};
       snap.forEach(function(docSnap){
+        // 9/19 追加修正：只保留目前團別看得到的活動，避免瀏覽器記憶體裡存進另一團的
+        // 應到名單內容（雖然本來就不會渲染出來，這裡直接不下載進本地物件）
+        if (!eventsById[docSnap.id]) return;
         var data = docSnap.data();
         rostersById[docSnap.id] = {
           members: data.members || [],
@@ -3677,8 +3692,11 @@
     }, function(err){ console.error('eventRosters 監聽失敗', err); });
 
     // 名單範本（roster-admin.html 管理）：只影響「建立活動」跟「名單調整」分頁的兩個下拉選單，
-    // 不影響活動列表本身能不能畫出來，不用加進 maybeRender() 的載入旗標比對
-    onSnapshot(collection(db, 'rosterTemplates'), function(snap){
+    // 不影響活動列表本身能不能畫出來，不用加進 maybeRender() 的載入旗標比對。9/19 資安修正：
+    // 原本沒有依團別過濾，firestore.rules 的 get/list 也還沒團別化之前，這裡會把另一團的
+    // 範本名稱/人數一起下載顯示在下拉選單裡；現在規則已經收緊成 isAdminTierFor(team)，
+    // 這裡的查詢也要跟著加上 where，不然規則會直接擋掉整個 list 請求
+    onSnapshot(query(collection(db, 'rosterTemplates'), where('team', '==', activeTeam)), function(snap){
       rosterTemplatesById = {};
       rosterTemplatesList = [];
       snap.forEach(function(docSnap){

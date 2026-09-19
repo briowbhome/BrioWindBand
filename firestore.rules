@@ -32,36 +32,17 @@ service cloud.firestore {
           selfProfile().permissions.canManageRoles == true);
     }
 
-    // Owner，或被個別授予 canManageEventTypes 的人（活動類型清單管理）
-    function canManageEventTypes() {
-      return isOwner() ||
-        (hasProfile() &&
-          selfProfile().permissions != null &&
-          selfProfile().permissions.canManageEventTypes == true);
+    // 9/19 分部管理分團：concerts/*/pieces／sections／notes 巢狀在 concerts/{concertId} 底下，
+    // team 存在音樂會本身，不在這些子文件上，用 get() 跨文件讀取（既有模式，checkinSessions／
+    // eventRosters 都這樣用）
+    function concertTeamOf(concertId) {
+      return get(/databases/$(database)/documents/concerts/$(concertId)).data.team[0];
     }
 
-    // Owner，或被個別授予 canManageSheetMusic 的人（藏譜管理，例如譜務）
-    function canManageSheetMusic() {
-      return isOwner() ||
-        (hasProfile() &&
-          selfProfile().permissions != null &&
-          selfProfile().permissions.canManageSheetMusic == true);
-    }
-
-    // Owner，或被個別授予 canManageFinance 的人（財務記帳，例如財務職位）
-    function canManageFinance() {
-      return isOwner() ||
-        (hasProfile() &&
-          selfProfile().permissions != null &&
-          selfProfile().permissions.canManageFinance == true);
-    }
-
-    // 分部長只能寫自己 sectionLeaderFor 範圍內的樂器分部（concerts/*/pieces/*/sections/{instrumentName}
-    // 文件 ID 本身就是樂器名稱，不用讀文件內容就能判斷範圍）
-    function canManageSection(instrumentName) {
-      return hasProfile() &&
-        selfProfile().sectionLeaderFor != null &&
-        instrumentName in selfProfile().sectionLeaderFor;
+    // 9/19 審核與活動週邊資料分團：checkinSessions／checkins／eventRosters／attendanceReports
+    // 都用 eventId 綁定，team 存在活動本身，用 get() 跨文件讀取（跟 concertTeamOf 同一種手法）
+    function eventTeamOf(eventId) {
+      return get(/databases/$(database)/documents/events/$(eventId)).data.team[0];
     }
 
     // 一般 Admin 審核用：role 是 admin 或 owner 就算「幹部層級」
@@ -69,15 +50,70 @@ service cloud.firestore {
       return hasProfile() && selfProfile().role in ['admin', 'owner'];
     }
 
-    // 指揮專用頁面（conductor-admin.html）讀取用：role 是 conductor。
-    // 刻意跟 isAdminTier() 分開、不合併成同一個函式——指揮跟幹部是不同的角色，只是這裡
-    // 剛好需要讀同一批資料，合併判斷式之後容易漏改任何一邊各自要調整的權限範圍
-    function isConductor() {
-      return hasProfile() && selfProfile().role == 'conductor';
+
+    // ---------- 依團別的角色/權限判斷（9/16 校友團/校內團分割新增）----------
+    // 跟上面的全域版本（isAdminTier/isConductor/canManageSection）並存，不是取代：
+    // 這批全域版本繼續給「這次還沒遷移」的其他 collection 規則用（events/announcements/
+    // eventTypes/settings/instruments 等），等各自的子系統計畫把它們改成呼叫下面這批
+    // 依團別版本後，全域版本才會在收尾計畫裡一併清掉
+    function teamProfile(team) {
+      return selfProfile().teams != null ? selfProfile().teams.get(team, null) : null;
     }
 
+    function hasTeam(team) {
+      return hasProfile() && teamProfile(team) != null;
+    }
+
+    function isAdminTierFor(team) {
+      return isOwner() || (hasTeam(team) && teamProfile(team).role == 'admin');
+    }
+
+    function isConductorFor(team) {
+      return hasTeam(team) && teamProfile(team).role == 'conductor';
+    }
+
+    function canManageRolesFor(team) {
+      return isOwner() ||
+        (hasTeam(team) &&
+          teamProfile(team).permissions != null &&
+          teamProfile(team).permissions.canManageRoles == true);
+    }
+
+    function canManageFinanceFor(team) {
+      return isOwner() ||
+        (hasTeam(team) &&
+          teamProfile(team).permissions != null &&
+          teamProfile(team).permissions.canManageFinance == true);
+    }
+
+    function canManageSheetMusicFor(team) {
+      return isOwner() ||
+        (hasTeam(team) &&
+          teamProfile(team).permissions != null &&
+          teamProfile(team).permissions.canManageSheetMusic == true);
+    }
+
+    function canManageEventTypesFor(team) {
+      return isOwner() ||
+        (hasTeam(team) &&
+          teamProfile(team).permissions != null &&
+          teamProfile(team).permissions.canManageEventTypes == true);
+    }
+
+    function canManageSectionFor(team, instrumentName) {
+      return isOwner() ||
+        (hasTeam(team) &&
+          teamProfile(team).sectionLeaderFor != null &&
+          instrumentName in teamProfile(team).sectionLeaderFor);
+    }
+
+    // 9/19 資安修正：team 分割後 teams.{team}.role/permissions 才是實際的權限判斷依據，
+    // 這個函式原本只擋全域 role/permissions 兩個頂層欄位，沒擋到 teams/teamIds，導致任何
+    // 「該團 admin」都能繞過 canManageRolesFor 的授權，透過下面「一般審核操作」規則
+    // 直接幫自己或同團的人把 teams.{team}.permissions 改成 true。這裡把 teams/teamIds
+    // 也一併擋掉——這兩個欄位只能透過下面專門的 canManageRolesFor 規則調整
     function touchesRoleOrPermissions() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'permissions']);
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'permissions', 'teams', 'teamIds']);
     }
 
     // 簽到碼是否仍然有效：checkinSessions/{eventId} 存在、code 相符、還沒過期
@@ -91,31 +127,20 @@ service cloud.firestore {
       // 本人可以讀自己的資料（登入後檢查審核狀態用）
       allow get: if request.auth != null && request.auth.uid == uid;
 
-      // 幹部層級可以讀取／列出所有團員資料（審核畫面用）
-      allow get, list: if isAdminTier();
-
-      // 指揮專用頁面（conductor-admin.html）唯讀查看團員名單（姓名/樂器對照應到名單用），
-      // 不開放建立/修改/刪除——之前漏了這條，指揮角色的使用者進頁面就會卡在「讀取資料失敗」
-      allow get, list: if isConductor();
-
-      // 註冊：只能建立「自己」的文件，且狀態一定要是待審核、一般團員角色
-      // 防止有人自己把自己設成 approved 或 admin
-      allow create: if request.auth != null
-        && request.auth.uid == uid
-        && request.resource.data.status == 'pending'
-        && request.resource.data.role == 'member';
-
-      // 一般審核操作：Admin/Owner 對「一般團員」核准／拒絕／標記停用／軟刪除
+      // 一般審核操作：Admin/Owner 對「一般團員」核准／拒絕／標記停用／軟刪除，改成看
+      // 申請人所屬團別的 admin（teamIds 在申請當下一定剛好一個值，見下方團別版 create 規則）
       // 不能透過這條規則動到 role 或 permissions 欄位
-      allow update: if isAdminTier()
+      allow update: if isAdminTierFor(resource.data.teamIds[0])
         && resource.data.role == 'member'
         && !touchesRoleOrPermissions();
 
-      // 角色與權限調整：Owner，或持有 canManageRoles 的人
-      // 對象不能是 Owner；也不能把任何人設成 owner，除非操作者本人就是 Owner
-      allow update: if canManageRoles()
-        && resource.data.role != 'owner'
-        && (request.resource.data.role != 'owner' || isOwner());
+      // 9/19 收尾計畫：原本的全域角色/權限編輯功能已經拿掉，這條規則的角色改成只放行
+      // instruments 欄位——角色/權限/分部長都已經有各自的團別版規則負責，這裡唯一要補的
+      // 缺口是讓幹部能改動「全域角色不是 member」的既有帳號（既有指揮/管理員）的樂器/聲部
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['instruments'])
+        && (isOwner()
+          || (resource.data.teamIds.hasAny(['alumni']) && isAdminTierFor('alumni'))
+          || (resource.data.teamIds.hasAny(['school']) && isAdminTierFor('school')));
 
       // Owner 編輯自己的安全欄位：上面兩條規則都把 Owner 自己的文件排除在外（刻意設計，
       // 防止 role/permissions 被任何管道改動，即使是 Owner 本人），但這樣 Owner 連自己的
@@ -150,7 +175,50 @@ service cloud.firestore {
 
       // 硬刪除：只開放給「已拒絕」的申請（對應已拒絕清單的「立即移除」）
       // 現役帳號一律走軟刪除（status: removed），真正的硬刪除由 Owner 在 Console 手動處理，不走這裡
-      allow delete: if isAdminTier() && resource.data.status == 'rejected';
+      // 9/19 分團：改看申請人所屬團別的 admin
+      allow delete: if isAdminTierFor(resource.data.teamIds[0]) && resource.data.status == 'rejected';
+
+      // ---------- 依團別的規則（9/16 新增，見上方 teamProfile 等 helper 說明）----------
+
+      // 幹部/指揮依團別讀取／列出所有團員資料。9/19 收尾計畫：拿掉了原本並存的全域
+      // isAdminTier()/isConductor() fallback——查證過現有 7 個既有幹部/指揮/Owner 帳號
+      // 的團別版角色都跟全域值一致，這條規則已經完整涵蓋
+      allow get, list: if isAdminTierFor('alumni') || isAdminTierFor('school')
+        || isConductorFor('alumni') || isConductorFor('school');
+
+      // 註冊：只能建立「自己」的文件，狀態一定要 pending、全域 role 一定要 member
+      // （防止自己把自己設成 owner），且 teamIds 剛好一個值、teams 底下只能有這一個團的
+      // 鍵、那個團的內容只能有 role 且必須是 member——不能連帶塞入 permissions/
+      // sectionLeaderFor/positionPresets，頂層也不能帶 permissions 欄位。9/19 資安修正：
+      // 原本跟這條並存的舊規則（只檢查全域 role/status，見上方已刪除的版本）完全沒做
+      // 這些形狀檢查，且這條原本也沒擋 permissions/teams 內容，會讓自建 Firestore 文件的人
+      // 在註冊當下就直接自我授予幹部權限，完全不需要任何審核就能生效
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.role == 'member'
+        && !('permissions' in request.resource.data)
+        && request.resource.data.teamIds is list
+        && request.resource.data.teamIds.size() == 1
+        && request.resource.data.teamIds[0] in ['alumni', 'school']
+        && request.resource.data.teams.keys().hasOnly([request.resource.data.teamIds[0]])
+        && request.resource.data.teams[request.resource.data.teamIds[0]].keys().hasOnly(['role'])
+        && request.resource.data.teams[request.resource.data.teamIds[0]].role == 'member';
+
+      // 角色與權限調整（團別版）：只持有「該團」canManageRoles 的人（或 Owner），
+      // 一次只能改動 teams 裡的其中一團，不能同時動兩團，也不能連帶動到任何其他欄位
+      // （包含全域的 role/status/permissions）。resource.data.get('teams', {}) 是既有文件
+      // 可能還沒有 teams 欄位（尚未遷移）時的安全預設值
+      // 9/17 修正：原本寫死只能動 'teams' 這一個欄位，但「加入這團」需要同時補上
+      // teamIds（規格文件的設計就是 teamIds 要跟 teams 的鍵值同步，見 9/16 設計文件），
+      // 放寬成 teams/teamIds 兩個欄位都可以動（單獨動 teams、或兩個一起動都允許）
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['teams', 'teamIds'])
+        && request.resource.data.teams.diff(resource.data.get('teams', {})).affectedKeys().hasOnly(['alumni'])
+        && canManageRolesFor('alumni');
+
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['teams', 'teamIds'])
+        && request.resource.data.teams.diff(resource.data.get('teams', {})).affectedKeys().hasOnly(['school'])
+        && canManageRolesFor('school');
     }
 
     // 活動（通用，音樂會/團練都在這裡）
@@ -158,21 +226,35 @@ service cloud.firestore {
     // 是刻意的決定：任何拿得到網址的人都能讀到活動名稱/時間/地點，不再需要帳號
     match /events/{eventId} {
       allow get, list: if true;
-      allow create, update, delete: if isAdminTier();
+
+      // 9/17 分團：建立時看「即將寫入的活動屬於哪團」，改/刪時看「這筆活動現在屬於哪團」，
+      // team[0] 是因為目前 UI 只會單選、陣列裡一定只有一個值——如果之後真的開放聯合活動
+      // 多選，這裡的權限判斷邏輯需要重新設計（例如要求對陣列內每個團都有權限），
+      // 不是這次的範圍。讀取（get/list）維持完全公開不動，理由見規格文件「D」一節
+      allow create: if isAdminTierFor(request.resource.data.team[0]);
+      allow update, delete: if isAdminTierFor(resource.data.team[0]);
     }
 
     // 活動類型清單（給活動的 type 欄位用，決定顯示名稱/顏色，首頁也靠 homeHighlight
     // 判斷哪一場算「下次團練」）。同上，改成公開讀取讓訪客也能正確算出下次團練卡片
     match /eventTypes/{typeId} {
       allow get, list: if true;
-      allow create, update, delete: if canManageEventTypes();
+      allow create, update, delete: if canManageEventTypesFor('alumni') || canManageEventTypesFor('school');
     }
 
     // 公告，首頁顯示用。發布者（createdBy）只記錄留存，不對團員顯示。
     // 同上改成公開讀取，訪客首頁也看得到公告內容
+    // 9/19 分團：寫入權限改成團別版（isAdminTierFor(team)），讀取（get/list）完全不變。
+    // 9/19 追加修正：「更新」分類公告記錄的是 App 軟體版本異動，跟團別無關，寫入權限
+    // 維持全域 isAdminTier()，不比照 urgent/event 兩類走團別版
     match /announcements/{announcementId} {
       allow get, list: if true;
-      allow create, update, delete: if isAdminTier();
+      allow create: if request.resource.data.category == 'update'
+        ? isAdminTier()
+        : isAdminTierFor(request.resource.data.team);
+      allow update, delete: if resource.data.category == 'update'
+        ? isAdminTier()
+        : isAdminTierFor(resource.data.team);
     }
 
     // 樂器/聲部清單，註冊頁（未登入）也要能讀，所以開放公開讀取；調整交給 canManageRoles
@@ -191,27 +273,46 @@ service cloud.firestore {
       allow write: if isOwner();
     }
 
+    // 9/18 分團：拆成兩份文件，查詢邏輯不變，只是文件路徑依團別決定。權限判斷式
+    // 完全不變——編輯維持全域 Owner-only，這是 2026-09-18 使用者明確確認過的決定，
+    // 不比照其他子專案改成 canManageRolesFor(team)
+    match /settings/seatingSections_alumni {
+      allow get: if hasProfile();
+      allow write: if isOwner();
+    }
+
+    match /settings/seatingSections_school {
+      allow get: if hasProfile();
+      allow write: if isOwner();
+    }
+
     // 財務分類清單／期初餘額，跟 feeDues/feePayments/ledgerEntries 同一個權限門檻，
     // 不對一般團員開放讀取
     match /settings/financeCategories {
-      allow get: if isAdminTier() || canManageFinance();
-      allow write: if isAdminTier() || canManageFinance();
+      allow get: if isAdminTierFor('alumni') || isAdminTierFor('school')
+        || canManageFinanceFor('alumni') || canManageFinanceFor('school');
+      allow write: if isAdminTierFor('alumni') || isAdminTierFor('school')
+        || canManageFinanceFor('alumni') || canManageFinanceFor('school');
     }
 
-    // 已存匯款帳戶（校內團/校友團等），純粹是建立應繳項目時的套用範本，不對一般團員
-    // 開放——團員看到的匯款資訊是複製進 feeDues 文件本身的欄位，不需要讀這份帳戶庫
-    // 8/30 讀取放寬：團員「我的團費」畫面要即時查詢應繳項目連結的帳戶目前的 QR Code
-    // （feeDues 只存 remittanceAccountId 參照，不複製 QR 圖片，見「開發路線圖」財務記帳章節），
-    // 銀行/帳號/戶名本來就不是機密（收款帳戶本來就是要公開讓人匯款），比照 settings/instruments
-    // 這類「非敏感共用清單」開放給所有登入者讀取；寫入維持只有幹部/財務能改
-    match /settings/financeRemittanceAccounts {
+    // 9/18 分團：拆成兩份文件，查詢邏輯不變，只是文件路徑依團別決定。讀取維持全體
+    // 登入者可讀（理由同上，銀行/帳號不是機密），寫入依團別檢查
+    match /settings/financeRemittanceAccounts_alumni {
       allow get: if hasProfile();
-      allow write: if isAdminTier() || canManageFinance();
+      allow write: if isAdminTierFor('alumni') || canManageFinanceFor('alumni');
     }
 
-    match /settings/financeSettings {
-      allow get: if isAdminTier() || canManageFinance();
-      allow write: if isAdminTier() || canManageFinance();
+    match /settings/financeRemittanceAccounts_school {
+      allow get: if hasProfile();
+      allow write: if isAdminTierFor('school') || canManageFinanceFor('school');
+    }
+
+    match /settings/financeSettings_alumni {
+      allow get, write: if isAdminTierFor('alumni') || canManageFinanceFor('alumni');
+    }
+
+    match /settings/financeSettings_school {
+      allow get, write: if isAdminTierFor('school') || canManageFinanceFor('school');
     }
 
     // 簽到中狀態，一場活動最多一份，過期後由 TTL 或幹部手動清除
@@ -219,19 +320,19 @@ service cloud.firestore {
       // 團員掃碼時要讀這份資料驗證 code／期限。8/23 從 hasProfile() 收緊成
       // isApprovedMember()——否則 pending/suspended/removed 的帳號也能直接讀到有效簽到碼
       allow get: if isApprovedMember();
-      // 幹部後台「生效中清單」用
-      allow list: if isAdminTier();
-      allow create, update, delete: if isAdminTier();
+      // 幹部後台「生效中清單」用——9/19 分團：任一團的 admin 都能讀（跟現況曝露程度一致）
+      allow list: if isAdminTierFor('alumni') || isAdminTierFor('school');
+      allow create, update, delete: if isAdminTierFor(eventTeamOf(eventId));
     }
 
     // 簽到紀錄，永久保留
     match /checkins/{checkinId} {
       // 本人可以查自己是否已簽到過（用文件 ID 判斷，不依賴文件是否存在）
       allow get: if request.auth != null &&
-        (checkinId.split('_')[1] == request.auth.uid || isAdminTier());
-      allow list: if isAdminTier();
+        (checkinId.split('_')[1] == request.auth.uid || isAdminTierFor('alumni') || isAdminTierFor('school'));
+      allow list: if isAdminTierFor('alumni') || isAdminTierFor('school');
       // 指揮專用頁面唯讀查看統計，不開放建立/修改/刪除
-      allow get, list: if isConductor();
+      allow get, list: if isConductorFor('alumni') || isConductorFor('school');
 
       // 團員掃碼簽到：只能建立「自己」的紀錄，文件 ID 必須對應 eventId_uid，
       // 且對應的簽到中狀態必須存在、code 相符、還在有效期限內。8/23 加上 isApprovedMember()
@@ -244,32 +345,36 @@ service cloud.firestore {
         && sessionValid(request.resource.data.eventId, request.resource.data.code);
 
       // 幹部手動補登／修正／刪除（event-admin.html 活動明細 sheet 的「簽到」分頁）
-      allow create, update, delete: if isAdminTier();
+      allow create, update, delete: if isAdminTierFor(eventTeamOf(checkinId.split('_')[0]));
     }
 
     // 可重複使用的參與名單範本（名單管理，roster-admin.html）：文件 ID 自動產生，
-    // members 套用到 eventRosters 時是複製快照，不是即時參照，跟 eventTypes 同樣的權限層級
+    // members 套用到 eventRosters 時是複製快照，不是即時參照。9/19 資安修正：get/list
+    // 原本沒有依團別過濾（任一團的 admin 都能讀到另一團的範本名稱/人數），跟自己的
+    // create/update/delete 不一致，也跟 event-admin.html「套用範本」下拉選單會直接
+    // 顯示出來的資訊不對稱，這裡改成跟寫入規則一致的團別版
     match /rosterTemplates/{templateId} {
-      allow get, list: if isAdminTier();
-      allow create, update, delete: if isAdminTier();
+      allow get, list: if isAdminTierFor(resource.data.team);
+      allow create: if isAdminTierFor(request.resource.data.team);
+      allow update, delete: if isAdminTierFor(resource.data.team);
     }
 
     // 出缺席調查：幹部建立的參與名單（應到名單），文件 ID = eventId
     match /eventRosters/{eventId} {
-      // 幹部後台可讀取全部
-      allow get, list: if isAdminTier();
+      // 幹部後台可讀取全部——9/19 分團：任一團的 admin 都能讀
+      allow get, list: if isAdminTierFor('alumni') || isAdminTierFor('school');
       // 團員查詢自己在哪些活動的名單內（首頁回報用），搭配 array-contains 查詢，
       // 只有回傳結果本來就包含自己 uid 的文件才會通過這條規則
       allow list: if hasProfile() && resource.data.members.hasAny([request.auth.uid]);
-      allow create, update, delete: if isAdminTier();
+      allow create, update, delete: if isAdminTierFor(eventTeamOf(eventId));
       // 指揮專用頁面唯讀查看應到名單，不開放建立/修改/刪除
-      allow get, list: if isConductor();
+      allow get, list: if isConductorFor('alumni') || isConductorFor('school');
     }
 
     // 出缺席調查：團員自主回報，文件 ID = eventId_uid（跟 checkins 同樣的去重方式）
     match /attendanceReports/{reportId} {
-      // 幹部後台可讀取全部
-      allow get, list: if isAdminTier();
+      // 幹部後台可讀取全部——9/19 分團：任一團的 admin 都能讀
+      allow get, list: if isAdminTierFor('alumni') || isAdminTierFor('school');
       // 本人查詢/讀取自己的回報狀態
       allow list: if hasProfile() && resource.data.uid == request.auth.uid;
       allow get: if request.auth != null && reportId.split('_')[1] == request.auth.uid;
@@ -284,9 +389,9 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/eventRosters/$(request.resource.data.eventId)).data.members.hasAny([request.auth.uid]);
 
       // 幹部手動修正／刪除
-      allow create, update, delete: if isAdminTier();
+      allow create, update, delete: if isAdminTierFor(eventTeamOf(reportId.split('_')[0]));
       // 指揮專用頁面唯讀查看回報狀況，不開放建立/修改/刪除
-      allow get, list: if isConductor();
+      allow get, list: if isConductorFor('alumni') || isConductorFor('school');
     }
 
     // 指揮頁面的私人筆記本——8/19 又一輪從「綁活動、文件 ID = eventId_uid」改成「不綁活動，
@@ -296,13 +401,15 @@ service cloud.firestore {
     // 「本人」不限定 conductor 角色——conductor-admin.html 是 admin/owner/conductor 都能
     // 進的頁面，筆記本身是「誰用這頁誰就有自己的筆記」。「私人」是字面意思：只有本人可以
     // 讀寫，Owner 額外開放讀取方便測試/必要時查看，其他人看不到別人的筆記
+    // 9/19 分團：create 改成團別版（isConductorFor(team)/isAdminTierFor(team)），
+    // get/list/update/delete 完全不變——本來就只看 uid 是否對上本人，跟團別無關
     match /conductorNotes/{noteId} {
       allow get: if request.auth != null &&
         (resource.data.uid == request.auth.uid || isOwner());
       allow list: if hasProfile() && resource.data.uid == request.auth.uid;
 
       allow create: if request.auth != null
-        && (isConductor() || isAdminTier())
+        && (isConductorFor(request.resource.data.team) || isAdminTierFor(request.resource.data.team))
         && request.resource.data.uid == request.auth.uid;
 
       allow update, delete: if request.auth != null && resource.data.uid == request.auth.uid;
@@ -313,53 +420,60 @@ service cloud.firestore {
     // 寫入這輪範圍內收在 isAdminTier()
     match /repertoire/{pieceId} {
       allow get, list: if hasProfile();
-      allow create, update, delete: if isAdminTier() || canManageSheetMusic();
+      allow create, update, delete: if isAdminTierFor('alumni') || isAdminTierFor('school')
+        || canManageSheetMusicFor('alumni') || canManageSheetMusicFor('school');
     }
 
     // 財務記帳（finance-admin.html）：應繳項目批次、繳費紀錄、記帳本收支明細。
-    // 刻意讀寫都鎖在 isAdminTier()/canManageFinance()，不像 events/announcements/
+    // 刻意讀寫都鎖在 isAdminTierFor(team)/canManageFinanceFor(team)，不像 events/announcements/
     // repertoire 那樣對一般團員（甚至訪客）開放讀取——財務資料敏感度不同，一般團員
-    // 完全看不到任何財務頁面或資料
+    // 完全看不到任何財務頁面或資料（feeDues/feePayments 各自的自查規則除外）。
+    // 9/18 分團：team 是單一字串（不是陣列，跟 events.team 不同——財務已確認兩團完全
+    // 獨立結算），判斷式直接傳字串進 isAdminTierFor/canManageFinanceFor，不用取 [0]
     match /feeDues/{dueId} {
-      allow get, list: if isAdminTier() || canManageFinance();
+      allow get, list: if isAdminTierFor(resource.data.team) || canManageFinanceFor(resource.data.team);
       // 團員自查：只放行「自己在 memberIds 名單內」的項目，跟 eventRosters 對
       // members 用 hasAny() 判斷同一套寫法，首頁通知中心/團務總覽用這條查自己的應繳項目
       allow list: if hasProfile() && resource.data.memberIds.hasAny([request.auth.uid]);
-      allow create, update, delete: if isAdminTier() || canManageFinance();
+      allow create: if isAdminTierFor(request.resource.data.team) || canManageFinanceFor(request.resource.data.team);
+      allow update, delete: if isAdminTierFor(resource.data.team) || canManageFinanceFor(resource.data.team);
     }
 
     match /feePayments/{paymentId} {
-      allow get, list: if isAdminTier() || canManageFinance();
+      allow get, list: if isAdminTierFor(resource.data.team) || canManageFinanceFor(resource.data.team);
       // 團員自查自己的繳費紀錄，跟 attendanceReports 對本人開放 list/get 同一套寫法
       allow list: if hasProfile() && resource.data.uid == request.auth.uid;
       allow get: if request.auth != null && paymentId.split('_')[1] == request.auth.uid;
-      allow create, update, delete: if isAdminTier() || canManageFinance();
+      allow create: if isAdminTierFor(request.resource.data.team) || canManageFinanceFor(request.resource.data.team);
+      allow update, delete: if isAdminTierFor(resource.data.team) || canManageFinanceFor(resource.data.team);
     }
 
     match /ledgerEntries/{entryId} {
-      allow get, list: if isAdminTier() || canManageFinance();
-      allow create, update, delete: if isAdminTier() || canManageFinance();
+      allow get, list: if isAdminTierFor(resource.data.team) || canManageFinanceFor(resource.data.team);
+      allow create: if isAdminTierFor(request.resource.data.team) || canManageFinanceFor(request.resource.data.team);
+      allow update, delete: if isAdminTierFor(resource.data.team) || canManageFinanceFor(resource.data.team);
     }
 
     // 音樂會（event-admin.html「音樂會」區塊管理）。讀取開放給所有登入者，讓團員能在
     // 首頁「團務總覽／我的音樂會」查到自己參與的音樂會內容
     match /concerts/{concertId} {
       allow get, list: if hasProfile();
-      allow create, update, delete: if isAdminTier();
+      allow create: if isAdminTierFor(request.resource.data.team[0]);
+      allow update, delete: if isAdminTierFor(resource.data.team[0]);
 
       // 音樂會引用曲目資料庫裡的曲子（文件 ID 沿用 repertoire 的 pieceId），這裡只存
       // order/addedAt，曲名/分部結構一律讀 repertoire/{pieceId}
       match /pieces/{pieceId} {
         allow get, list: if hasProfile();
-        allow create, update, delete: if isAdminTier();
+        allow create, update, delete: if isAdminTierFor(concertTeamOf(concertId));
 
         // 每曲 × 每樂器分部指派，文件 ID = 樂器名稱。分部長（一般團員身分）能寫入自己
-        // sectionLeaderFor 範圍內的文件（canManageSection()），不檢查 parts[].members
+        // sectionLeaderFor 範圍內的文件（canManageSectionFor()），不檢查 parts[].members
         // 內容的正確性——名單/樂器資格由 section-admin.html 前端的可選名單篩選把關，
         // 規則只負責「誰能碰這份文件」
         match /sections/{instrumentName} {
           allow get, list: if hasProfile();
-          allow create, update, delete: if isAdminTier() || canManageSection(instrumentName);
+          allow create, update, delete: if isAdminTierFor(concertTeamOf(concertId)) || canManageSectionFor(concertTeamOf(concertId), instrumentName);
         }
       }
 
@@ -368,15 +482,15 @@ service cloud.firestore {
       // 明確要求的（一次團練可能同時練好幾首曲子，巢狀在曲目底下要多一層點擊）。讀取
       // 比照 concerts/pieces/sections/concertRosters 既有的「所有登入者可讀」慣例。
       // 新增只檢查 authorUid 是自己，不深驗證 instrumentName 是否真的對應這場音樂會的
-      // 樂器身分——跟 canManageSection() 對 sections 內容不做正確性檢查同一種取捨，規則
+      // 樂器身分——跟 canManageSectionFor() 對 sections 內容不做正確性檢查同一種取捨，規則
       // 只負責「誰能碰這份文件」，可選樂器範圍由前端讀 concertRosters 把關
       match /notes/{noteId} {
         allow get, list: if hasProfile();
         allow create: if hasProfile() && request.resource.data.authorUid == request.auth.uid;
         allow update: if hasProfile() && resource.data.authorUid == request.auth.uid;
-        allow delete: if isAdminTier()
+        allow delete: if isAdminTierFor(concertTeamOf(concertId))
           || (hasProfile() && resource.data.authorUid == request.auth.uid)
-          || canManageSection(resource.data.instrumentName);
+          || canManageSectionFor(concertTeamOf(concertId), resource.data.instrumentName);
       }
     }
 
@@ -386,7 +500,7 @@ service cloud.firestore {
     // 比 events/eventTypes 現在對所有人（含訪客）完全公開讀取更低，只是登入者才看得到
     match /concertRosters/{concertId} {
       allow get, list: if hasProfile();
-      allow create, update, delete: if isAdminTier();
+      allow create, update, delete: if isAdminTierFor(concertTeamOf(concertId));
     }
 
     // Bug 回報／功能許願池：團員只能新增（寫自己 submitterUid），完全不能讀取——

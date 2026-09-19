@@ -13,24 +13,8 @@
 <script src="./pwa-register.js" defer></script>
 <script src="./pull-refresh.js" defer></script>
 <script src="./ios-install.js" defer></script>
+<link rel="stylesheet" href="./theme.css">
 <style>
-  :root{
-    --ink:#20242F;
-    --ink-soft:#4A4F5C;
-    --paper:#F2EFE5;
-    --paper-raised:#FBFAF4;
-    --line:#DAD3BE;
-    --brass:#B8863A;
-    --brass-deep:#8F6A2C;
-    --burgundy:#7A2331;
-    --burgundy-deep:#5C1A26;
-    --sage:#5F6E58;
-    --sage-bg:#E7EBDF;
-    --radius-lg:20px;
-    --radius-md:14px;
-    --radius-sm:9px;
-    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
-  }
 
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -245,6 +229,19 @@
     cursor:pointer;
   }
   .picker-trigger .chev{ flex:none; width:16px; height:16px; opacity:.55; }
+
+  /* ---------- Team picker (registration step 2, 9/17 新增) ---------- */
+  .team-picker{ display:flex; gap:10px; }
+  .team-option{
+    flex:1; border-radius:var(--radius-sm); padding:14px 10px; text-align:center;
+    border:1.6px solid var(--line); background:var(--paper); cursor:pointer;
+    display:flex; flex-direction:column; gap:4px; font-family:inherit;
+  }
+  .team-option.selected{ border-color:var(--burgundy); background:#F6E9EA; }
+  .team-option-label{ font-size:13px; font-weight:700; color:var(--ink-soft); }
+  .team-option.selected .team-option-label{ color:var(--burgundy-deep); }
+  .team-option-desc{ font-size:10.5px; color:var(--ink-soft); opacity:.8; }
+  .field.invalid .team-picker{ outline:1.6px solid var(--burgundy); outline-offset:2px; border-radius:var(--radius-sm); }
 
   /* ---------- Chips (reused inside bottom sheet) ---------- */
   .chip{
@@ -476,6 +473,20 @@
         </div>
 
         <div class="reg-step" id="regStep2">
+          <div class="field" id="f-reg-team">
+            <label>選擇要加入的團</label>
+            <div class="team-picker" id="teamPicker">
+              <button type="button" class="team-option" data-team-option="alumni">
+                <span class="team-option-label">校友團</span>
+              </button>
+              <button type="button" class="team-option" data-team-option="school">
+                <span class="team-option-label">校內團</span>
+              </button>
+            </div>
+            <span class="hint">如有跨團需求，註冊後請洽幹部協助開通</span>
+            <span class="error">請選擇要加入的團</span>
+          </div>
+
           <div class="field" id="f-reg-name">
             <label>姓名</label>
             <input type="text" id="regName" placeholder="請輸入真實姓名">
@@ -573,7 +584,19 @@
   import { subscribeInstruments, FAMILY_LABELS, FAMILY_ORDER } from './instruments.js';
 
   var selectedInstruments = [];
+  var selectedTeam = null; // 'alumni' | 'school' | null
   var sheetBody = document.getElementById('sheetBody');
+
+  var teamPicker = document.getElementById('teamPicker');
+  teamPicker.addEventListener('click', function(e){
+    var btn = e.target.closest('[data-team-option]');
+    if (!btn) return;
+    selectedTeam = btn.getAttribute('data-team-option');
+    teamPicker.querySelectorAll('.team-option').forEach(function(opt){
+      opt.classList.toggle('selected', opt === btn);
+    });
+    setInvalid('f-reg-team', false);
+  });
 
   var sheetOverlay = document.getElementById('sheetOverlay');
   var instrumentTrigger = document.getElementById('instrumentTrigger');
@@ -892,6 +915,7 @@
     var plate = document.getElementById('regPlate').value.trim();
 
     var ok = true;
+    setInvalid('f-reg-team', !selectedTeam); if (!selectedTeam) ok = false;
     setInvalid('f-reg-name', !name); if (!name) ok = false;
     setInvalid('f-reg-birthday', !birthday); if (!birthday) ok = false;
     var phoneValid = /^09\d{8}$/.test(phone);
@@ -912,7 +936,8 @@
       birthday: birthday,
       phone: phone,
       licensePlate: plate,
-      instruments: selectedInstruments
+      instruments: selectedInstruments,
+      team: selectedTeam
     }).then(function(result){
       // 註冊成功後直接登入進首頁——審核前只能看受限版的首頁，不用再回登入頁等審核，
       // 見 index.html 的訪客/審核中身分處理

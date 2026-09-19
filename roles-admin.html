@@ -12,24 +12,8 @@
 <link rel="apple-touch-icon" href="assets/icons/icon-180.png">
 <script src="./pwa-register.js" defer></script>
 <script src="./pull-refresh.js" defer></script>
+<link rel="stylesheet" href="./theme.css">
 <style>
-  :root{
-    --ink:#20242F;
-    --ink-soft:#4A4F5C;
-    --paper:#F2EFE5;
-    --paper-raised:#FBFAF4;
-    --line:#DAD3BE;
-    --brass:#B8863A;
-    --brass-deep:#8F6A2C;
-    --burgundy:#7A2331;
-    --burgundy-deep:#5C1A26;
-    --sage:#5F6E58;
-    --sage-bg:#E7EBDF;
-    --radius-lg:20px;
-    --radius-md:14px;
-    --radius-sm:9px;
-    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
-  }
 
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -228,9 +212,28 @@
   }
   .role-chip.selected{ background:var(--burgundy); color:#F2EFE5; border-color:var(--burgundy); }
 
+  .team-tabs{ display:flex; gap:8px; }
+  .team-tab{
+    flex:1; padding:8px; border-radius:9px; border:1.4px solid var(--line);
+    background:var(--paper); color:var(--ink-soft); font-weight:700; font-size:12.5px; cursor:pointer;
+  }
+  .team-tab.active{ background:var(--burgundy); color:#F2EFE5; border-color:var(--burgundy); }
+
   .check-list{ display:flex; flex-direction:column; gap:2px; }
+  .check-list.collapsed{ display:none; }
   .check-row{ display:flex; align-items:center; gap:10px; padding:8px 2px; }
   .check-row + .check-row{ border-top:1px solid var(--line); }
+
+  /* 9/19：樂器/聲部改成預設收合＋摘要列，跟 event-admin.html 的活動類型收合是同一套既有樣式 */
+  .inst-summary-toggle{ display:flex; align-items:center; gap:8px; cursor:pointer; }
+  .inst-summary-toggle label{ margin:0; cursor:pointer; }
+  .collapse-toggle{
+    margin-left:auto; background:none; border:none; padding:4px; cursor:pointer;
+    color:var(--ink-soft); display:flex; align-items:center;
+  }
+  .collapse-toggle .chev{ transition:transform .18s ease; }
+  .collapse-toggle.open .chev{ transform:rotate(180deg); }
+  .inst-summary-text{ margin:0; font-size:12.5px; color:var(--ink-soft); }
   .checkbox{
     width:18px; height:18px; border-radius:5px; border:1.5px solid var(--line);
     flex:none; display:flex; align-items:center; justify-content:center;
@@ -335,6 +338,7 @@
       </div>
     </a>
     <div class="spacer"></div>
+    <span class="team-badge hidden" id="teamBadge"></span>
     <button class="avatar skel" id="avatarBtn" type="button" aria-label="帳號選單"></button>
   </div>
 
@@ -446,6 +450,15 @@
         <p class="form-error" id="resetPasswordError"></p>
       </div>
     </div>
+    <!-- 團別身分：9/17 新增，獨立於 memberSheetBody 之外，理由跟上面 resetPasswordWrap
+         的既有註解一樣——避免既有角色/權限欄位的每次重繪把這裡的草稿也一起清掉 -->
+    <div class="team-roles-wrap" style="padding:0 20px 14px; max-height:38vh; overflow-y:auto;">
+      <label style="display:block;font-family:'Roboto Mono',monospace;font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px;">團別</label>
+      <div class="team-tabs" id="teamTabs"></div>
+      <div id="teamRolesBody" style="margin-top:12px;"></div>
+      <button type="button" class="cta-btn hidden" id="saveTeamRolesBtn" style="margin-top:10px;" disabled>儲存這團的變更</button>
+      <p class="form-error" id="teamRolesError"></p>
+    </div>
     <div class="sheet-footer">
       <button type="button" class="cta-btn cta-btn-secondary" id="cancelMemberBtn">取消</button>
       <button type="button" class="cta-btn" id="saveMemberBtn" disabled>儲存變更</button>
@@ -458,9 +471,10 @@
   import { showToast } from './toast.js';
   import { showConfirm } from './dialog.js';
   import { MESSAGES } from './messages.js';
-  import { requireAdmin, peekCachedProfile } from './auth-guard.js';
+  import { requireCanManageRoles, peekCachedProfile, getActiveTeam } from './auth-guard.js';
   import { db, functions } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
+  import { initTeamSwitcher } from './team-switcher.js';
   import { subscribeInstruments, addInstrument, removeInstrument, setInstrumentsOrder, FAMILY_LABELS, FAMILY_ORDER } from './instruments.js';
   import { subscribeSeatingSections, setSeatingSections } from './seating-chart.js';
   import {
@@ -500,22 +514,27 @@
 
   var ROLE_LABELS = { member: '團員', conductor: '指揮', admin: '管理員', owner: 'Owner' };
   var ROLE_WEIGHT = { owner: 0, admin: 1, conductor: 2, member: 3 };
-  var PERMISSION_DEFS = [
-    { key: 'canManageRoles', label: '可調整他人角色/權限' },
-    { key: 'canDeleteAccounts', label: '可軟刪除現役帳號' },
-    { key: 'canManageSheetMusic', label: '可管理樂譜資料夾' },
-    { key: 'canViewAllSheetMusic', label: '可檢視全部分部樂譜' },
-    { key: 'canManageEventTypes', label: '可管理活動類型' },
-    { key: 'canManageFinance', label: '可管理財務記帳' }
+
+  // 9/19 收尾計畫：角色/權限全部收斂成團別版，只有 Owner 是全域角色。這三個旗標
+  // （canManageSheetMusic/canViewAllSheetMusic/canManageEventTypes）雖然管的是兩團共用
+  // 資源，但「誰被信任管理」改成各團自己決定，搬進 TEAM_PERMISSION_DEFS
+  var TEAM_PERMISSION_DEFS = [
+    { key: 'canManageRoles', label: '可調整他人角色/權限（該團）' },
+    { key: 'canDeleteAccounts', label: '可軟刪除現役帳號（該團）' },
+    { key: 'canManageFinance', label: '可管理財務記帳（該團）' },
+    { key: 'canManageSheetMusic', label: '可管理樂譜資料夾（該團）' },
+    { key: 'canViewAllSheetMusic', label: '可檢視全部分部樂譜（該團）' },
+    { key: 'canManageEventTypes', label: '可管理活動類型（該團）' }
   ];
 
   // 職位範本：交接時負責轉移的人不用記得「這個職位要打勾哪幾個旗標」，選職位名稱
-  // 直接把對應的權限旗標打勾好。套用只影響本地草稿（跟這個 sheet 既有的「先勾選、
-  // 按儲存變更才真的送出」互動模式一致），不會自動反選沒列在這個職位裡的其他旗標。
-  var POSITION_PRESETS = [
+  // 直接把對應的權限旗標打勾好。套用只影響本地草稿，不會自動反選沒列在這個職位裡的
+  // 其他旗標。9/19 收尾計畫：原本全域的「譜務」「財務」都搬進團別身分區塊
+  var TEAM_POSITION_PRESETS = [
     { key: 'repertoire', label: '譜務', permissions: { canManageSheetMusic: true } },
     { key: 'finance', label: '財務', permissions: { canManageFinance: true } }
   ];
+  var TEAM_LABELS = { alumni: '校友團', school: '校內團' };
 
   var membersById = {};
   var membersLoaded = false;
@@ -525,19 +544,20 @@
   var seatSectionsLoaded = false;
   var openMemberId = null;
   var currentAdminUid = null;
-  var draftRole = null;
-  var draftPermissions = {};
-  var draftSections = [];
+  var activeTeam = null;
   var draftInstruments = [];
-  var draftPositionPresets = []; // 純顯示/追蹤用，記錄套用過哪些職位範本，不參與任何權限判斷
-  var initialRole = null;
-  var initialPermKey = '';
-  var initialSectionsKey = '';
   var initialInstrumentsKey = '';
-  var sheetRestrictedSelf = false;
+  var instListExpanded = false; // 樂器/聲部很少變動，預設收合成摘要列，展開/收合只是顯示狀態，不影響儲存
 
-  function permissionsKey(perms){
-    return PERMISSION_DEFS.map(function(p){ return p.key + ':' + (!!perms[p.key]); }).sort().join('|');
+  var editingTeam = 'alumni'; // 團別身分區塊目前顯示哪一團
+  var teamDraftRole = null;
+  var teamDraftPermissions = {};
+  var teamDraftSections = [];
+  var teamDraftPositionPresets = [];
+  var teamInitialKey = '';
+
+  function permissionsKey(perms, defs){
+    return defs.map(function(p){ return p.key + ':' + (!!perms[p.key]); }).sort().join('|');
   }
   function sectionsKey(arr){
     return arr.slice().sort().join('|');
@@ -554,6 +574,19 @@
   var memberSheetOverlay = document.getElementById('memberSheetOverlay');
   var memberSheetBody = document.getElementById('memberSheetBody');
   var saveMemberBtn = document.getElementById('saveMemberBtn');
+  var teamTabsEl = document.getElementById('teamTabs');
+  var teamRolesBodyEl = document.getElementById('teamRolesBody');
+  var saveTeamRolesBtn = document.getElementById('saveTeamRolesBtn');
+  var teamRolesErrorEl = document.getElementById('teamRolesError');
+
+  function teamDraftKey(){
+    return JSON.stringify({
+      role: teamDraftRole,
+      perms: permissionsKey(teamDraftPermissions, TEAM_PERMISSION_DEFS),
+      sections: sectionsKey(teamDraftSections),
+      presets: sectionsKey(teamDraftPositionPresets)
+    });
+  }
   var resetPasswordWrap = document.getElementById('resetPasswordWrap');
   var resetPasswordForm = document.getElementById('resetPasswordForm');
   var resetPasswordInput = document.getElementById('resetPasswordInput');
@@ -666,29 +699,88 @@
   }
 
   function isMemberDirty(){
-    return draftRole !== initialRole ||
-      permissionsKey(draftPermissions) !== initialPermKey ||
-      sectionsKey(draftSections) !== initialSectionsKey ||
-      sectionsKey(draftInstruments) !== initialInstrumentsKey;
+    return sectionsKey(draftInstruments) !== initialInstrumentsKey;
   }
 
-  function renderMemberSheetBody(){
-    var roles = ['member', 'conductor', 'admin'];
+  function renderTeamTabs(){
+    teamTabsEl.innerHTML = ['alumni', 'school'].map(function(team){
+      return (
+        '<button type="button" class="team-tab' + (editingTeam === team ? ' active' : '') + '" data-edit-team="' + team + '">' +
+          TEAM_LABELS[team] +
+        '</button>'
+      );
+    }).join('');
+  }
 
+  function renderTeamRolesBody(){
+    var m = membersById[openMemberId];
+    var teamData = m.teams && m.teams[editingTeam];
+
+    if (!teamData){
+      teamRolesBodyEl.innerHTML =
+        '<p class="lede" style="margin:0 0 10px;">這個人還沒有' + TEAM_LABELS[editingTeam] + '的團籍。</p>' +
+        '<button type="button" class="cta-btn cta-btn-secondary" id="grantTeamBtn" data-grant-team="' + editingTeam + '">加入這團（預設一般團員）</button>';
+      saveTeamRolesBtn.classList.add('hidden');
+      return;
+    }
+
+    teamDraftRole = teamData.role;
+    teamDraftPermissions = Object.assign({}, teamData.permissions || {});
+    teamDraftSections = (teamData.sectionLeaderFor || []).slice();
+    teamDraftPositionPresets = (teamData.positionPresets || []).slice();
+    teamInitialKey = teamDraftKey();
+
+    var roles = ['member', 'conductor', 'admin'];
     var roleChips = roles.map(function(r){
-      return '<div class="role-chip' + (draftRole === r ? ' selected' : '') + '" data-role-chip="' + r + '">' + ROLE_LABELS[r] + '</div>';
+      return '<div class="role-chip' + (teamDraftRole === r ? ' selected' : '') + '" data-team-role-chip="' + r + '">' + ROLE_LABELS[r] + '</div>';
     }).join('');
 
-    var permRows = PERMISSION_DEFS.map(function(p){
-      var on = !!draftPermissions[p.key];
+    var permRows = TEAM_PERMISSION_DEFS.map(function(p){
+      var on = !!teamDraftPermissions[p.key];
       return (
         '<div class="check-row">' +
-          '<div class="checkbox' + (on ? ' on' : '') + '" data-perm-toggle="' + p.key + '">' + (on ? '✓' : '') + '</div>' +
-          '<div class="check-text" data-perm-toggle="' + p.key + '">' + p.label + '</div>' +
+          '<div class="checkbox' + (on ? ' on' : '') + '" data-team-perm-toggle="' + p.key + '">' + (on ? '✓' : '') + '</div>' +
+          '<div class="check-text" data-team-perm-toggle="' + p.key + '">' + p.label + '</div>' +
         '</div>'
       );
     }).join('');
 
+    var sectionRows = instrumentsList.length === 0
+      ? '<div class="empty">目前沒有樂器清單</div>'
+      : instrumentsList.map(function(inst){
+          var on = teamDraftSections.indexOf(inst.name) !== -1;
+          return (
+            '<div class="check-row">' +
+              '<div class="checkbox' + (on ? ' on' : '') + '" data-team-section-toggle="' + inst.name + '">' + (on ? '✓' : '') + '</div>' +
+              '<div class="check-text" data-team-section-toggle="' + inst.name + '">' + inst.name + '</div>' +
+            '</div>'
+          );
+        }).join('');
+
+    var teamPresetOptionsHtml = '<option value="">選擇職位套用權限…</option>' +
+      TEAM_POSITION_PRESETS.map(function(preset){
+        return '<option value="' + preset.key + '">' + preset.label + '</option>';
+      }).join('');
+    var teamPositionPresetField =
+      '<div class="field">' +
+        '<label>職位範本（選填，快速套用對應權限）</label>' +
+        '<div class="part-add-row">' +
+          '<select id="teamPositionPresetSelect">' + teamPresetOptionsHtml + '</select>' +
+          '<button type="button" class="part-add-btn" id="teamPositionPresetApplyBtn">套用</button>' +
+        '</div>' +
+      '</div>';
+
+    teamRolesBodyEl.innerHTML =
+      '<div class="field"><label>身分組</label><div class="role-picker">' + roleChips + '</div></div>' +
+      '<div class="field"><label>額外權限</label><div class="check-list">' + permRows + '</div></div>' +
+      teamPositionPresetField +
+      '<div class="field"><label>分部長（選填）</label><div class="check-list">' + sectionRows + '</div></div>';
+
+    saveTeamRolesBtn.classList.remove('hidden');
+    saveTeamRolesBtn.disabled = true;
+  }
+
+  function renderMemberSheetBody(){
     var instRows = instrumentsList.length === 0
       ? '<div class="empty">目前沒有樂器清單，請先在下面新增</div>'
       : instrumentsList.map(function(inst){
@@ -701,61 +793,18 @@
           );
         }).join('');
 
-    var sectionRows = instrumentsList.length === 0
-      ? '<div class="empty">目前沒有樂器清單，請先在下面新增</div>'
-      : instrumentsList.map(function(inst){
-          var on = draftSections.indexOf(inst.name) !== -1;
-          return (
-            '<div class="check-row">' +
-              '<div class="checkbox' + (on ? ' on' : '') + '" data-section-toggle="' + inst.name + '">' + (on ? '✓' : '') + '</div>' +
-              '<div class="check-text" data-section-toggle="' + inst.name + '">' + inst.name + '</div>' +
-            '</div>'
-          );
-        }).join('');
-
-    var presetOptionsHtml = '<option value="">選擇職位套用權限…</option>' +
-      POSITION_PRESETS.map(function(preset){
-        return '<option value="' + preset.key + '">' + preset.label + '</option>';
-      }).join('');
-    var appliedPresetLabels = draftPositionPresets.map(function(key){
-      var preset = POSITION_PRESETS.filter(function(p){ return p.key === key; })[0];
-      return preset ? preset.label : key;
-    });
-    var positionPresetField =
-      '<div class="field">' +
-        '<label>職位範本（選填，快速套用對應權限）</label>' +
-        '<div class="part-add-row">' +
-          '<select id="positionPresetSelect">' + presetOptionsHtml + '</select>' +
-          '<button type="button" class="part-add-btn" id="positionPresetApplyBtn">套用</button>' +
-        '</div>' +
-        (appliedPresetLabels.length
-          ? '<p class="lede" style="margin:6px 0 0;">目前掛著：' + appliedPresetLabels.join('、') + '</p>'
-          : '') +
-      '</div>';
-
-    var roleAndPermFields = sheetRestrictedSelf
-      ? '<p class="lede" style="margin:0 0 4px;">只能調整自己的樂器/聲部與分部長，角色與權限無法透過這裡調整。</p>'
-      : (
-          '<div class="field">' +
-            '<label>角色</label>' +
-            '<div class="role-picker">' + roleChips + '</div>' +
-          '</div>' +
-          '<div class="field">' +
-            '<label>額外權限</label>' +
-            '<div class="check-list">' + permRows + '</div>' +
-          '</div>' +
-          positionPresetField
-        );
+    var instSummary = draftInstruments.length === 0 ? '尚未設定' : draftInstruments.join('、');
 
     memberSheetBody.innerHTML =
-      roleAndPermFields +
       '<div class="field">' +
-        '<label>樂器/聲部</label>' +
-        '<div class="check-list">' + instRows + '</div>' +
-      '</div>' +
-      '<div class="field">' +
-        '<label>分部長（選填）</label>' +
-        '<div class="check-list">' + sectionRows + '</div>' +
+        '<div class="inst-summary-toggle" data-inst-toggle-expand>' +
+          '<label>樂器/聲部</label>' +
+          '<button type="button" class="collapse-toggle' + (instListExpanded ? ' open' : '') + '" aria-label="展開/收合樂器聲部">' +
+            '<svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+          '</button>' +
+        '</div>' +
+        '<p class="inst-summary-text">' + instSummary + '</p>' +
+        '<div class="check-list' + (instListExpanded ? '' : ' collapsed') + '">' + instRows + '</div>' +
       '</div>' +
       '<p class="form-error" id="memberFormError"></p>';
 
@@ -766,21 +815,17 @@
     var m = membersById[uid];
     if (!m) return;
     openMemberId = uid;
-    sheetRestrictedSelf = m.role === 'owner' && uid === currentAdminUid;
-    draftRole = m.role;
-    draftPermissions = Object.assign({}, m.permissions || {});
-    draftSections = (m.sectionLeaderFor || []).slice();
     draftInstruments = (m.instruments || []).slice();
-    draftPositionPresets = (m.positionPresets || []).slice();
-    initialRole = draftRole;
-    initialPermKey = permissionsKey(draftPermissions);
-    initialSectionsKey = sectionsKey(draftSections);
     initialInstrumentsKey = sectionsKey(draftInstruments);
+    instListExpanded = false; // 每次重新打開都從收合狀態開始
 
     document.getElementById('sheetMemberName').textContent = m.name || '—';
     document.getElementById('sheetMemberAccount').textContent = '@' + (m.account || '');
     saveMemberBtn.textContent = '儲存變更';
     renderMemberSheetBody();
+    editingTeam = 'alumni'; // 每次重新打開都從校友團開始
+    renderTeamTabs();
+    renderTeamRolesBody();
     resetPasswordWrap.classList.toggle('hidden', uid === currentAdminUid || m.role === 'owner');
     resetResetPasswordForm();
     memberSheetOverlay.classList.add('active');
@@ -799,22 +844,12 @@
   });
 
   memberSheetBody.addEventListener('click', function(e){
-    var roleChip = e.target.closest('[data-role-chip]');
-    var permToggle = e.target.closest('[data-perm-toggle]');
+    if (e.target.closest('[data-inst-toggle-expand]')){
+      instListExpanded = !instListExpanded;
+      renderMemberSheetBody();
+      return;
+    }
     var instToggle = e.target.closest('[data-member-inst-toggle]');
-    var sectionToggle = e.target.closest('[data-section-toggle]');
-
-    if (roleChip){
-      draftRole = roleChip.getAttribute('data-role-chip');
-      renderMemberSheetBody();
-      return;
-    }
-    if (permToggle){
-      var key = permToggle.getAttribute('data-perm-toggle');
-      draftPermissions[key] = !draftPermissions[key];
-      renderMemberSheetBody();
-      return;
-    }
     if (instToggle){
       var iname = instToggle.getAttribute('data-member-inst-toggle');
       var iidx = draftInstruments.indexOf(iname);
@@ -822,25 +857,124 @@
       renderMemberSheetBody();
       return;
     }
-    if (sectionToggle){
-      var sname = sectionToggle.getAttribute('data-section-toggle');
-      var sidx = draftSections.indexOf(sname);
-      if (sidx === -1) draftSections.push(sname); else draftSections.splice(sidx, 1);
-      renderMemberSheetBody();
-      return;
-    }
-    if (e.target.closest('#positionPresetApplyBtn')){
-      var presetKey = document.getElementById('positionPresetSelect').value;
-      if (!presetKey) return;
-      var preset = POSITION_PRESETS.filter(function(p){ return p.key === presetKey; })[0];
-      if (!preset) return;
-      Object.keys(preset.permissions).forEach(function(permKey){
-        draftPermissions[permKey] = preset.permissions[permKey];
+  });
+
+  teamTabsEl.addEventListener('click', function(e){
+    var tab = e.target.closest('[data-edit-team]');
+    if (!tab) return;
+    editingTeam = tab.getAttribute('data-edit-team');
+    renderTeamTabs();
+    renderTeamRolesBody();
+  });
+
+  teamRolesBodyEl.addEventListener('click', function(e){
+    // 角色 chip／權限/分部長 checkbox 都只切換 class、更新 draft 變數，不重新呼叫
+    // renderTeamRolesBody()——那個函式一開頭會重新從 teamData（資料庫目前的值，不是草稿）
+    // 覆寫 teamDraftRole 等變數，儲存前呼叫它會把剛勾選、還沒送出的變更蓋掉
+    var roleChip = e.target.closest('[data-team-role-chip]');
+    if (roleChip){
+      teamDraftRole = roleChip.getAttribute('data-team-role-chip');
+      roleChip.parentElement.querySelectorAll('.role-chip').forEach(function(el){
+        el.classList.toggle('selected', el === roleChip);
       });
-      if (draftPositionPresets.indexOf(presetKey) === -1) draftPositionPresets.push(presetKey);
-      renderMemberSheetBody();
+      saveTeamRolesBtn.disabled = teamDraftKey() === teamInitialKey;
       return;
     }
+    var permToggle = e.target.closest('[data-team-perm-toggle]');
+    if (permToggle){
+      var pkey = permToggle.getAttribute('data-team-perm-toggle');
+      teamDraftPermissions[pkey] = !teamDraftPermissions[pkey];
+      permToggle.parentElement.querySelectorAll('[data-team-perm-toggle="' + pkey + '"].checkbox').forEach(function(el){
+        el.classList.toggle('on', teamDraftPermissions[pkey]);
+        el.textContent = teamDraftPermissions[pkey] ? '✓' : '';
+      });
+      saveTeamRolesBtn.disabled = teamDraftKey() === teamInitialKey;
+      return;
+    }
+    var sectionToggle = e.target.closest('[data-team-section-toggle]');
+    if (sectionToggle){
+      var sname = sectionToggle.getAttribute('data-team-section-toggle');
+      var sidx = teamDraftSections.indexOf(sname);
+      if (sidx === -1) teamDraftSections.push(sname); else teamDraftSections.splice(sidx, 1);
+      saveTeamRolesBtn.disabled = teamDraftKey() === teamInitialKey;
+      return;
+    }
+    if (e.target.closest('#teamPositionPresetApplyBtn')){
+      var teamPresetKey = document.getElementById('teamPositionPresetSelect').value;
+      if (!teamPresetKey) return;
+      var teamPreset = TEAM_POSITION_PRESETS.filter(function(p){ return p.key === teamPresetKey; })[0];
+      if (!teamPreset) return;
+      // 套用只更新草稿變數＋就地改對應 checkbox 的樣式，不能整個重新呼叫
+      // renderTeamRolesBody()——那個函式一開頭會用資料庫目前的值覆寫 teamDraftPermissions，
+      // 會把剛套用的變更蓋掉（跟角色 chip／checkbox toggle 同一個既有限制，見上面註解）
+      Object.keys(teamPreset.permissions).forEach(function(permKey){
+        teamDraftPermissions[permKey] = teamPreset.permissions[permKey];
+        teamRolesBodyEl.querySelectorAll('[data-team-perm-toggle="' + permKey + '"].checkbox').forEach(function(el){
+          el.classList.toggle('on', teamDraftPermissions[permKey]);
+          el.textContent = teamDraftPermissions[permKey] ? '✓' : '';
+        });
+      });
+      if (teamDraftPositionPresets.indexOf(teamPresetKey) === -1) teamDraftPositionPresets.push(teamPresetKey);
+      saveTeamRolesBtn.disabled = teamDraftKey() === teamInitialKey;
+      return;
+    }
+    var grantBtn = e.target.closest('[data-grant-team]');
+    if (grantBtn){
+      var grantTeam = grantBtn.getAttribute('data-grant-team');
+      grantBtn.disabled = true;
+      var newTeams = Object.assign({}, membersById[openMemberId].teams || {}, {
+        [grantTeam]: { role: 'member', permissions: {}, sectionLeaderFor: [], positionPresets: [] }
+      });
+      // 9/17 修正：teamIds 一定要跟 teams 的鍵值同步（見 9/16 設計文件），漏寫這行會讓
+      // 團別切換器誤判成單團籍（切換器/配色判斷依據是 teamIds，不是 teams 有幾把鍵）
+      var newTeamIds = Object.keys(newTeams);
+      updateDoc(doc(db, 'users', openMemberId), { teams: newTeams, teamIds: newTeamIds }).then(function(){
+        membersById[openMemberId].teams = newTeams; // 本地同步，不用等下一次 onSnapshot 回來
+        membersById[openMemberId].teamIds = newTeamIds;
+        renderTeamRolesBody();
+      }).catch(function(err){
+        teamRolesErrorEl.textContent = '加入失敗（' + err.code + '）';
+        teamRolesErrorEl.classList.add('show');
+        grantBtn.disabled = false;
+      });
+      return;
+    }
+  });
+
+  saveTeamRolesBtn.addEventListener('click', function(){
+    if (!openMemberId) return;
+    var saveUid = openMemberId;
+    var team = editingTeam;
+    saveTeamRolesBtn.disabled = true;
+    saveTeamRolesBtn.textContent = '儲存中…';
+    teamRolesErrorEl.classList.remove('show');
+
+    var m = membersById[saveUid];
+    var payload = {
+      teams: Object.assign({}, m.teams || {}, {
+        [team]: {
+          role: teamDraftRole,
+          permissions: Object.assign(
+            { canManageRoles: false, canDeleteAccounts: false, canManageFinance: false,
+              canManageSheetMusic: false, canViewAllSheetMusic: false, canManageEventTypes: false },
+            teamDraftPermissions
+          ),
+          sectionLeaderFor: teamDraftSections,
+          positionPresets: teamDraftPositionPresets
+        }
+      })
+    };
+
+    updateDoc(doc(db, 'users', saveUid), payload).then(function(){
+      membersById[saveUid].teams = payload.teams;
+      teamInitialKey = teamDraftKey();
+      saveTeamRolesBtn.textContent = '儲存這團的變更';
+    }).catch(function(err){
+      teamRolesErrorEl.textContent = '儲存失敗（' + err.code + '）';
+      teamRolesErrorEl.classList.add('show');
+      saveTeamRolesBtn.disabled = false;
+      saveTeamRolesBtn.textContent = '儲存這團的變更';
+    });
   });
 
   document.getElementById('memberSheetClose').addEventListener('click', closeMemberSheet);
@@ -854,19 +988,7 @@
     var saveUid = openMemberId;
     saveMemberBtn.disabled = true;
     saveMemberBtn.textContent = '儲存中…';
-    var payload = sheetRestrictedSelf
-      ? { sectionLeaderFor: draftSections, instruments: draftInstruments }
-      : {
-          role: draftRole,
-          permissions: Object.assign(
-            { canManageRoles: false, canDeleteAccounts: false, canManageSheetMusic: false, canViewAllSheetMusic: false, canManageEventTypes: false, canManageFinance: false },
-            draftPermissions
-          ),
-          sectionLeaderFor: draftSections,
-          instruments: draftInstruments,
-          positionPresets: draftPositionPresets
-        };
-    updateDoc(doc(db, 'users', saveUid), payload).then(function(){
+    updateDoc(doc(db, 'users', saveUid), { instruments: draftInstruments }).then(function(){
       closeMemberSheet();
     }).catch(function(err){
       var errEl = document.getElementById('memberFormError');
@@ -1070,7 +1192,7 @@
     var tmp = newList[idx];
     newList[idx] = newList[otherIdx];
     newList[otherIdx] = tmp;
-    setSeatingSections(db, newList).catch(function(err){
+    setSeatingSections(db, activeTeam, newList).catch(function(err){
       showToast('調整順序失敗：' + err.code, 'error');
     });
   }
@@ -1081,7 +1203,7 @@
     if (!newRow || newRow < 1) return;
     var newList = seatSectionsList.slice();
     newList[idx] = Object.assign({}, sec, { row: newRow });
-    setSeatingSections(db, newList).catch(function(err){
+    setSeatingSections(db, activeTeam, newList).catch(function(err){
       showToast('調整排數失敗：' + err.code, 'error');
     });
   }
@@ -1092,7 +1214,7 @@
     if (!newWeight || newWeight < 1) return;
     var newList = seatSectionsList.slice();
     newList[idx] = Object.assign({}, sec, { weight: newWeight });
-    setSeatingSections(db, newList).catch(function(err){
+    setSeatingSections(db, activeTeam, newList).catch(function(err){
       showToast('調整寬度權重失敗：' + err.code, 'error');
     });
   }
@@ -1114,7 +1236,7 @@
       row: isPercussion ? null : Math.max(1, Number(document.getElementById('seatRow').value) || 1),
       weight: isPercussion ? null : Math.max(1, Number(document.getElementById('seatWeight').value) || 1)
     };
-    setSeatingSections(db, seatSectionsList.concat([newSection])).then(function(){
+    setSeatingSections(db, activeTeam, seatSectionsList.concat([newSection])).then(function(){
       seatForm.reset();
     }).catch(function(err){
       showSeatError('新增失敗（' + err.code + '）');
@@ -1136,7 +1258,7 @@
     if (!ok) return;
     var newList = seatSectionsList.slice();
     newList.splice(idx, 1);
-    setSeatingSections(db, newList).catch(function(err){
+    setSeatingSections(db, activeTeam, newList).catch(function(err){
       showToast('刪除失敗：' + err.code, 'error');
     });
   });
@@ -1148,21 +1270,16 @@
     if (weightInput){ changeSeatSectionWeight(Number(weightInput.getAttribute('data-seat-weight-input')), Number(weightInput.value)); return; }
   });
 
-  requireAdmin().then(function(result){
+  requireCanManageRoles().then(function(result){
     if (!result) return;
 
-    var isOwner = result.profile.role === 'owner';
-    var canManage = isOwner || (result.profile.permissions && result.profile.permissions.canManageRoles === true);
-    if (!canManage){
-      location.href = 'admin-index.html';
-      return;
-    }
-
     currentAdminUid = result.uid;
+    activeTeam = getActiveTeam(result.profile);
     var avatarBtn = document.getElementById('avatarBtn');
     avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
     avatarBtn.classList.remove('skel');
     initAccountMenu(result.profile.name);
+    initTeamSwitcher(result.profile);
     initAdminNav('roles');
 
     onSnapshot(query(collection(db, 'users'), where('status', '==', 'approved')), function(snap){
@@ -1175,7 +1292,8 @@
           role: data.role,
           permissions: data.permissions || {},
           sectionLeaderFor: data.sectionLeaderFor || [],
-          instruments: data.instruments || []
+          instruments: data.instruments || [],
+          teams: data.teams || {} // 9/17 新增：團別身分區塊要讀這個，之前漏加，一律預設空物件
         };
       });
       membersLoaded = true;
@@ -1195,7 +1313,7 @@
     if (!isOwner) return;
     document.getElementById('seatSectionWrap').classList.remove('hidden');
 
-    subscribeSeatingSections(db, function(sections){
+    subscribeSeatingSections(db, activeTeam, function(sections){
       seatSectionsList = sections;
       seatSectionsLoaded = true;
       renderSeatSections();

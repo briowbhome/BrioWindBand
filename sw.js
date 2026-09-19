@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'brio-v39';
+const CACHE_VERSION = 'brio-v40';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -20,6 +20,8 @@ const CORE_ASSETS = [
   './feedback-admin.html',
   './profile.html',
   './sheet-music.html',
+  './theme.css',
+  './team-switcher.js',
   './pdf-split.js',
   './pdf.worker.min.mjs',
   './auth-guard.js',

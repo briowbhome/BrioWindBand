@@ -1,0 +1,35 @@
+/* 共用配色與基礎變數（9/17 從 21 個頁面各自重複的 :root 區塊抽出集中管理，
+   見 docs/superpowers/specs/2026-09-17-events-team-partition-design.md「A. 共用配色檔」）。
+   校友團維持原值不變；校內團透過 :root[data-team="school"] 覆寫，
+   data-team 屬性由 auth-guard.js 依登入者的團別自動設定，頁面不需要自己處理。
+   之後如果要做深色模式，比照這個模式疊加 :root[data-theme="dark"]，兩者互不干擾。 */
+:root{
+  --ink:#20242F;
+  --ink-soft:#4A4F5C;
+  --paper:#F2EFE5;
+  --paper-raised:#FBFAF4;
+  --line:#DAD3BE;
+  --brass:#B8863A;
+  --brass-deep:#8F6A2C;
+  --burgundy:#7A2331;
+  --burgundy-deep:#5C1A26;
+  --sage:#5F6E58;
+  --sage-bg:#E7EBDF;
+  --radius-lg:20px;
+  --radius-md:14px;
+  --radius-sm:9px;
+  --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
+}
+
+:root[data-team="school"]{
+  --ink:#1B2A22;
+  --ink-soft:#57685E;
+  --paper:#F0EEE6;
+  --paper-raised:#F8F6EF;
+  --line:#DAD5C6;
+  --brass:#C77B4E;
+  --brass-deep:#A15F37;
+  --burgundy:#7A6B45;
+  --burgundy-deep:#5C5034;
+  /* --sage/--sage-bg/--radius-*/--shadow-card 不分團，沿用上面 :root 的共用值 */
+}

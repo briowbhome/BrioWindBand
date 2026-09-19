@@ -5,11 +5,26 @@ service firebase.storage {
       return request.auth != null &&
         firestore.exists(/databases/(default)/documents/users/$(request.auth.uid));
     }
+    // 9/19 資安複查順手抓到的既有 bug：校友團/校內團分割把 role/canManageSheetMusic
+    // 全部搬進 teams.{team}.* 之後，這個函式一直沒有跟著更新，還在看已經沒人會再寫入的
+    // 頂層 role/permissions.canManageSheetMusic——導致「只在某團是 admin」或「只在某團
+    // 被授予 canManageSheetMusic」的人（現在是取得這兩種身分的唯一管道）完全無法上傳/
+    // 刪除樂譜檔案，即使 firestore.rules 的 repertoire collection 早就放行他們了。
+    // Storage 規則跟 Firestore 規則是分開部署、分開維護的兩份設定，容易顧此失彼，
+    // 之後改 firestore.rules 的角色/權限判斷式時記得檢查這份檔案是否也要跟著改
+    function selfDoc() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
     function canManageSheetMusic() {
       return request.auth != null &&
         firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
-        (firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'owner'] ||
-         firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.permissions.canManageSheetMusic == true);
+        (
+          selfDoc().role == 'owner' ||
+          (selfDoc().teams != null && selfDoc().teams.alumni != null && selfDoc().teams.alumni.role == 'admin') ||
+          (selfDoc().teams != null && selfDoc().teams.school != null && selfDoc().teams.school.role == 'admin') ||
+          (selfDoc().teams != null && selfDoc().teams.alumni != null && selfDoc().teams.alumni.permissions != null && selfDoc().teams.alumni.permissions.canManageSheetMusic == true) ||
+          (selfDoc().teams != null && selfDoc().teams.school != null && selfDoc().teams.school.permissions != null && selfDoc().teams.school.permissions.canManageSheetMusic == true)
+        );
     }
     // partFile 涵蓋分部譜（{partId}.pdf）、總譜（full-score.pdf），跟 9/7 新增的「多個分部
     // 共用一份檔案」（group-{fileGroupId}.pdf，見 repertoire.js uploadGroupSheetMusic()），

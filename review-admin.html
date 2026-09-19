@@ -12,24 +12,8 @@
 <link rel="apple-touch-icon" href="assets/icons/icon-180.png">
 <script src="./pwa-register.js" defer></script>
 <script src="./pull-refresh.js" defer></script>
+<link rel="stylesheet" href="./theme.css">
 <style>
-  :root{
-    --ink:#20242F;
-    --ink-soft:#4A4F5C;
-    --paper:#F2EFE5;
-    --paper-raised:#FBFAF4;
-    --line:#DAD3BE;
-    --brass:#B8863A;
-    --brass-deep:#8F6A2C;
-    --burgundy:#7A2331;
-    --burgundy-deep:#5C1A26;
-    --sage:#5F6E58;
-    --sage-bg:#E7EBDF;
-    --radius-lg:20px;
-    --radius-md:14px;
-    --radius-sm:9px;
-    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
-  }
 
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -230,6 +214,15 @@
   .status-tag.pending{ background:#F2E7D2; color:var(--brass-deep); }
   .status-tag.approved{ background:var(--sage-bg); color:var(--sage); }
   .status-tag.rejected{ background:#EFE1E3; color:var(--burgundy-deep); }
+  .team-tag{
+    font-family:'Roboto Mono',monospace;
+    font-size:9.5px; letter-spacing:.05em;
+    padding:1.5px 7px; border-radius:5px;
+    font-weight:600;
+    flex:none;
+  }
+  .team-tag.alumni{ background:#E4E9F2; color:#33507D; }
+  .team-tag.school{ background:#F3E4D9; color:#A15F37; }
 
   .item-instruments{
     display:flex; flex-wrap:wrap; gap:6px;
@@ -332,6 +325,7 @@
       </div>
     </a>
     <div class="spacer"></div>
+    <span class="team-badge hidden" id="teamBadge"></span>
     <button class="avatar skel" id="avatarBtn" type="button" aria-label="帳號選單"></button>
   </div>
 
@@ -358,9 +352,10 @@
 
 <script type="module">
   import { initAdminNav } from './admin-nav.js';
-  import { requireAdmin, peekCachedProfile } from './auth-guard.js';
+  import { requireAdminOrTeamAdmin, peekCachedProfile } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
+  import { initTeamSwitcher } from './team-switcher.js';
   import {
     collection, query, where, onSnapshot,
     doc, updateDoc, deleteDoc, serverTimestamp, Timestamp
@@ -439,8 +434,17 @@
     rejected: '已拒絕的申請將於 30 天後自動清除，也可點右上角 ✕ 立即移除。'
   };
 
+  var currentAdminTeams = []; // 目前登入的幹部管理得到哪些團，在 requireAdmin() 之後才會有值
+
   function subscribeStatus(status){
-    var q = query(collection(db, 'users'), where('status', '==', status));
+    // 團別過濾：只看得到自己管得到的團的申請人。currentAdminTeams 是全域 admin/owner
+    // 一定會是 ['alumni','school']（兩團都算），只在某團有 teams.{team}.role=='admin'
+    // 的人只會看到那一團
+    var q = query(
+      collection(db, 'users'),
+      where('status', '==', status),
+      where('teamIds', 'array-contains-any', currentAdminTeams)
+    );
     onSnapshot(q, function(snap){
       var rows = [];
       snap.forEach(function(docSnap){
@@ -452,7 +456,8 @@
           instruments: data.instruments || [],
           createdAt: toDate(data.createdAt),
           approvedAt: toDate(data.approvedAt),
-          status: data.status
+          status: data.status,
+          team: Array.isArray(data.teamIds) && data.teamIds.length ? data.teamIds[0] : null
         });
       });
       rows.sort(function(a, b){
@@ -531,7 +536,8 @@
           '<div class="item-top">' +
             '<span class="avatar">' + initial(a.name) + '</span>' +
             '<div class="item-id">' +
-              '<div class="item-name">' + a.name + '<span class="status-tag ' + tag.cls + '">' + tag.text + '</span></div>' +
+              '<div class="item-name">' + a.name + '<span class="status-tag ' + tag.cls + '">' + tag.text + '</span>' +
+                '<span class="team-tag ' + (a.team === 'school' ? 'school' : 'alumni') + '">' + (a.team === 'school' ? '校內團' : '校友團') + '</span></div>' +
               '<div class="item-account">@' + a.account + '</div>' +
             '</div>' +
             removeIconHtml +
@@ -603,16 +609,26 @@
     }
   });
 
-  requireAdmin().then(function(result){
-    if (!result) return; // 未通過驗證，requireAdmin 已經處理導轉
+  requireAdminOrTeamAdmin().then(function(result){
+    if (!result) return; // 未通過驗證，requireAdminOrTeamAdmin 已經處理導轉
     var profile = result.profile;
     currentAdminUid = result.uid;
+
+    // 全域 admin/owner 視同兩團都能審核；只在某團是 admin 的人，currentAdminTeams
+    // 只會列出那一團，畫面上的分團標籤/統計數字自然只涵蓋相關範圍
+    var isGlobalAdmin = profile.role === 'admin' || profile.role === 'owner';
+    currentAdminTeams = isGlobalAdmin
+      ? ['alumni', 'school']
+      : Object.keys(profile.teams || {}).filter(function(team){
+          return profile.teams[team] && profile.teams[team].role === 'admin';
+        });
 
     var avatarBtn = document.getElementById('avatarBtn');
     avatarBtn.textContent = profile.name ? profile.name.charAt(0) : '?';
     avatarBtn.classList.remove('skel');
 
     initAccountMenu(profile.name);
+    initTeamSwitcher(profile);
     initAdminNav('review');
 
     subscribeStatus('pending');

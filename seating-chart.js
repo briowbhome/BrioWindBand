@@ -21,12 +21,15 @@ export var DEFAULT_SECTIONS = DEFAULT_INSTRUMENTS.map(function (inst, i) {
   };
 });
 
-var seeded = false;
+// 9/18 修正：改成 team 參數後，如果還是用單一布林值記錄「這次頁面載入有沒有補過
+// 預設值」，會變成「補過其中一團就不會再補另一團」——雖然目前切團要整頁重新整理，
+// 這個情境不容易真的發生，但既然要動這段程式碼，順手改成依團別分開追蹤比較保險
+var seededTeams = {};
 
-function seedDefaults(db) {
-  if (seeded) return;
-  seeded = true;
-  setDoc(doc(db, "settings", "seatingSections"), {
+function seedDefaults(db, team) {
+  if (seededTeams[team]) return;
+  seededTeams[team] = true;
+  setDoc(doc(db, "settings", "seatingSections_" + team), {
     sections: DEFAULT_SECTIONS,
     updatedAt: serverTimestamp()
   }).catch(function () {});
@@ -34,27 +37,27 @@ function seedDefaults(db) {
 
 // callback(sections) 每次異動都會呼叫，sections 是 [{zoneId, instrumentName, label, percussion}] 陣列
 // seedIfMissing 傳 true 才會在文件不存在時嘗試建立內建預設清單，用法跟 subscribeInstruments 一致
-export function subscribeSeatingSections(db, callback, seedIfMissing, onError) {
-  return onSnapshot(doc(db, "settings", "seatingSections"), function (snap) {
+export function subscribeSeatingSections(db, team, callback, seedIfMissing, onError) {
+  return onSnapshot(doc(db, "settings", "seatingSections_" + team), function (snap) {
     if (snap.exists()) {
       callback(snap.data().sections || []);
     } else {
       callback(DEFAULT_SECTIONS);
-      if (seedIfMissing) seedDefaults(db);
+      if (seedIfMissing) seedDefaults(db, team);
     }
   }, onError);
 }
 
 // 一次性讀取版本，conductor-admin.html 是一次性查詢頁面，不需要常駐監聽
-export async function getSeatingSectionsOnce(db) {
-  var snap = await getDoc(doc(db, "settings", "seatingSections"));
+export async function getSeatingSectionsOnce(db, team) {
+  var snap = await getDoc(doc(db, "settings", "seatingSections_" + team));
   return snap.exists() ? (snap.data().sections || []) : DEFAULT_SECTIONS;
 }
 
 // 排序/新增/刪除都是整份覆寫，用法跟 setInstrumentsOrder 一致——分區清單很小，
 // 不需要 arrayUnion/arrayRemove 那套局部更新
-export function setSeatingSections(db, sections) {
-  return setDoc(doc(db, "settings", "seatingSections"), {
+export function setSeatingSections(db, team, sections) {
+  return setDoc(doc(db, "settings", "seatingSections_" + team), {
     sections: sections,
     updatedAt: serverTimestamp()
   }, { merge: true });

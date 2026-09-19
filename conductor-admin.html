@@ -12,24 +12,8 @@
 <link rel="apple-touch-icon" href="assets/icons/icon-180.png">
 <script src="./pwa-register.js" defer></script>
 <script src="./pull-refresh.js" defer></script>
+<link rel="stylesheet" href="./theme.css">
 <style>
-  :root{
-    --ink:#20242F;
-    --ink-soft:#4A4F5C;
-    --paper:#F2EFE5;
-    --paper-raised:#FBFAF4;
-    --line:#DAD3BE;
-    --brass:#B8863A;
-    --brass-deep:#8F6A2C;
-    --burgundy:#7A2331;
-    --burgundy-deep:#5C1A26;
-    --sage:#5F6E58;
-    --sage-bg:#E7EBDF;
-    --radius-lg:20px;
-    --radius-md:14px;
-    --radius-sm:9px;
-    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
-  }
 
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -142,6 +126,12 @@
     background:none; border:none; padding:4px 0; cursor:pointer;
     font-size:12px; font-weight:700; color:var(--brass-deep);
   }
+  .notes-filter-toggle{
+    margin-left:auto; border:1px solid var(--line); background:var(--paper-raised);
+    border-radius:999px; padding:4px 12px; font-size:11px; font-weight:700;
+    color:var(--ink-soft); cursor:pointer;
+  }
+  .notes-filter-toggle.active{ background:var(--ink); border-color:var(--ink); color:var(--paper-raised); }
   .instrument-bars{ margin-top:4px; }
   .instrument-bar-row{
     display:grid; grid-template-columns:64px 1fr 22px; align-items:center; gap:10px;
@@ -248,6 +238,7 @@
       </div>
     </a>
     <div class="spacer"></div>
+    <span class="team-badge hidden" id="teamBadge"></span>
     <button class="avatar skel" id="avatarBtn" type="button" aria-label="帳號選單"></button>
   </div>
 
@@ -287,7 +278,10 @@
     </div>
   </div>
 
-  <div class="section-label"><span class="tw">排練筆記</span></div>
+  <div class="section-label">
+    <span class="tw">排練筆記</span>
+    <button type="button" class="notes-filter-toggle" id="notesFilterToggle">顯示全部</button>
+  </div>
   <p class="lede">自己的筆記本，可以新增多則。</p>
   <div class="card">
     <textarea id="noteNewTextarea" class="note-textarea" placeholder="寫點什麼，按下面按鈕新增一則。"></textarea>
@@ -320,9 +314,10 @@
   import { showConfirm } from './dialog.js';
   import { MESSAGES } from './messages.js';
   import { initAdminNav } from './admin-nav.js';
-  import { requireAdminOrConductor, peekCachedProfile } from './auth-guard.js';
+  import { requireAdminOrConductor, peekCachedProfile, getActiveTeam } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
+  import { initTeamSwitcher } from './team-switcher.js';
   import { subscribeEventTypes, COLOR_THEMES } from './event-types.js';
   import { DEFAULT_INSTRUMENTS } from './instruments.js';
   import { getSeatingSectionsOnce, DEFAULT_SECTIONS } from './seating-chart.js';
@@ -372,12 +367,14 @@
   // 00:00）才換下一場，原本用 Timestamp.now() 會讓活動一開始就被查詢排除、報表整個消失
   var eventTypesById = {};
   var typesLoaded = false;
+  var activeTeam = null;
 
   async function loadUpcomingHighlightEvents(){
     var todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     var snap = await getDocs(query(
       collection(db, 'events'),
+      where('team', 'array-contains', activeTeam),
       where('date', '>=', Timestamp.fromDate(todayStart)),
       orderBy('date', 'asc'),
       limit(20)
@@ -717,6 +714,7 @@
   var myNotes = []; // [{id, note, createdAt}]，新的在前面
   var editingNoteId = null;
   var editingNoteDraft = '';
+  var showAllTeamsNotes = false; // 「顯示全部」開關狀態，不做持久化，每次進頁面重置
 
   function escapeNoteHtml(text){
     var div = document.createElement('div');
@@ -730,11 +728,15 @@
     return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + d.toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit', hour12:false });
   }
 
-  // 只用 where('uid','==',currentUid) 不加 orderBy，避免 Firestore 要求額外的複合索引，
-  // 排序（新的在前）交給前端做就好，筆記本身數量不多，這樣做不會有效能問題
+  // 只用等式過濾不加 orderBy，避免 Firestore 要求額外的複合索引，排序（新的在前）交給
+  // 前端做就好，筆記本身數量不多，這樣做不會有效能問題。9/19 分團：預設多加一條
+  // where('team','==',activeTeam)，「顯示全部」開關打開時省略這條，撈自己名下全部團別的筆記
   async function loadNotes(){
     try {
-      var snap = await getDocs(query(collection(db, 'conductorNotes'), where('uid', '==', currentUid)));
+      var notesQuery = showAllTeamsNotes
+        ? query(collection(db, 'conductorNotes'), where('uid', '==', currentUid))
+        : query(collection(db, 'conductorNotes'), where('uid', '==', currentUid), where('team', '==', activeTeam));
+      var snap = await getDocs(notesQuery);
       myNotes = [];
       snap.forEach(function(docSnap){
         var data = docSnap.data();
@@ -785,6 +787,13 @@
     }).join('');
   }
 
+  var notesFilterToggleBtn = document.getElementById('notesFilterToggle');
+  notesFilterToggleBtn.addEventListener('click', function(){
+    showAllTeamsNotes = !showAllTeamsNotes;
+    notesFilterToggleBtn.classList.toggle('active', showAllTeamsNotes);
+    loadNotes();
+  });
+
   noteAddBtn.addEventListener('click', function(){
     var text = noteNewTextarea.value.trim();
     if (!text) return;
@@ -794,6 +803,7 @@
     setDoc(newRef, {
       uid: currentUid,
       note: text,
+      team: activeTeam,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     }).then(function(){
@@ -896,7 +906,7 @@
   // 讀不到（還沒設定過或網路失敗）就退回 DEFAULT_SECTIONS，跟樂器清單一樣不能讓整頁卡住
   async function loadSeatingSections(){
     try {
-      seatingSectionsList = await getSeatingSectionsOnce(db);
+      seatingSectionsList = await getSeatingSectionsOnce(db, activeTeam);
     } catch (e) {
       seatingSectionsList = DEFAULT_SECTIONS;
     }
@@ -977,12 +987,14 @@
   requireAdminOrConductor().then(function(result){
     if (!result) return;
     currentUid = result.uid;
+    activeTeam = getActiveTeam(result.profile);
 
     var avatarBtn = document.getElementById('avatarBtn');
     avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
     avatarBtn.classList.remove('skel');
     var isAdmin = result.profile.role === 'admin' || result.profile.role === 'owner';
     initAccountMenu(result.profile.name, isAdmin ? 'admin-index.html' : null, null);
+    initTeamSwitcher(result.profile);
     // 純 conductor 角色沒有其他 8 個後台頁面的權限，顯示一個大部分項目都點不動的
     // 導覽選單沒有意義，只有 admin-tier 才顯示漢堡圖示、掛上 initAdminNav()
     if (isAdmin) {

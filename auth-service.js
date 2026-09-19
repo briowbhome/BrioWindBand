@@ -27,7 +27,7 @@ function mapAuthError(error) {
   return "發生錯誤，請稍後再試（" + (code || "unknown") + "）";
 }
 
-export async function registerAccount({ account, password, name, birthday, phone, licensePlate, instruments }) {
+export async function registerAccount({ account, password, name, birthday, phone, licensePlate, instruments, team }) {
   var email = usernameToEmail(account);
   var credential;
   try {
@@ -50,7 +50,11 @@ export async function registerAccount({ account, password, name, birthday, phone
       role: "member",
       createdAt: serverTimestamp(),
       approvedAt: null,
-      approvedBy: null
+      approvedBy: null,
+      // 9/17 校友團/校內團分割新增：teamIds 純粹給查詢用（跟 teams 保持同步），
+      // teams.{team} 才是實際的團籍資料，見 firestore.rules 的團別版 create 規則
+      teamIds: [team],
+      teams: { [team]: { role: "member" } }
     });
   } catch (error) {
     throw new Error("帳號已建立，但寫入團員資料失敗，請洽幹部協助（" + error.code + "）");

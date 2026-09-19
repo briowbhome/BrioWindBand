@@ -12,24 +12,8 @@
 <link rel="apple-touch-icon" href="assets/icons/icon-180.png">
 <script src="./pwa-register.js" defer></script>
 <script src="./pull-refresh.js" defer></script>
+<link rel="stylesheet" href="./theme.css">
 <style>
-  :root{
-    --ink:#20242F;
-    --ink-soft:#4A4F5C;
-    --paper:#F2EFE5;
-    --paper-raised:#FBFAF4;
-    --line:#DAD3BE;
-    --brass:#B8863A;
-    --brass-deep:#8F6A2C;
-    --burgundy:#7A2331;
-    --burgundy-deep:#5C1A26;
-    --sage:#5F6E58;
-    --sage-bg:#E7EBDF;
-    --radius-lg:20px;
-    --radius-md:14px;
-    --radius-sm:9px;
-    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
-  }
 
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -237,6 +221,7 @@
       </div>
     </a>
     <div class="spacer"></div>
+    <span class="team-badge hidden" id="teamBadge"></span>
     <button class="avatar skel" id="avatarBtn" type="button" aria-label="帳號選單"></button>
   </div>
 
@@ -276,9 +261,10 @@
 </div>
 
 <script type="module">
-  import { requireAdmin, peekCachedProfile } from './auth-guard.js';
+  import { requireAdmin, peekCachedProfile, getActiveTeam } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
+  import { initTeamSwitcher } from './team-switcher.js';
   import { subscribeEventTypes, badgeStyle } from './event-types.js';
   import { FAMILY_LABELS, FAMILY_ORDER } from './instruments.js';
   import {
@@ -387,7 +373,12 @@
     statList.innerHTML = SKELETON_ROWS_HTML;
 
     try {
-      var eventsSnap = await getDocs(collection(db, 'events'));
+      var eventsSnap = await getDocs(query(collection(db, 'events'), where('team', 'array-contains', activeTeam)));
+      // 9/19 追加修正：eventsSnap 已經是目前團別的活動，組一個 id 集合，撈其他 collection
+      // 時比對這個集合，避免瀏覽器記憶體裡存進另一團的簽到/名單/回報內容
+      var eventIdSet = {};
+      eventsSnap.forEach(function(docSnap){ eventIdSet[docSnap.id] = true; });
+
       var checkinsQuery = rangeVal === 'all'
         ? collection(db, 'checkins')
         : query(collection(db, 'checkins'), where('checkedInAt', '>=', Timestamp.fromMillis(cutoffMs)));
@@ -402,12 +393,14 @@
       checkinsSnap.forEach(function(docSnap){
         var data = docSnap.data();
         var eid = data.eventId;
+        if (!eventIdSet[eid]) return;
         if (!checkinsByEvent[eid]) checkinsByEvent[eid] = [];
         checkinsByEvent[eid].push({ uid: data.uid, name: data.name, account: data.account });
       });
 
       rostersByEvent = {};
       rostersSnap.forEach(function(docSnap){
+        if (!eventIdSet[docSnap.id]) return;
         rostersByEvent[docSnap.id] = { members: docSnap.data().members || [] };
       });
 
@@ -415,6 +408,7 @@
       reportsSnap.forEach(function(docSnap){
         var data = docSnap.data();
         var eid = data.eventId;
+        if (!eventIdSet[eid]) return;
         if (!reportsByEvent[eid]) reportsByEvent[eid] = [];
         reportsByEvent[eid].push({ uid: data.uid, name: data.name, account: data.account, status: data.status, reason: data.reason });
       });
@@ -588,6 +582,7 @@
   });
 
   var typesLoaded = false;
+  var activeTeam = null;
 
   rangeFilter.addEventListener('change', function(){
     if (typesLoaded) loadStats();
@@ -595,11 +590,13 @@
 
   requireAdmin().then(function(result){
     if (!result) return;
+    activeTeam = getActiveTeam(result.profile);
 
     var avatarBtn = document.getElementById('avatarBtn');
     avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
     avatarBtn.classList.remove('skel');
     initAccountMenu(result.profile.name);
+    initTeamSwitcher(result.profile);
 
     subscribeEventTypes(db, function(types){
       eventTypesById = {};

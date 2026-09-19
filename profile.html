@@ -13,24 +13,8 @@
 <script src="./pwa-register.js" defer></script>
 <script src="./pull-refresh.js" defer></script>
 <script src="./ios-install.js" defer></script>
+<link rel="stylesheet" href="./theme.css">
 <style>
-  :root{
-    --ink:#20242F;
-    --ink-soft:#4A4F5C;
-    --paper:#F2EFE5;
-    --paper-raised:#FBFAF4;
-    --line:#DAD3BE;
-    --brass:#B8863A;
-    --brass-deep:#8F6A2C;
-    --burgundy:#7A2331;
-    --burgundy-deep:#5C1A26;
-    --sage:#5F6E58;
-    --sage-bg:#E7EBDF;
-    --radius-lg:20px;
-    --radius-md:14px;
-    --radius-sm:9px;
-    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
-  }
 
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -356,6 +340,7 @@
       <div class="sub">Brio Wind Band</div>
     </div>
     <div class="spacer"></div>
+    <span class="team-badge hidden" id="teamBadge"></span>
     <button class="bell-btn" id="notifBtn" type="button" aria-label="通知">
       <svg width="21" height="21" viewBox="0 0 24 24" fill="none"><path d="M6 9a6 6 0 0 1 12 0v4l1.8 3.2a.6.6 0 0 1-.5.9H4.7a.6.6 0 0 1-.5-.9L6 13V9Z" stroke="#20242F" stroke-width="1.6" stroke-linejoin="round"/><path d="M9.5 19.5a2.5 2.5 0 0 0 5 0" stroke="#20242F" stroke-width="1.6" stroke-linecap="round"/></svg>
       <span class="notif-dot hidden" id="notifDot"></span>
@@ -571,7 +556,8 @@
 </div>
 
 <script type="module">
-  import { resolveMemberAccess, peekCachedProfile, logout } from './auth-guard.js';
+  import { resolveMemberAccess, peekCachedProfile, logout, getSectionLeaderInstruments } from './auth-guard.js';
+  import { initTeamSwitcher } from './team-switcher.js';
   import { showToast } from './toast.js';
   import { showConfirm } from './dialog.js';
   import { MESSAGES } from './messages.js';
@@ -646,6 +632,7 @@
 
     var result = access;
     var profile = access.profile;
+    initTeamSwitcher(profile);
 
     feedbackViewerUid = result.uid;
     feedbackViewerName = profile.name || '';
@@ -1211,7 +1198,7 @@
     // 後台管理／指揮專用／分部長專屬連結：跟 index.html 同一套判斷式
     var isAdmin = profile.role === 'admin' || profile.role === 'owner';
     var canSeeConductorPage = isAdmin || profile.role === 'conductor';
-    var canSeeSectionLeaderPage = isAdmin || (Array.isArray(profile.sectionLeaderFor) && profile.sectionLeaderFor.length > 0);
+    var canSeeSectionLeaderPage = isAdmin || getSectionLeaderInstruments(profile).length > 0;
 
     // 團員審核待辦：只有 admin/owner 訂閱，理由跟 index.html 同一套（conductor 沒有審核權限、
     // firestore.rules 的 users list 也只放行 admin-tier）

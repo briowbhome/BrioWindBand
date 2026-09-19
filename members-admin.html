@@ -12,24 +12,8 @@
 <link rel="apple-touch-icon" href="assets/icons/icon-180.png">
 <script src="./pwa-register.js" defer></script>
 <script src="./pull-refresh.js" defer></script>
+<link rel="stylesheet" href="./theme.css">
 <style>
-  :root{
-    --ink:#20242F;
-    --ink-soft:#4A4F5C;
-    --paper:#F2EFE5;
-    --paper-raised:#FBFAF4;
-    --line:#DAD3BE;
-    --brass:#B8863A;
-    --brass-deep:#8F6A2C;
-    --burgundy:#7A2331;
-    --burgundy-deep:#5C1A26;
-    --sage:#5F6E58;
-    --sage-bg:#E7EBDF;
-    --radius-lg:20px;
-    --radius-md:14px;
-    --radius-sm:9px;
-    --shadow-card: 0 1px 2px rgba(32,36,47,.06), 0 8px 24px -12px rgba(32,36,47,.18);
-  }
 
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -204,6 +188,7 @@
       </div>
     </a>
     <div class="spacer"></div>
+    <span class="team-badge hidden" id="teamBadge"></span>
     <button class="avatar skel" id="avatarBtn" type="button" aria-label="帳號選單"></button>
   </div>
 
@@ -233,9 +218,10 @@
 
 <script type="module">
   import { initAdminNav } from './admin-nav.js';
-  import { requireAdmin, peekCachedProfile } from './auth-guard.js';
+  import { requireAdmin, peekCachedProfile, getSectionLeaderInstruments } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
+  import { initTeamSwitcher } from './team-switcher.js';
   import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
   var ROLE_LABELS = { member: '團員', conductor: '指揮', admin: '管理員', owner: 'Owner' };
@@ -332,8 +318,9 @@
       var instTags = m.instruments.length
         ? m.instruments.map(function(i){ return '<span class="tag-chip">' + i + '</span>'; }).join('')
         : '<span class="tag-chip">—</span>';
-      var sectionBadge = m.sectionLeaderFor.length
-        ? '<span class="section-badge">分部長 · ' + m.sectionLeaderFor.join('、') + '</span>'
+      var sectionInstruments = getSectionLeaderInstruments(m);
+      var sectionBadge = sectionInstruments.length
+        ? '<span class="section-badge">分部長 · ' + sectionInstruments.join('、') + '</span>'
         : '';
       var birthdayLabel = formatBirthday(m.birthday);
 
@@ -388,6 +375,7 @@
     avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
     avatarBtn.classList.remove('skel');
     initAccountMenu(result.profile.name);
+    initTeamSwitcher(result.profile);
     initAdminNav('members');
 
     onSnapshot(query(collection(db, 'users'), where('status', '==', 'approved')), function(snap){
@@ -402,7 +390,8 @@
           phone: data.phone || null,
           birthday: data.birthday || null,
           licensePlate: data.licensePlate || null,
-          sectionLeaderFor: data.sectionLeaderFor || []
+          sectionLeaderFor: data.sectionLeaderFor || [],
+          teams: data.teams || {}
         };
       });
       membersLoaded = true;
