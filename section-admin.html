@@ -197,7 +197,7 @@
 
 <script type="module">
   import { showToast } from './toast.js';
-  import { requireSectionLeader, peekCachedProfile, getActiveTeam, hasAnyTeamRole } from './auth-guard.js';
+  import { requireSectionLeader, peekCachedProfile, hasActiveTeamRole } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
@@ -537,10 +537,12 @@
   requireSectionLeader().then(function(result){
     if (!result) return;
     currentUid = result.uid;
-    var activeTeam = getActiveTeam(result.profile);
+    var activeTeam = result.activeTeam;
     var teamProfile = result.profile.teams && result.profile.teams[activeTeam];
     viewerSectionLeaderFor = teamProfile && Array.isArray(teamProfile.sectionLeaderFor) ? teamProfile.sectionLeaderFor : [];
-    isViewerAdminTier = result.profile.role === 'owner' || hasAnyTeamRole(result.profile, 'admin');
+    // 9/20 修正：改成只看目前切換中的那一團，跟這頁本來就依 activeTeam 篩選音樂會/
+    // 分部指派範圍一致，不是「隨便哪一團有 admin 身分就視同全部樂器都能操作」
+    isViewerAdminTier = result.profile.role === 'owner' || hasActiveTeamRole(result.profile, 'admin');
 
     var avatarBtn = document.getElementById('avatarBtn');
     avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';

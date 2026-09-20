@@ -1164,7 +1164,7 @@
   import { showConfirm } from './dialog.js';
   import { MESSAGES } from './messages.js';
   import { subscribeRemittanceAccounts } from './finance.js';
-  import { resolveMemberAccess, peekCachedProfile, getActiveTeam, getSectionLeaderInstruments, hasAnyTeamRole } from './auth-guard.js';
+  import { resolveMemberAccess, peekCachedProfile, getActiveTeam, hasAnyTeamRole, hasActiveTeamRole } from './auth-guard.js';
   import { initTeamSwitcher } from './team-switcher.js';
   import { loadEventTypesOnce } from './event-types.js';
   import { cachedThenFresh } from './data-cache.js';
@@ -2385,7 +2385,10 @@
           return { pieceId: ref.id, title: piece.title, assignedLabel: labels.length ? labels.join('、') : null };
         }));
 
-        return { concertId: entry.concertId, title: concertSnap.data().title, instruments: entry.instruments, pieces: pieces };
+        // team：這場音樂會實際所屬的團別，供 canDeleteConcertNote() 判斷刪除權限用——
+        // 不能拿 activeTeam（目前切換中的團別）代替，因為這份清單本來就是不分團撈出
+        // 「我自己有演出紀錄的全部音樂會」，難免包含跟目前切換中團別不同的音樂會
+        return { concertId: entry.concertId, title: concertSnap.data().title, team: (concertSnap.data().team || [])[0] || null, instruments: entry.instruments, pieces: pieces };
       }));
 
       return concerts.filter(function(c){ return c; });
@@ -2559,9 +2562,19 @@
     }
 
     function canDeleteConcertNote(n){
-      if (viewerProfile.role === 'owner' || hasAnyTeamRole(viewerProfile, 'admin')) return true;
+      if (viewerProfile.role === 'owner') return true;
       if (n.authorUid === viewerUid) return true;
-      return getSectionLeaderInstruments(viewerProfile).indexOf(n.instrumentName) !== -1;
+      // 9/20 修正：firestore.rules 的刪除規則看 concertTeamOf(concertId)——這則筆記所屬
+      // 音樂會「實際」的團別，不是 activeTeam（目前切換中的團別）。「我的音樂會」清單
+      // （myConcertsData）本來就是不分團撈出「我自己有演出紀錄的全部音樂會」，難免包含
+      // 跟目前切換中團別不同的音樂會，用 activeTeam 判斷會跟真正的規則對不起來，要直接
+      // 查這場音樂會自己的 team 欄位
+      var concert = myConcertsData.filter(function(x){ return x.concertId === activeNotesConcertId; })[0];
+      var concertTeam = concert && concert.team;
+      var teamData = concertTeam && viewerProfile.teams && viewerProfile.teams[concertTeam];
+      if (!teamData) return false;
+      if (teamData.role === 'admin') return true;
+      return Array.isArray(teamData.sectionLeaderFor) && teamData.sectionLeaderFor.indexOf(n.instrumentName) !== -1;
     }
 
     function renderConcertNoteItem(n){
@@ -2839,9 +2852,11 @@
       // 通知鈴鐺：訪客沒有個人資料可查，整個隱藏；審核中/已核准維持顯示（自然是空狀態）
       document.getElementById('notifBtn').classList.toggle('hidden', viewerState === 'guest');
       // 指揮後台入口：只有 admin/owner/conductor 看得到，跟 profile.html 的
-      // canSeeConductorPage 同一套判斷式，角色資料已經在 viewerProfile 裡，不用多查一次
+      // canSeeConductorPage 同一套判斷式，角色資料已經在 viewerProfile 裡，不用多查一次。
+      // 9/20 修正：conductor-admin.html 的門檻已經改成只看目前切換中的那一團，這裡也要
+      // 跟著看 activeTeam，不然圖示顯示了、點下去卻被彈回首頁
       var canSeeConductorPage = viewerProfile &&
-        (viewerProfile.role === 'owner' || hasAnyTeamRole(viewerProfile, 'admin') || hasAnyTeamRole(viewerProfile, 'conductor'));
+        (viewerProfile.role === 'owner' || hasActiveTeamRole(viewerProfile, 'admin') || hasActiveTeamRole(viewerProfile, 'conductor'));
       document.getElementById('conductorBtn').classList.toggle('hidden', !canSeeConductorPage);
       // 審核中狀態橫幅
       document.getElementById('pendingBanner').classList.toggle('hidden', viewerState !== 'pending');

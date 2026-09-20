@@ -177,10 +177,12 @@ export async function requireApprovedMember() {
     goToLogin();
     return null;
   }
-  return { uid: user.uid, profile: profile };
+  return { uid: user.uid, profile: profile, activeTeam: getActiveTeam(profile) };
 }
 
-// 後台頁面（review-admin.html 等）用：必須登入、審核通過，且角色是幹部或擁有者
+// 後台頁面用：必須登入、審核通過，且角色是幹部或擁有者。9/20 現在只剩 feedback-admin.html
+// 還在用（其餘 8 個頁面都已經改用 requireAdminOrTeamAdmin()）；isAllowed() 改用共用的
+// hasAnyTeamRole()（頂層 role 已經停用，之後會被清除腳本刪掉，不能再靠它判斷）
 export async function requireAdmin() {
   var user = await waitForAuthUser();
   if (!user) {
@@ -189,55 +191,8 @@ export async function requireAdmin() {
     return null;
   }
 
-  var profile;
-  try {
-    profile = await resolveProfile(user.uid, function (fresh) {
-      if (!fresh || fresh.status !== "approved") {
-        clearProfileCache();
-        signOut(auth).then(goToLogin);
-      } else if (fresh.role !== "admin" && fresh.role !== "owner") {
-        clearProfileCache();
-        location.href = "index.html";
-      }
-    });
-  } catch (e) {
-    showConnectionError();
-    return null;
-  }
-
-  if (!profile || profile.status !== "approved") {
-    clearProfileCache();
-    await signOut(auth);
-    goToLogin();
-    return null;
-  }
-  if (profile.role !== "admin" && profile.role !== "owner") {
-    location.href = "index.html";
-    return null;
-  }
-  return { uid: user.uid, profile: profile };
-}
-
-// 指揮專用頁面（conductor-admin.html）用：必須登入、審核通過，角色是幹部/擁有者「或」指揮，
-// 這次（9/19 conductorNotes 分團）放寬成也認得「任一團的團別身分是 admin/conductor」——
-// 跟 requireAdminOrTeamAdmin()/requireAdminOrFinanceManager() 同一類缺口修正，差別是這個
-// 函式只有這一個頁面在用，直接改寫原函式，不另外新增平行函式
-export async function requireAdminOrConductor() {
-  var user = await waitForAuthUser();
-  if (!user) {
-    clearProfileCache();
-    goToLogin();
-    return null;
-  }
-
-  var allowedRoles = ["admin", "owner", "conductor"];
-
   function isAllowed(p) {
-    var isTeamAllowed = !!(p && p.teams && Object.keys(p.teams).some(function (team) {
-      var role = p.teams[team] && p.teams[team].role;
-      return role === "admin" || role === "conductor";
-    }));
-    return !!p && (allowedRoles.indexOf(p.role) !== -1 || isTeamAllowed);
+    return !!p && (p.role === "owner" || hasAnyTeamRole(p, "admin"));
   }
 
   var profile;
@@ -266,7 +221,54 @@ export async function requireAdminOrConductor() {
     location.href = "index.html";
     return null;
   }
-  return { uid: user.uid, profile: profile };
+  return { uid: user.uid, profile: profile, activeTeam: getActiveTeam(profile) };
+}
+
+// 指揮專用頁面（conductor-admin.html）用：必須登入、審核通過，角色是幹部/擁有者「或」指揮。
+// 9/20 修正：從「任一團的團別身分是 admin/conductor 就放行」改成「目前切換中的那一團」——
+// conductorNotes 是依 activeTeam 建立的私人筆記，門檻理所當然也要看現在是哪一團，不然
+// 校友團 admin 切到自己只是一般團員的校內團，仍然能進這頁、以為自己有指揮/幹部身分
+export async function requireAdminOrConductor() {
+  var user = await waitForAuthUser();
+  if (!user) {
+    clearProfileCache();
+    goToLogin();
+    return null;
+  }
+
+  function isAllowed(p) {
+    return ownerOrActiveTeamPredicate(p, function (teamData) {
+      return teamData.role === "admin" || teamData.role === "conductor";
+    });
+  }
+
+  var profile;
+  try {
+    profile = await resolveProfile(user.uid, function (fresh) {
+      if (!fresh || fresh.status !== "approved") {
+        clearProfileCache();
+        signOut(auth).then(goToLogin);
+      } else if (!isAllowed(fresh)) {
+        clearProfileCache();
+        location.href = "index.html";
+      }
+    });
+  } catch (e) {
+    showConnectionError();
+    return null;
+  }
+
+  if (!profile || profile.status !== "approved") {
+    clearProfileCache();
+    await signOut(auth);
+    goToLogin();
+    return null;
+  }
+  if (!isAllowed(profile)) {
+    location.href = "index.html";
+    return null;
+  }
+  return { uid: user.uid, profile: profile, activeTeam: getActiveTeam(profile) };
 }
 
 // 通用小函式：這個人在「任一團」有沒有某個共用資源職能旗標（canManageSheetMusic／
@@ -285,10 +287,67 @@ export function hasTeamPermission(profile, key) {
 // section-admin.html/sheet-music.html 各自還在只看頂層全域 role，兩邊本來要同步的判斷式
 // 跑掉了（分團後全域 role 不再代表任何身分，只有 teams.{team}.role 才是真的）。統一改用
 // 這個函式，之後不會再各自維護一份容易漏改的複本
+//
+// ⚠️ 呼叫前務必確認要的是「任一團」還是「目前切換中的那一團」——這裡是「任一團」，
+// 下面簽名一模一樣的 hasActiveTeamRole() 才是「只看目前切換中那一團」，兩者選錯不會
+// 有任何錯誤訊息，只會默默放行/擋下錯的人。只有「管的資源本身兩團共用」的情境
+// （canManageSheetMusic/canViewAllSheetMusic/canManageEventTypes、意見回饋、
+// 「任一團 admin 都能看到審核待辦通知」這幾個既有例外）才該用這個「任一團」版本；
+// 「後台頁面能不能進去、能不能編輯」這類跟「現在瀏覽的是哪一團」有關的判斷，一律用
+// hasActiveTeamRole()
 export function hasAnyTeamRole(profile, role) {
   return !!(profile && profile.teams && Object.keys(profile.teams).some(function (team) {
     return profile.teams[team] && profile.teams[team].role === role;
   }));
+}
+
+// 通用小函式：回傳「某個成員」（不一定是目前登入這個人，可以是清單裡任何一筆 users
+// 文件資料）在「指定那一團」的角色，沒有就預設 'member'。9/20 抽出來共用——
+// members-admin.html／roles-admin.html／member-stats-admin.html 三個檔案各自手刻
+// `(data.teams && data.teams[team] && data.teams[team].role) || 'member'` 這段一模一樣
+// 的邏輯，抽成這裡一份，三邊改叫這個函式，之後預設值或查找方式要調整只需要改一個地方
+export function roleInTeam(data, team) {
+  return (data && data.teams && data.teams[team] && data.teams[team].role) || 'member';
+}
+
+// 通用小函式：回傳這個人在「目前切換中的那一團」（getActiveTeam()）的 teams.{team} 物件
+// （沒有就回傳 null）。9/20 新增——後台頁面的門檻本來大多用 hasAnyTeamRole()/
+// hasTeamPermission() 的「任一團」聯集邏輯，但「角色身分」（admin/conductor）跟
+// canManageRoles/canManageFinance 這種依團別各自獨立授權的權限，正確的門檻應該是
+// 「目前作用中的那一團」有沒有這個身分/權限，不是「隨便哪一團有就放行」——不然雙團籍
+// 帳號只要在其中一團是 admin，切到另一團（自己只是一般團員）仍然能進整個後台。
+// canManageSheetMusic/canViewAllSheetMusic/canManageEventTypes 這三個「管的資源本身
+// 兩團共用」的旗標不適用這個函式，維持原本 hasTeamPermission() 的任一團判斷（見上方註解）
+export function activeTeamData(profile) {
+  var team = getActiveTeam(profile);
+  return (profile && profile.teams && profile.teams[team]) || null;
+}
+
+// 通用小函式：這個人在「目前切換中的那一團」的團別身分是不是某個角色。跟 hasAnyTeamRole()
+// 簽名故意一樣（方便直接替換），差別是這個只看 activeTeam，不是任一團——後台入口的連結/
+// 圖示是否顯示，應該跟目的頁面的門檻（已經改成只看 activeTeam）一致，不然連結點了會被彈回
+// 首頁，使用者以為連結故意顯示卻按不進去，體驗上比直接不顯示更奇怪
+//
+// ⚠️ 這是預設該用的版本——「後台頁面能不能進去/編輯」「導覽連結/圖示要不要顯示」這類
+// 判斷都用這個。只有明確屬於「兩團共用資源」的少數例外才改用上面的 hasAnyTeamRole()，
+// 見它自己的註解列出的例外清單
+export function hasActiveTeamRole(profile, role) {
+  var teamData = activeTeamData(profile);
+  return !!(teamData && teamData.role === role);
+}
+
+// 通用小函式：owner 一律放行；不是 owner 的話，看「目前切換中的那一團」的資料是否符合
+// predicate（沒有該團資料就一律不放行）。9/20 抽出來共用——原本 requireAdminOrConductor/
+// requireAdminOrFinanceManager/requireAdminOrTeamAdmin/requireCanManageRoles/
+// requireSectionLeader 這 5 個函式各自重複「owner 短路 + 沒有 teamData 就擋下來」這幾行，
+// 還各自寫了兩種不同寫法（有的用 !!(teamData && ...)，有的用 if(!teamData) return false）。
+// 統一走這個函式之後，只有 predicate 那一行需要各自不同，其餘骨架只有一份，以後要調整
+// owner 短路或「沒有 activeTeam 資料」的規則，改這裡一個地方就好
+function ownerOrActiveTeamPredicate(profile, predicate) {
+  if (!profile) return false;
+  if (profile.role === "owner") return true;
+  var teamData = activeTeamData(profile);
+  return !!(teamData && predicate(teamData));
 }
 
 // 藏譜管理頁面（repertoire-admin.html）用：必須登入、審核通過，且「role 是 admin/owner」或
@@ -303,8 +362,7 @@ export async function requireAdminOrSheetMusicManager() {
   }
 
   function isAllowed(p) {
-    return !!p && (p.role === "admin" || p.role === "owner" ||
-      (p.permissions && p.permissions.canManageSheetMusic === true) ||
+    return !!p && (p.role === "owner" || hasAnyTeamRole(p, "admin") ||
       hasTeamPermission(p, 'canManageSheetMusic'));
   }
 
@@ -334,12 +392,14 @@ export async function requireAdminOrSheetMusicManager() {
     location.href = "index.html";
     return null;
   }
-  return { uid: user.uid, profile: profile };
+  return { uid: user.uid, profile: profile, activeTeam: getActiveTeam(profile) };
 }
 
-// 財務管理頁面（finance-admin.html）用：必須登入、審核通過，且「role 是 admin/owner」或
-// 「被個別授予 canManageFinance 權限」（例如財務職位）。跟 requireAdminOrSheetMusicManager()
-// 完全同一種骨架，只是換成 canManageFinance 這個旗標
+// 財務管理頁面（finance-admin.html）用：必須登入、審核通過，且「role 是 owner」或「目前
+// 切換中的那一團身分是 admin，或在那一團被個別授予 canManageFinance 權限」（例如財務職位）。
+// 9/20 修正：從「任一團有身分/權限就放行」改成「目前切換中的那一團」——財務資料本來就是
+// 兩團完全獨立結算（見 financeSettings_alumni/school 各自獨立文件），校友團的財務身分
+// 不該讓人切到校內團後還能進財務後台，即使剛好也是校友團的財務管理員
 export async function requireAdminOrFinanceManager() {
   var user = await waitForAuthUser();
   if (!user) {
@@ -348,12 +408,10 @@ export async function requireAdminOrFinanceManager() {
     return null;
   }
 
-  // 9/18 修正：地基階段已經把 canManageFinance 搬到 teams.{team}.permissions.canManageFinance，
-  // 但這個守門函式原本只認全域 permissions.canManageFinance，導致「只在某一團有財務權限」的
-  // 人完全進不了這個頁面。這裡補上判斷：只要在任一團有這個權限就放行，進頁後看到的資料
-  // 仍然依 activeTeam 過濾，只會看到自己有權限的那團
   function isAllowed(p) {
-    return !!p && (p.role === "admin" || p.role === "owner" || hasTeamPermission(p, 'canManageFinance'));
+    return ownerOrActiveTeamPredicate(p, function (teamData) {
+      return teamData.role === "admin" || (teamData.permissions && teamData.permissions.canManageFinance === true);
+    });
   }
 
   var profile;
@@ -382,13 +440,19 @@ export async function requireAdminOrFinanceManager() {
     location.href = "index.html";
     return null;
   }
-  return { uid: user.uid, profile: profile };
+  return { uid: user.uid, profile: profile, activeTeam: getActiveTeam(profile) };
 }
 
-// 公告管理頁面（announce-admin.html）用：必須登入、審核通過，且「role 是 admin/owner」或
-// 「在任一團的團別身分是 admin」。9/19 公告分團後，寫入權限改成 isAdminTierFor(team)，
-// 但公告本來就是團別版全新的頁面守門情境（不像財務那樣有「全域 canManageFinance 旗標」
-// 這種額外情境要相容），只要任一團是團別 admin 就放行，進頁後用 activeTeam 決定編輯哪一團
+// 公告管理頁面（announce-admin.html），以及 admin-index.html/members-admin.html/
+// roster-admin.html/event-admin.html/stats-admin.html/concert-stats-admin.html/
+// checkin-stats-admin.html/member-stats-admin.html 這 8 個「內容依團別各自獨立」的
+// 後台頁面共用：必須登入、審核通過，且「role 是 owner」或「目前切換中的那一團身分是
+// admin」。9/20 修正（雙團籍帳號的重要缺口）：原本看「任一團」，導致校友團 admin
+// 切到自己只是一般團員的校內團後，仍然通過這裡進到校內團的後台——這批頁面顯示/操作的
+// 內容本來就是依 activeTeam 決定看哪一團的資料，門檻理所當然也要看「現在是哪一團」，
+// 不是「隨便哪一團有身分就放行」。review-admin.html（跨團審核佇列，內部本來就用
+// currentAdminTeams 依實際團別身分各自過濾，不受 activeTeam 影響）跟 feedback-admin.html
+// （意見回饋是兩團共用的單一信箱，不分團）改用 requireAdmin()，不受這次修正影響
 export async function requireAdminOrTeamAdmin() {
   var user = await waitForAuthUser();
   if (!user) {
@@ -398,10 +462,9 @@ export async function requireAdminOrTeamAdmin() {
   }
 
   function isAllowed(p) {
-    var isTeamAdmin = !!(p && p.teams && Object.keys(p.teams).some(function (team) {
-      return p.teams[team] && p.teams[team].role === "admin";
-    }));
-    return !!p && (p.role === "admin" || p.role === "owner" || isTeamAdmin);
+    return ownerOrActiveTeamPredicate(p, function (teamData) {
+      return teamData.role === "admin";
+    });
   }
 
   var profile;
@@ -430,7 +493,7 @@ export async function requireAdminOrTeamAdmin() {
     location.href = "index.html";
     return null;
   }
-  return { uid: user.uid, profile: profile };
+  return { uid: user.uid, profile: profile, activeTeam: getActiveTeam(profile) };
 }
 
 // 分部長身分可能同時存在於全域 sectionLeaderFor 跟團別版 teams.{team}.sectionLeaderFor
@@ -453,10 +516,15 @@ export function getSectionLeaderInstruments(profile) {
   return result;
 }
 
-// roles-admin.html 專用頁面守門：必須登入、審核通過，且「role 是 owner」或「在任一團有
-// canManageRoles 權限」。9/19 收尾計畫：取代原本 requireAdmin()（全域 role）+ 額外的全域
-// canManageRoles 檢查兩層邏輯——這是團別分割專案最後也最關鍵的一塊，讓「只在某團有角色
-// 管理權限、全域角色不是 admin/owner」的人也能真正使用這個頁面管理自己團的角色
+// roles-admin.html 專用頁面守門：必須登入、審核通過，且「role 是 owner」或「在目前切換中
+// 的那一團有 canManageRoles 權限」。9/19 收尾計畫：取代原本 requireAdmin()（全域 role）+
+// 額外的全域 canManageRoles 檢查兩層邏輯，讓「只在某團有角色管理權限、全域角色不是
+// admin/owner」的人也能真正使用這個頁面管理自己團的角色。9/20 修正：從「任一團有這個
+// 權限就放行」改成只看目前切換中的那一團——這頁的成員清單本來就已經依 activeTeam 篩選
+// （見 roles-admin.html 的查詢），只在校友團有 canManageRoles 的人切到校內團後，看到的
+// 會是完全唯讀（幫別人編輯校內團身分的權限本來就沒有），乾脆在門檻擋下來，不要讓他進
+// 一個什麼都不能編輯的頁面。（頁面內部 canManageRolesForTeam() 檢查的是「正在編輯的那個
+// 成員的某個團籍分頁」，用途不同、繼續保留，兩者不衝突）
 export async function requireCanManageRoles() {
   var user = await waitForAuthUser();
   if (!user) {
@@ -466,7 +534,9 @@ export async function requireCanManageRoles() {
   }
 
   function isAllowed(p) {
-    return !!p && (p.role === "owner" || hasTeamPermission(p, 'canManageRoles'));
+    return ownerOrActiveTeamPredicate(p, function (teamData) {
+      return teamData.permissions && teamData.permissions.canManageRoles === true;
+    });
   }
 
   var profile;
@@ -495,12 +565,14 @@ export async function requireCanManageRoles() {
     location.href = "index.html";
     return null;
   }
-  return { uid: user.uid, profile: profile };
+  return { uid: user.uid, profile: profile, activeTeam: getActiveTeam(profile) };
 }
 
-// 分部長專屬頁面（section-admin.html）用：必須登入、審核通過，且「role 是 admin/owner」或
-// 「sectionLeaderFor 陣列不是空的」。刻意跟 requireAdminOrConductor() 分開——這裡放行的
-// 判斷依據是陣列欄位有沒有值，不是角色列舉，跟其他守門函式的角色判斷邏輯不同
+// 分部長專屬頁面（section-admin.html）用：必須登入、審核通過，且「role 是 owner」或「目前
+// 切換中的那一團身分是 admin」或「在那一團被指派為分部長」。9/20 修正：從「任一團有身分
+// 就放行／sectionLeaderFor 任一團有值就放行」改成只看目前切換中的那一團——這頁本來就是
+// 依 activeTeam 篩選音樂會清單（見 section-admin.html 自己的 viewerSectionLeaderFor
+// 只取 teams[activeTeam].sectionLeaderFor），門檻理所當然要跟頁面實際瀏覽範圍一致
 export async function requireSectionLeader() {
   var user = await waitForAuthUser();
   if (!user) {
@@ -510,7 +582,9 @@ export async function requireSectionLeader() {
   }
 
   function isAllowed(p) {
-    return !!p && (p.role === "admin" || p.role === "owner" || getSectionLeaderInstruments(p).length > 0);
+    return ownerOrActiveTeamPredicate(p, function (teamData) {
+      return teamData.role === "admin" || (Array.isArray(teamData.sectionLeaderFor) && teamData.sectionLeaderFor.length > 0);
+    });
   }
 
   var profile;
@@ -539,7 +613,7 @@ export async function requireSectionLeader() {
     location.href = "index.html";
     return null;
   }
-  return { uid: user.uid, profile: profile };
+  return { uid: user.uid, profile: profile, activeTeam: getActiveTeam(profile) };
 }
 
 // index.html／profile.html 用：訪客（未登入）、審核中（pending）、已核准都算「看得到」，
@@ -574,7 +648,7 @@ export async function resolveMemberAccess() {
     goToLogin();
     return null;
   }
-  return { state: profile.status, uid: user.uid, profile: profile };
+  return { state: profile.status, uid: user.uid, profile: profile, activeTeam: getActiveTeam(profile) };
 }
 
 // redirectTo 選填，預設是登入頁（給其他 8 個後台頁面用，登出後本來就該回登入頁）。

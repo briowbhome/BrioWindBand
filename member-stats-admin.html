@@ -181,7 +181,7 @@
 </div>
 
 <script type="module">
-  import { requireAdminOrTeamAdmin, peekCachedProfile } from './auth-guard.js';
+  import { requireAdminOrTeamAdmin, peekCachedProfile, roleInTeam } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
@@ -195,6 +195,8 @@
     avatarBtnEl.textContent = cachedProfile.name.charAt(0);
     avatarBtnEl.classList.remove('skel');
   }
+
+  var activeTeam = null;
 
   function renderError(){
     document.getElementById('instrumentCard').innerHTML = '<div class="empty">讀取失敗，請重新整理再試一次</div>';
@@ -317,9 +319,19 @@
 
   async function loadStats(){
     try {
-      var snap = await getDocs(query(collection(db, 'users'), where('status', '==', 'approved')));
+      // 9/20：加上 teamIds 篩選，只統計目前切換中團別（activeTeam）的成員——之前沒篩選，
+      // 兩團混在一起算，跟 members-admin.html/roles-admin.html 已經套用的篩選方式不一致
+      var snap = await getDocs(query(collection(db, 'users'), where('status', '==', 'approved'), where('teamIds', 'array-contains', activeTeam)));
       var members = [];
-      snap.forEach(function(docSnap){ members.push(docSnap.data()); });
+      snap.forEach(function(docSnap){
+        var data = docSnap.data();
+        // role 改讀 teams[activeTeam].role（頂層 role 已經停用，roles-admin.html 只會寫
+        // teams.{team}.role，繼續看頂層在分團後新升格的管理員身上會漏算，跟 members-admin.html
+        // 同一處修正）
+        members.push(Object.assign({}, data, {
+          role: roleInTeam(data, activeTeam)
+        }));
+      });
 
       var totalEl = document.getElementById('totalCount');
       totalEl.textContent = members.length;
@@ -341,6 +353,7 @@
     avatarBtn.classList.remove('skel');
     initAccountMenu(result.profile.name);
     initTeamSwitcher(result.profile);
+    activeTeam = result.activeTeam;
 
     loadStats();
   });

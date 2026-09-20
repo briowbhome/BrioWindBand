@@ -225,7 +225,7 @@
 
 <script type="module">
   import { initAdminNav } from './admin-nav.js';
-  import { requireAdminOrTeamAdmin, peekCachedProfile, getSectionLeaderInstruments, getActiveTeam } from './auth-guard.js';
+  import { requireAdminOrTeamAdmin, peekCachedProfile, roleInTeam } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
@@ -325,7 +325,7 @@
       var instTags = m.instruments.length
         ? m.instruments.map(function(i){ return '<span class="tag-chip">' + i + '</span>'; }).join('')
         : '<span class="tag-chip">—</span>';
-      var sectionInstruments = getSectionLeaderInstruments(m);
+      var sectionInstruments = m.sectionLeaderFor;
       var sectionBadge = sectionInstruments.length
         ? '<span class="section-badge">分部長 · ' + sectionInstruments.join('、') + '</span>'
         : '';
@@ -378,7 +378,7 @@
   requireAdminOrTeamAdmin().then(function(result){
     if (!result) return;
 
-    var activeTeam = getActiveTeam(result.profile);
+    var activeTeam = result.activeTeam;
     var avatarBtn = document.getElementById('avatarBtn');
     avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
     avatarBtn.classList.remove('skel');
@@ -398,12 +398,16 @@
           // role 改讀 teams[activeTeam].role（頂層 role 已經停用，roles-admin.html 只會
           // 寫 teams.{team}.role，繼續看頂層會看到改角色前的舊值；Owner 的 teams.alumni.role
           // 遷移時也寫成 'owner'，所以這裡不用另外特判 Owner）
-          role: (data.teams && data.teams[activeTeam] && data.teams[activeTeam].role) || 'member',
+          role: roleInTeam(data, activeTeam),
           instruments: data.instruments || [],
           phone: data.phone || null,
           birthday: data.birthday || null,
           licensePlate: data.licensePlate || null,
-          sectionLeaderFor: data.sectionLeaderFor || [],
+          // 9/20 修正：改讀 teams[activeTeam].sectionLeaderFor，不是頂層 sectionLeaderFor
+          // （已經停用的舊欄位）也不是「任一團」聯集——這份清單本來就已經篩選成只顯示
+          // activeTeam 的成員，分部長徽章也該只反映在這一團的分部長身分，不然雙團籍
+          // 成員在另一團的分部長身分會被誤標到這裡
+          sectionLeaderFor: (data.teams && data.teams[activeTeam] && data.teams[activeTeam].sectionLeaderFor) || [],
           teams: data.teams || {}
         };
       });

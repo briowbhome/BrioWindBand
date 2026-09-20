@@ -24,14 +24,6 @@ service cloud.firestore {
       return hasProfile() && selfProfile().status == 'approved';
     }
 
-    // Owner，或被個別授予 canManageRoles 的人（例如團長/行政老師）
-    function canManageRoles() {
-      return isOwner() ||
-        (hasProfile() &&
-          selfProfile().permissions != null &&
-          selfProfile().permissions.canManageRoles == true);
-    }
-
     // 9/19 分部管理分團：concerts/*/pieces／sections／notes 巢狀在 concerts/{concertId} 底下，
     // team 存在音樂會本身，不在這些子文件上，用 get() 跨文件讀取（既有模式，checkinSessions／
     // eventRosters 都這樣用）
@@ -45,17 +37,10 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/events/$(eventId)).data.team[0];
     }
 
-    // 一般 Admin 審核用：role 是 admin 或 owner 就算「幹部層級」
-    function isAdminTier() {
-      return hasProfile() && selfProfile().role in ['admin', 'owner'];
-    }
-
-
     // ---------- 依團別的角色/權限判斷（9/16 校友團/校內團分割新增）----------
-    // 跟上面的全域版本（isAdminTier/isConductor/canManageSection）並存，不是取代：
-    // 這批全域版本繼續給「這次還沒遷移」的其他 collection 規則用（events/announcements/
-    // eventTypes/settings/instruments 等），等各自的子系統計畫把它們改成呼叫下面這批
-    // 依團別版本後，全域版本才會在收尾計畫裡一併清掉
+    // 9/20 收尾：原本並存的全域版本 isAdminTier()/canManageRoles() 已經清掉，僅存的三個
+    // 呼叫點（settings/instruments、announcements category=update、feedbackItems）都已經
+    // 改成呼叫下面這批依團別版本的「任一團符合就算」寫法
     function teamProfile(team) {
       return selfProfile().teams != null ? selfProfile().teams.get(team, null) : null;
     }
@@ -129,9 +114,12 @@ service cloud.firestore {
 
       // 一般審核操作：Admin/Owner 對「一般團員」核准／拒絕／標記停用／軟刪除，改成看
       // 申請人所屬團別的 admin（teamIds 在申請當下一定剛好一個值，見下方團別版 create 規則）
-      // 不能透過這條規則動到 role 或 permissions 欄位
+      // 不能透過這條規則動到 role 或 permissions 欄位。9/20 收尾：頂層 role 即將被清除腳本
+      // 刪掉（Owner 除外），「是不是一般團員」改看申請人那一團的 teams.{team}.role，用
+      // .get(key, default) 安全存取（跟上面 teamProfile() 同一種防呆寫法），避免極端情況下
+      // （teamIds 是空陣列、或 teams 底下缺對應的鍵）整條規則直接算不出結果
       allow update: if isAdminTierFor(resource.data.teamIds[0])
-        && resource.data.role == 'member'
+        && resource.data.teams.get(resource.data.teamIds[0], {}).get('role', null) == 'member'
         && !touchesRoleOrPermissions();
 
       // 9/19 收尾計畫：原本的全域角色/權限編輯功能已經拿掉，這條規則的角色改成只放行
@@ -186,17 +174,18 @@ service cloud.firestore {
       allow get, list: if isAdminTierFor('alumni') || isAdminTierFor('school')
         || isConductorFor('alumni') || isConductorFor('school');
 
-      // 註冊：只能建立「自己」的文件，狀態一定要 pending、全域 role 一定要 member
-      // （防止自己把自己設成 owner），且 teamIds 剛好一個值、teams 底下只能有這一個團的
-      // 鍵、那個團的內容只能有 role 且必須是 member——不能連帶塞入 permissions/
-      // sectionLeaderFor/positionPresets，頂層也不能帶 permissions 欄位。9/19 資安修正：
+      // 註冊：只能建立「自己」的文件，狀態一定要 pending，且 teamIds 剛好一個值、teams
+      // 底下只能有這一個團的鍵、那個團的內容只能有 role 且必須是 member——不能連帶塞入
+      // permissions/sectionLeaderFor/positionPresets，頂層也不能帶 role 或 permissions
+      // 欄位（防止自己把自己設成 owner；9/20 收尾：Owner 以外不再有頂層 role，新註冊帳號
+      // 直接比照 permissions 的做法整個禁止出現，不再要求「等於 member」）。9/19 資安修正：
       // 原本跟這條並存的舊規則（只檢查全域 role/status，見上方已刪除的版本）完全沒做
       // 這些形狀檢查，且這條原本也沒擋 permissions/teams 內容，會讓自建 Firestore 文件的人
       // 在註冊當下就直接自我授予幹部權限，完全不需要任何審核就能生效
       allow create: if request.auth != null
         && request.auth.uid == uid
         && request.resource.data.status == 'pending'
-        && request.resource.data.role == 'member'
+        && !('role' in request.resource.data)
         && !('permissions' in request.resource.data)
         && request.resource.data.teamIds is list
         && request.resource.data.teamIds.size() == 1
@@ -246,28 +235,29 @@ service cloud.firestore {
     // 同上改成公開讀取，訪客首頁也看得到公告內容
     // 9/19 分團：寫入權限改成團別版（isAdminTierFor(team)），讀取（get/list）完全不變。
     // 9/19 追加修正：「更新」分類公告記錄的是 App 軟體版本異動，跟團別無關，寫入權限
-    // 維持全域 isAdminTier()，不比照 urgent/event 兩類走團別版
+    // 維持全域層級（9/20 收尾：原本的 isAdminTier() 改成「任一團 admin」，不再靠頂層 role）
     match /announcements/{announcementId} {
       allow get, list: if true;
       allow create: if request.resource.data.category == 'update'
-        ? isAdminTier()
+        ? (isAdminTierFor('alumni') || isAdminTierFor('school'))
         : isAdminTierFor(request.resource.data.team);
       allow update, delete: if resource.data.category == 'update'
-        ? isAdminTier()
+        ? (isAdminTierFor('alumni') || isAdminTierFor('school'))
         : isAdminTierFor(resource.data.team);
     }
 
-    // 樂器/聲部清單，註冊頁（未登入）也要能讀，所以開放公開讀取；調整交給 canManageRoles
+    // 樂器/聲部清單，註冊頁（未登入）也要能讀，所以開放公開讀取；調整交給任一團有
+    // canManageRoles 的人（9/20 收尾：原本的全域 canManageRoles() 改成團別版）
     match /settings/instruments {
       allow get: if true;
-      allow write: if canManageRoles();
+      allow write: if canManageRolesFor('alumni') || canManageRolesFor('school');
     }
 
     // 座位圖分區清單（哪個扇形分區對應哪個樂器），conductor-admin.html 讀取用，
     // 所有登入的人都能讀（資料本身不敏感，跟 eventTypes/instruments 一樣）。
     // 寫入刻意收緊成只有 Owner——8/19 使用者要求「暫時不希望其他人能編輯座位圖」，
-    // 跟 instruments/eventTypes 慣用的 canManageRoles/canManageEventTypes 不同層級，
-    // 之後如果要放寬給其他幹部編輯，把這裡換回 canManageRoles() 就好
+    // 跟 instruments/eventTypes 慣用的 canManageRolesFor/canManageEventTypesFor 不同層級，
+    // 之後如果要放寬給其他幹部編輯，把這裡換回 canManageRolesFor('alumni') || canManageRolesFor('school') 就好
     match /settings/seatingSections {
       allow get: if hasProfile();
       allow write: if isOwner();
@@ -507,11 +497,11 @@ service cloud.firestore {
     // 包含提交者本人都看不到，這是使用者明確要求的「單向回報」設計，不像
     // attendanceReports/feePayments 有一條「本人可查詢自己紀錄」的規則，這裡完全
     // 不需要。標記狀態/刪除/內部備註只有 admin-tier 能做，不新增權限旗標——
-    // 沒有獨立的「回饋管理」職能角色
+    // 沒有獨立的「回饋管理」職能角色（9/20 收尾：原本的 isAdminTier() 改成「任一團 admin」）
     match /feedbackItems/{itemId} {
       allow create: if hasProfile() && request.resource.data.submitterUid == request.auth.uid;
-      allow get, list: if isAdminTier();
-      allow update, delete: if isAdminTier();
+      allow get, list: if isAdminTierFor('alumni') || isAdminTierFor('school');
+      allow update, delete: if isAdminTierFor('alumni') || isAdminTierFor('school');
     }
   }
 }

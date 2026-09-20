@@ -478,7 +478,7 @@
   import { showToast } from './toast.js';
   import { showConfirm } from './dialog.js';
   import { MESSAGES } from './messages.js';
-  import { requireCanManageRoles, peekCachedProfile, getActiveTeam } from './auth-guard.js';
+  import { requireCanManageRoles, peekCachedProfile, roleInTeam } from './auth-guard.js';
   import { db, functions } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
@@ -1317,7 +1317,7 @@
 
     currentAdminUid = result.uid;
     currentAdminProfile = result.profile;
-    activeTeam = getActiveTeam(result.profile);
+    activeTeam = result.activeTeam;
     var avatarBtn = document.getElementById('avatarBtn');
     avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
     avatarBtn.classList.remove('skel');
@@ -1337,7 +1337,7 @@
           // role 改讀 teams[activeTeam].role（頂層 role 已經停用，roles-admin.html 只會
           // 寫 teams.{team}.role，繼續看頂層會看到改角色前的舊值；Owner 的 teams.alumni.role
           // 遷移時也寫成 'owner'，所以這裡不用另外特判 Owner）
-          role: (data.teams && data.teams[activeTeam] && data.teams[activeTeam].role) || 'member',
+          role: roleInTeam(data, activeTeam),
           permissions: data.permissions || {},
           sectionLeaderFor: data.sectionLeaderFor || [],
           instruments: data.instruments || [],

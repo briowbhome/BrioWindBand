@@ -268,7 +268,7 @@
 </div>
 
 <script type="module">
-  import { requireAdminOrTeamAdmin, peekCachedProfile, getActiveTeam } from './auth-guard.js';
+  import { requireAdminOrTeamAdmin, peekCachedProfile } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
@@ -597,7 +597,7 @@
 
   requireAdminOrTeamAdmin().then(function(result){
     if (!result) return;
-    activeTeam = getActiveTeam(result.profile);
+    activeTeam = result.activeTeam;
 
     var avatarBtn = document.getElementById('avatarBtn');
     avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';

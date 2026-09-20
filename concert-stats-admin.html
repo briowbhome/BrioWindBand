@@ -305,7 +305,7 @@
 </div>
 
 <script type="module">
-  import { requireAdminOrTeamAdmin, peekCachedProfile, getActiveTeam } from './auth-guard.js';
+  import { requireAdminOrTeamAdmin, peekCachedProfile } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
@@ -858,7 +858,7 @@
     initAccountMenu(result.profile.name);
     initTeamSwitcher(result.profile);
 
-    activeTeam = getActiveTeam(result.profile);
+    activeTeam = result.activeTeam;
     loadConcertList();
   });
 </script>

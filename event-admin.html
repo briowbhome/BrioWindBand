@@ -967,7 +967,7 @@
   import { showToast } from './toast.js';
   import { showConfirm } from './dialog.js';
   import { MESSAGES } from './messages.js';
-  import { requireAdminOrTeamAdmin, peekCachedProfile, getActiveTeam, hasTeamPermission } from './auth-guard.js';
+  import { requireAdminOrTeamAdmin, peekCachedProfile, hasTeamPermission } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
@@ -3579,7 +3579,7 @@
   requireAdminOrTeamAdmin().then(function(result){
     if (!result) return;
     currentAdminUid = result.uid;
-    activeTeam = getActiveTeam(result.profile);
+    activeTeam = result.activeTeam;
 
     var avatarBtn = document.getElementById('avatarBtn');
     avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';

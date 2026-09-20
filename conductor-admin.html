@@ -321,7 +321,7 @@
   import { showConfirm } from './dialog.js';
   import { MESSAGES } from './messages.js';
   import { initAdminNav } from './admin-nav.js';
-  import { requireAdminOrConductor, peekCachedProfile, getActiveTeam, hasAnyTeamRole } from './auth-guard.js';
+  import { requireAdminOrConductor, peekCachedProfile, hasActiveTeamRole } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
@@ -994,12 +994,15 @@
   requireAdminOrConductor().then(function(result){
     if (!result) return;
     currentUid = result.uid;
-    activeTeam = getActiveTeam(result.profile);
+    activeTeam = result.activeTeam;
 
     var avatarBtn = document.getElementById('avatarBtn');
     avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
     avatarBtn.classList.remove('skel');
-    var isAdmin = result.profile.role === 'owner' || hasAnyTeamRole(result.profile, 'admin');
+    // 9/20 修正：後台管理連結／漢堡選單指向的其他後台頁面門檻都已經改成只看目前切換中
+    // 的那一團，這裡也要跟著看 activeTeam，不然校友團 admin 切到校內團後，仍然看得到
+    // 一整排連結，點下去卻都被彈回首頁
+    var isAdmin = result.profile.role === 'owner' || hasActiveTeamRole(result.profile, 'admin');
     initAccountMenu(result.profile.name, isAdmin ? 'admin-index.html' : null, null);
     initTeamSwitcher(result.profile);
     // 純 conductor 角色沒有其他 8 個後台頁面的權限，顯示一個大部分項目都點不動的

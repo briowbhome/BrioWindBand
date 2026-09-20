@@ -558,7 +558,7 @@
 </div>
 
 <script type="module">
-  import { resolveMemberAccess, peekCachedProfile, logout, getSectionLeaderInstruments, getActiveTeam } from './auth-guard.js';
+  import { resolveMemberAccess, peekCachedProfile, logout, hasAnyTeamRole, hasActiveTeamRole, activeTeamData, roleInTeam } from './auth-guard.js';
   import { initTeamSwitcher } from './team-switcher.js';
   import { showToast } from './toast.js';
   import { showConfirm } from './dialog.js';
@@ -664,8 +664,7 @@
     // 不是頂層 role——頂層欄位已經停用（roles-admin.html 只會寫 teams.{team}.role），
     // 繼續看頂層會看到改角色前的舊值 ----------
     var ROLE_LABELS = { member: '團員', conductor: '指揮', admin: '管理員', owner: 'Owner' };
-    var displayActiveTeam = getActiveTeam(profile);
-    var displayRole = (profile.teams && profile.teams[displayActiveTeam] && profile.teams[displayActiveTeam].role) || 'member';
+    var displayRole = roleInTeam(profile, result.activeTeam);
     if (displayRole !== 'member'){
       var roleBadgeEl = document.getElementById('profileRoleBadge');
       roleBadgeEl.textContent = ROLE_LABELS[displayRole] || displayRole;
@@ -1201,21 +1200,24 @@
       }
     }, function(err){ console.error('users 監聽失敗', err); });
 
-    // 後台管理／指揮專用／分部長專屬連結：跟 index.html 同一套判斷式。
-    // isAdmin／canSeeConductorPage 看「任一團」是否具備該身分（admin 依規劃不會再出現在
-    // 頂層 role，只存在 teams.{team}.role，見 schema.md），跟 auth-guard.js 的
-    // requireAdminOrConductor() 用同一套「任一團符合就算」判斷法，Owner 仍走頂層 role
-    function hasAnyTeamRole(p, role){
-      return !!(p && p.teams && Object.keys(p.teams).some(function(team){
-        return p.teams[team] && p.teams[team].role === role;
-      }));
-    }
+    // 團員審核待辦訂閱用：任一團有 admin 身分就查（firestore.rules 的 users list 本來就是
+    // 「任一團 admin 都放行」，見 schema.md，不受目前切換中的團別影響）
     var isAdmin = profile.role === 'owner' || hasAnyTeamRole(profile, 'admin');
-    var canSeeConductorPage = isAdmin || hasAnyTeamRole(profile, 'conductor');
-    var canSeeSectionLeaderPage = isAdmin || getSectionLeaderInstruments(profile).length > 0;
 
-    // 團員審核待辦：只有 admin/owner 訂閱，理由跟 index.html 同一套（conductor 沒有審核權限、
-    // firestore.rules 的 users list 也只放行 admin-tier）
+    // 後台管理／指揮專用／分部長專屬連結：9/20 修正——這幾個連結的目的地（admin-index.html／
+    // conductor-admin.html／section-admin.html）門檻都已經改成只看「目前切換中的那一團」
+    // （auth-guard.js 的 requireAdminOrTeamAdmin()/requireAdminOrConductor()/
+    // requireSectionLeader()），連結顯示邏輯要跟著看 activeTeam，不然連結顯示了、點下去
+    // 卻被彈回首頁——比直接不顯示更讓人困惑
+    // 命名刻意不叫 activeTeam——這個變數存的是 teams.{team} 物件，跟其他檔案（例如
+    // conductor-admin.html/section-admin.html）裡同名的 activeTeam 其實是字串（團別 id）
+    // 不一樣，用不同名字避免以後複製貼上程式碼時把物件當字串用
+    var myActiveTeamData = activeTeamData(profile);
+    var canSeeAdminIndex = profile.role === 'owner' || hasActiveTeamRole(profile, 'admin');
+    var canSeeConductorPage = canSeeAdminIndex || hasActiveTeamRole(profile, 'conductor');
+    var canSeeSectionLeaderPage = canSeeAdminIndex ||
+      !!(myActiveTeamData && Array.isArray(myActiveTeamData.sectionLeaderFor) && myActiveTeamData.sectionLeaderFor.length > 0);
+
     if (isAdmin){
       cachedThenFresh('brio_cache_pendingReviewCount_' + result.uid, function(){
         return getDocs(query(collection(db, 'users'), where('status', '==', 'pending'))).then(function(snap){
@@ -1228,7 +1230,7 @@
       }).catch(function(err){ console.error('pending 團員審核讀取失敗', err); });
     }
     var linksHtml = '';
-    if (isAdmin){
+    if (canSeeAdminIndex){
       linksHtml += '<a class="link-row" href="admin-index.html">後台管理<span class="chev">›</span></a>';
     }
     if (canSeeConductorPage){

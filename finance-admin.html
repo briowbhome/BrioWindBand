@@ -477,7 +477,7 @@
   import { showToast } from './toast.js';
   import { showConfirm } from './dialog.js';
   import { MESSAGES } from './messages.js';
-  import { requireAdminOrFinanceManager, peekCachedProfile, getActiveTeam, hasAnyTeamRole } from './auth-guard.js';
+  import { requireAdminOrFinanceManager, peekCachedProfile, hasActiveTeamRole } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
@@ -1366,13 +1366,15 @@
   requireAdminOrFinanceManager().then(function (result) {
     if (!result) return;
     currentAdminUid = result.uid;
-    activeTeam = getActiveTeam(result.profile);
+    activeTeam = result.activeTeam;
 
     var avatarBtn = document.getElementById('avatarBtn');
     avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
     avatarBtn.classList.remove('skel');
 
-    var isAdmin = result.profile.role === 'owner' || hasAnyTeamRole(result.profile, 'admin');
+    // 9/20 修正：後台管理連結／漢堡選單指向的其他後台頁面門檻都已經改成只看目前切換中
+    // 的那一團，這裡也要跟著看 activeTeam（財務身分本來就分團獨立，這裡才是真的一致）
+    var isAdmin = result.profile.role === 'owner' || hasActiveTeamRole(result.profile, 'admin');
     initAccountMenu(result.profile.name, isAdmin ? 'admin-index.html' : null, null);
     initTeamSwitcher(result.profile);
     if (isAdmin) {

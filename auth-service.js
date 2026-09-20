@@ -47,12 +47,13 @@ export async function registerAccount({ account, password, name, birthday, phone
       licensePlate: licensePlate ? licensePlate.trim() : null,
       instruments: instruments,
       status: "pending",
-      role: "member",
       createdAt: serverTimestamp(),
       approvedAt: null,
       approvedBy: null,
       // 9/17 校友團/校內團分割新增：teamIds 純粹給查詢用（跟 teams 保持同步），
-      // teams.{team} 才是實際的團籍資料，見 firestore.rules 的團別版 create 規則
+      // teams.{team} 才是實際的團籍資料，見 firestore.rules 的團別版 create 規則。
+      // 9/20 收尾：不再寫入頂層 role——Owner 以外不應該有這個欄位，firestore.rules 的
+      // create 規則也已經改成禁止頂層帶 role（比照 permissions 的做法）
       teamIds: [team],
       teams: { [team]: { role: "member" } }
     });

@@ -359,7 +359,7 @@
 
 <script type="module">
   import { initAdminNav } from './admin-nav.js';
-  import { requireAdminOrTeamAdmin, peekCachedProfile } from './auth-guard.js';
+  import { requireAdmin, peekCachedProfile } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
@@ -616,14 +616,16 @@
     }
   });
 
-  requireAdminOrTeamAdmin().then(function(result){
-    if (!result) return; // 未通過驗證，requireAdminOrTeamAdmin 已經處理導轉
+  requireAdmin().then(function(result){
+    if (!result) return; // 未通過驗證，requireAdmin() 已經處理導轉
     var profile = result.profile;
     currentAdminUid = result.uid;
 
-    // 全域 admin/owner 視同兩團都能審核；只在某團是 admin 的人，currentAdminTeams
-    // 只會列出那一團，畫面上的分團標籤/統計數字自然只涵蓋相關範圍
-    var isGlobalAdmin = profile.role === 'admin' || profile.role === 'owner';
+    // Owner 視同兩團都能審核；其餘人 currentAdminTeams 只列出「自己在 teams.{team}.role
+    // 真的是 admin」的團，畫面上的分團標籤/統計數字自然只涵蓋相關範圍。9/20 修正：拿掉
+    // 「頂層 role 是 admin 也算全域」這條路——頂層欄位已經停用，只會殘留舊值，被降回一般
+    // 團員的帳號如果頂層舊值還沒清掉，會被誤判成兩團都能審核
+    var isGlobalAdmin = profile.role === 'owner';
     currentAdminTeams = isGlobalAdmin
       ? ['alumni', 'school']
       : Object.keys(profile.teams || {}).filter(function(team){

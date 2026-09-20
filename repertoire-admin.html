@@ -636,7 +636,7 @@
   import { showToast } from './toast.js';
   import { showConfirm } from './dialog.js';
   import { MESSAGES } from './messages.js';
-  import { requireAdminOrSheetMusicManager, peekCachedProfile, hasAnyTeamRole } from './auth-guard.js';
+  import { requireAdminOrSheetMusicManager, peekCachedProfile, hasActiveTeamRole } from './auth-guard.js';
   import { db, storage } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
@@ -2240,10 +2240,11 @@
     avatarBtn.classList.remove('skel');
 
     // 非 admin-tier（例如純譜務身分的一般團員）沒有其他 8 個後台頁面的權限：
-    // 側滑選單顯示了也大部分點不動。9/20 修正：改用 hasAnyTeamRole 判斷團別 admin，
-    // 原本只看全域 role，團別分割後全域角色不再代表任何身分，會誤判團別管理員成
-    // 非 admin-tier，比照 conductor-admin.html 既有的雙模式寫法
-    var isAdmin = result.profile.role === 'owner' || hasAnyTeamRole(result.profile, 'admin');
+    // 側滑選單顯示了也大部分點不動。9/20 修正：這裡的漢堡選單/後台管理連結指向的其他
+    // 後台頁面門檻已經改成只看目前切換中的那一團，改用 hasActiveTeamRole 才會一致——
+    // 藏譜管理本身是任一團 admin 都能進（曲庫全團共用），但連去 members-admin 等頁面
+    // 就得看 activeTeam 了，兩者判斷依據不同，不能混用
+    var isAdmin = result.profile.role === 'owner' || hasActiveTeamRole(result.profile, 'admin');
     initAccountMenu(result.profile.name, isAdmin ? 'admin-index.html' : null, null);
     initTeamSwitcher(result.profile);
     if (isAdmin) {
