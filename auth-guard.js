@@ -279,6 +279,18 @@ export function hasTeamPermission(profile, key) {
   }));
 }
 
+// 通用小函式：這個人在「任一團」的團別身分是不是某個角色（例如 admin/conductor）。
+// 9/20 抽出來共用——原本 profile.html 的 canSeeConductorPage 等判斷式已經用同一套邏輯，
+// 但 index.html/conductor-admin.html/finance-admin.html/repertoire-admin.html/
+// section-admin.html/sheet-music.html 各自還在只看頂層全域 role，兩邊本來要同步的判斷式
+// 跑掉了（分團後全域 role 不再代表任何身分，只有 teams.{team}.role 才是真的）。統一改用
+// 這個函式，之後不會再各自維護一份容易漏改的複本
+export function hasAnyTeamRole(profile, role) {
+  return !!(profile && profile.teams && Object.keys(profile.teams).some(function (team) {
+    return profile.teams[team] && profile.teams[team].role === role;
+  }));
+}
+
 // 藏譜管理頁面（repertoire-admin.html）用：必須登入、審核通過，且「role 是 admin/owner」或
 // 「被個別授予 canManageSheetMusic 權限」（例如譜務）。刻意跟 requireAdmin() 分開——這個放寬
 // 只給這一個頁面用，不影響其餘 8 個 admin-only 後台頁面的守門邏輯

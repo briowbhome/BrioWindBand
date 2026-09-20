@@ -636,7 +636,7 @@
   import { showToast } from './toast.js';
   import { showConfirm } from './dialog.js';
   import { MESSAGES } from './messages.js';
-  import { requireAdminOrSheetMusicManager, peekCachedProfile } from './auth-guard.js';
+  import { requireAdminOrSheetMusicManager, peekCachedProfile, hasAnyTeamRole } from './auth-guard.js';
   import { db, storage } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
@@ -2240,9 +2240,10 @@
     avatarBtn.classList.remove('skel');
 
     // 非 admin-tier（例如純譜務身分的一般團員）沒有其他 8 個後台頁面的權限：
-    // 側滑選單顯示了也大部分點不動，返回箭頭也不能連去 admin-index.html
-    // （會被那頁的 requireAdmin() 擋下），比照 conductor-admin.html 既有的雙模式寫法
-    var isAdmin = result.profile.role === 'admin' || result.profile.role === 'owner';
+    // 側滑選單顯示了也大部分點不動。9/20 修正：改用 hasAnyTeamRole 判斷團別 admin，
+    // 原本只看全域 role，團別分割後全域角色不再代表任何身分，會誤判團別管理員成
+    // 非 admin-tier，比照 conductor-admin.html 既有的雙模式寫法
+    var isAdmin = result.profile.role === 'owner' || hasAnyTeamRole(result.profile, 'admin');
     initAccountMenu(result.profile.name, isAdmin ? 'admin-index.html' : null, null);
     initTeamSwitcher(result.profile);
     if (isAdmin) {

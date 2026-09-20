@@ -184,7 +184,7 @@
 </div>
 
 <script type="module">
-  import { resolveMemberAccess, getActiveTeam, getSectionLeaderInstruments, hasTeamPermission } from './auth-guard.js';
+  import { resolveMemberAccess, getActiveTeam, getSectionLeaderInstruments, hasTeamPermission, hasAnyTeamRole } from './auth-guard.js';
   import { initTeamSwitcher } from './team-switcher.js';
   import { db } from './firebase-init.js';
   import {
@@ -215,8 +215,12 @@
   // 可見性規則（設計文件「權限」一節）：以樂器為單位，不細到 partId。
   // assignedInstrumentNames 是這個人在「這場音樂會、這首曲子」實際被指派過的樂器集合，
   // 呼叫端只查目前這張卡片所屬的那場音樂會，不跨音樂會合併判斷
+  function isAdminOrConductor(profile){
+    return profile.role === 'owner' || hasAnyTeamRole(profile, 'admin') || hasAnyTeamRole(profile, 'conductor');
+  }
+
   function canViewInstrument(profile, instrumentName, assignedInstrumentNames){
-    if (profile.role === 'admin' || profile.role === 'owner' || profile.role === 'conductor') return true;
+    if (isAdminOrConductor(profile)) return true;
     if (profile.permissions && profile.permissions.canViewAllSheetMusic === true) return true;
     if (hasTeamPermission(profile, 'canViewAllSheetMusic')) return true;
     if (getSectionLeaderInstruments(profile).indexOf(instrumentName) !== -1) return true;
@@ -226,7 +230,7 @@
   // 總譜（指揮用、全部分部合一的版本）視野跟分部譜不同——不是「自己分部」的概念，
   // 只開放給管理員/擁有者/指揮/canViewAllSheetMusic，分部長跟一般被指派過的團員不算
   function isFullScoreEligible(profile){
-    return profile.role === 'admin' || profile.role === 'owner' || profile.role === 'conductor' ||
+    return isAdminOrConductor(profile) ||
       (profile.permissions && profile.permissions.canViewAllSheetMusic === true) ||
       hasTeamPermission(profile, 'canViewAllSheetMusic');
   }

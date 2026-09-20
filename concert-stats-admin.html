@@ -249,7 +249,7 @@
     <span class="tw">活動統計</span>
     <span class="en">Concert Stats</span>
   </div>
-  <p class="lede">以音樂會為單位，查看參與人數跟整個籌備週期的出席狀況。</p>
+  <p class="lede">以音樂會為單位，查看參與人數跟出席狀況。</p>
 
   <div id="concertListView">
     <div class="list" id="concertList"></div>
@@ -270,7 +270,7 @@
     <div class="compare-controls hidden" id="compareControls">
       <p class="compare-label">先選一個指標</p>
       <div class="chip-row" id="metricChips">
-        <button type="button" class="chip" data-metric="report">出缺席回報率</button>
+        <button type="button" class="chip" data-metric="report">出席率</button>
         <button type="button" class="chip" data-metric="checkin">簽到率</button>
       </div>
       <p class="compare-label">再選要比較的樂器（可複選）</p>
@@ -305,7 +305,7 @@
 </div>
 
 <script type="module">
-  import { requireAdmin, peekCachedProfile, getActiveTeam } from './auth-guard.js';
+  import { requireAdminOrTeamAdmin, peekCachedProfile, getActiveTeam } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
@@ -614,12 +614,12 @@
     renderChart();
   });
 
-  var METRIC_LABEL = { report: '出缺席回報率', checkin: '簽到率' };
+  var METRIC_LABEL = { report: '出席率', checkin: '簽到率' };
 
   function buildSeries(){
     if (chartMode === 'overall'){
       return [
-        { name: '出缺席回報率', color: SERIES_COLORS[2], values: currentRehearsals.map(function(r){ return rateFor(r.id, 'report'); }) },
+        { name: '出席率', color: SERIES_COLORS[2], values: currentRehearsals.map(function(r){ return rateFor(r.id, 'report'); }) },
         { name: '簽到率', color: SERIES_COLORS[0], values: currentRehearsals.map(function(r){ return rateFor(r.id, 'checkin'); }) }
       ];
     }
@@ -815,7 +815,7 @@
     var reportRate = rateFor(eventId, 'report');
     var checkinRate = rateFor(eventId, 'checkin');
     document.getElementById('detailSheetHint').textContent =
-      '回報率 ' + (reportRate == null ? '—' : Math.round(reportRate * 100) + '%') +
+      '出席率 ' + (reportRate == null ? '—' : Math.round(reportRate * 100) + '%') +
       '・簽到率 ' + (checkinRate == null ? '—' : Math.round(checkinRate * 100) + '%');
 
     document.getElementById('detailSheetBody').innerHTML = sheetView === 'checkin'
@@ -849,7 +849,7 @@
     });
   });
 
-  requireAdmin().then(function(result){
+  requireAdminOrTeamAdmin().then(function(result){
     if (!result) return;
 
     var avatarBtn = document.getElementById('avatarBtn');

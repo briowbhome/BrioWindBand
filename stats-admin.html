@@ -213,7 +213,7 @@
 
 <script type="module">
   import { initAdminNav } from './admin-nav.js';
-  import { requireAdmin, peekCachedProfile } from './auth-guard.js';
+  import { requireAdminOrTeamAdmin, peekCachedProfile } from './auth-guard.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
 
@@ -234,7 +234,7 @@
     avatarBtnEl.classList.remove('skel');
   }
 
-  requireAdmin().then(function(result){
+  requireAdminOrTeamAdmin().then(function(result){
     if (!result) return;
 
     var avatarBtn = document.getElementById('avatarBtn');

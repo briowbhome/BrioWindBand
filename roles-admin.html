@@ -551,6 +551,7 @@
   var seatSectionsLoaded = false;
   var openMemberId = null;
   var currentAdminUid = null;
+  var currentAdminProfile = null;
   var activeTeam = null;
   var draftInstruments = [];
   var initialInstrumentsKey = '';
@@ -562,6 +563,17 @@
   var teamDraftSections = [];
   var teamDraftPositionPresets = [];
   var teamInitialKey = '';
+
+  // firestore.rules 的 canManageRolesFor(team) 在客戶端的對應判斷：能不能動某個團的角色/
+  // 權限，看操作者自己在「那個團」有沒有 canManageRoles，跟操作者在其他團的身分無關（Owner
+  // 例外）。UI 沒跟著這條規則做防呆的話，跨團管理員會看到按鈕、點下去才被 Firestore 用
+  // permission-denied 擋下來，體驗上像是壞掉而不是「這是另一團的治理範圍」，見開發討論
+  function canManageRolesForTeam(profile, team){
+    if (!profile) return false;
+    if (profile.role === 'owner') return true;
+    var teamData = profile.teams && profile.teams[team];
+    return !!(teamData && teamData.permissions && teamData.permissions.canManageRoles === true);
+  }
 
   function permissionsKey(perms, defs){
     return defs.map(function(p){ return p.key + ':' + (!!perms[p.key]); }).sort().join('|');
@@ -722,11 +734,16 @@
   function renderTeamRolesBody(){
     var m = membersById[openMemberId];
     var teamData = m.teams && m.teams[editingTeam];
+    var canEdit = canManageRolesForTeam(currentAdminProfile, editingTeam);
+    var noPermNotice = '<p class="lede" style="margin:0 0 10px;">你沒有' + TEAM_LABELS[editingTeam] +
+      '的角色管理權限，請找' + TEAM_LABELS[editingTeam] + '的管理員或系統管理員協助。</p>';
 
     if (!teamData){
       teamRolesBodyEl.innerHTML =
         '<p class="lede" style="margin:0 0 10px;">這個人還沒有' + TEAM_LABELS[editingTeam] + '的團籍。</p>' +
-        '<button type="button" class="cta-btn cta-btn-secondary" id="grantTeamBtn" data-grant-team="' + editingTeam + '">加入這團（預設一般團員）</button>';
+        (canEdit
+          ? '<button type="button" class="cta-btn cta-btn-secondary" id="grantTeamBtn" data-grant-team="' + editingTeam + '">加入這團（預設一般團員）</button>'
+          : noPermNotice);
       saveTeamRolesBtn.classList.add('hidden');
       return;
     }
@@ -736,6 +753,19 @@
     teamDraftSections = (teamData.sectionLeaderFor || []).slice();
     teamDraftPositionPresets = (teamData.positionPresets || []).slice();
     teamInitialKey = teamDraftKey();
+
+    if (!canEdit){
+      var readonlyPerms = TEAM_PERMISSION_DEFS.filter(function(p){ return !!teamDraftPermissions[p.key]; })
+        .map(function(p){ return p.label; }).join('、') || '無';
+      var readonlySections = teamDraftSections.length ? teamDraftSections.join('、') : '無';
+      teamRolesBodyEl.innerHTML =
+        noPermNotice +
+        '<div class="field"><label>身分組</label><p class="lede" style="margin:0;">' + (ROLE_LABELS[teamDraftRole] || teamDraftRole) + '</p></div>' +
+        '<div class="field"><label>額外權限</label><p class="lede" style="margin:0;">' + readonlyPerms + '</p></div>' +
+        '<div class="field"><label>分部長</label><p class="lede" style="margin:0;">' + readonlySections + '</p></div>';
+      saveTeamRolesBtn.classList.add('hidden');
+      return;
+    }
 
     var roles = ['member', 'conductor', 'admin'];
     var roleChips = roles.map(function(r){
@@ -1286,6 +1316,7 @@
     if (!result) return;
 
     currentAdminUid = result.uid;
+    currentAdminProfile = result.profile;
     activeTeam = getActiveTeam(result.profile);
     var avatarBtn = document.getElementById('avatarBtn');
     avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';

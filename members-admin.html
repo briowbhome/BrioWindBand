@@ -225,7 +225,7 @@
 
 <script type="module">
   import { initAdminNav } from './admin-nav.js';
-  import { requireAdmin, peekCachedProfile, getSectionLeaderInstruments, getActiveTeam } from './auth-guard.js';
+  import { requireAdminOrTeamAdmin, peekCachedProfile, getSectionLeaderInstruments, getActiveTeam } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
@@ -375,7 +375,7 @@
     render();
   });
 
-  requireAdmin().then(function(result){
+  requireAdminOrTeamAdmin().then(function(result){
     if (!result) return;
 
     var activeTeam = getActiveTeam(result.profile);

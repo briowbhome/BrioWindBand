@@ -197,7 +197,7 @@
 
 <script type="module">
   import { showToast } from './toast.js';
-  import { requireSectionLeader, peekCachedProfile, getActiveTeam } from './auth-guard.js';
+  import { requireSectionLeader, peekCachedProfile, getActiveTeam, hasAnyTeamRole } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
@@ -540,7 +540,7 @@
     var activeTeam = getActiveTeam(result.profile);
     var teamProfile = result.profile.teams && result.profile.teams[activeTeam];
     viewerSectionLeaderFor = teamProfile && Array.isArray(teamProfile.sectionLeaderFor) ? teamProfile.sectionLeaderFor : [];
-    isViewerAdminTier = result.profile.role === 'admin' || result.profile.role === 'owner';
+    isViewerAdminTier = result.profile.role === 'owner' || hasAnyTeamRole(result.profile, 'admin');
 
     var avatarBtn = document.getElementById('avatarBtn');
     avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';

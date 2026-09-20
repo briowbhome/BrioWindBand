@@ -1164,7 +1164,7 @@
   import { showConfirm } from './dialog.js';
   import { MESSAGES } from './messages.js';
   import { subscribeRemittanceAccounts } from './finance.js';
-  import { resolveMemberAccess, peekCachedProfile, getActiveTeam, getSectionLeaderInstruments } from './auth-guard.js';
+  import { resolveMemberAccess, peekCachedProfile, getActiveTeam, getSectionLeaderInstruments, hasAnyTeamRole } from './auth-guard.js';
   import { initTeamSwitcher } from './team-switcher.js';
   import { loadEventTypesOnce } from './event-types.js';
   import { cachedThenFresh } from './data-cache.js';
@@ -2559,7 +2559,7 @@
     }
 
     function canDeleteConcertNote(n){
-      if (viewerProfile.role === 'admin' || viewerProfile.role === 'owner') return true;
+      if (viewerProfile.role === 'owner' || hasAnyTeamRole(viewerProfile, 'admin')) return true;
       if (n.authorUid === viewerUid) return true;
       return getSectionLeaderInstruments(viewerProfile).indexOf(n.instrumentName) !== -1;
     }
@@ -2841,7 +2841,7 @@
       // 指揮後台入口：只有 admin/owner/conductor 看得到，跟 profile.html 的
       // canSeeConductorPage 同一套判斷式，角色資料已經在 viewerProfile 裡，不用多查一次
       var canSeeConductorPage = viewerProfile &&
-        (viewerProfile.role === 'admin' || viewerProfile.role === 'owner' || viewerProfile.role === 'conductor');
+        (viewerProfile.role === 'owner' || hasAnyTeamRole(viewerProfile, 'admin') || hasAnyTeamRole(viewerProfile, 'conductor'));
       document.getElementById('conductorBtn').classList.toggle('hidden', !canSeeConductorPage);
       // 審核中狀態橫幅
       document.getElementById('pendingBanner').classList.toggle('hidden', viewerState !== 'pending');
@@ -3050,10 +3050,10 @@
         }
       }, function(err){ console.error('users 監聽失敗', err); });
 
-      // 團員審核待辦：只有 admin/owner 訂閱，conductor 沒有審核權限、不會看到這項，
-      // firestore.rules 對 users collection 的 list 也只放行 admin-tier，這裡的角色判斷
-      // 只是避免非 admin-tier 白打一次一定會被拒絕的查詢
-      if (viewerProfile.role === 'admin' || viewerProfile.role === 'owner'){
+      // 團員審核待辦：只有 admin-tier（含團別版）訂閱，conductor 沒有審核權限、不會看到
+      // 這項，firestore.rules 對 users collection 的 list 現在是 isAdminTierFor(team)，
+      // 這裡的角色判斷只是避免非 admin-tier 白打一次一定會被拒絕的查詢
+      if (viewerProfile.role === 'owner' || hasAnyTeamRole(viewerProfile, 'admin')){
         cachedThenFresh('brio_cache_pendingReviewCount_' + viewerUid, function(){
           return getDocs(query(collection(db, 'users'), where('status', '==', 'pending'))).then(function(snap){
             return snap.size;

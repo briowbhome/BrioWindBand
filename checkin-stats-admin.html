@@ -268,7 +268,7 @@
 </div>
 
 <script type="module">
-  import { requireAdmin, peekCachedProfile, getActiveTeam } from './auth-guard.js';
+  import { requireAdminOrTeamAdmin, peekCachedProfile, getActiveTeam } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
@@ -595,7 +595,7 @@
     if (typesLoaded) loadStats();
   });
 
-  requireAdmin().then(function(result){
+  requireAdminOrTeamAdmin().then(function(result){
     if (!result) return;
     activeTeam = getActiveTeam(result.profile);
 

@@ -477,7 +477,7 @@
   import { showToast } from './toast.js';
   import { showConfirm } from './dialog.js';
   import { MESSAGES } from './messages.js';
-  import { requireAdminOrFinanceManager, peekCachedProfile, getActiveTeam } from './auth-guard.js';
+  import { requireAdminOrFinanceManager, peekCachedProfile, getActiveTeam, hasAnyTeamRole } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
@@ -1372,7 +1372,7 @@
     avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
     avatarBtn.classList.remove('skel');
 
-    var isAdmin = result.profile.role === 'admin' || result.profile.role === 'owner';
+    var isAdmin = result.profile.role === 'owner' || hasAnyTeamRole(result.profile, 'admin');
     initAccountMenu(result.profile.name, isAdmin ? 'admin-index.html' : null, null);
     initTeamSwitcher(result.profile);
     if (isAdmin) {
