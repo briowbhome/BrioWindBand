@@ -55,13 +55,8 @@
     padding:18px 20px 14px;
   }
   .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
-  /* 團徽只在「真的擁擠」時才隱藏：實測過 conductorBtn 單獨顯示時其實空間還很寬裕（因為它是固定 34px），
-     真正會擠的只有雙團籍徽章 team-badge 出現的時候（它是寬度不固定的元素），所以只看這一個條件就夠：
-     大部分單團籍帳號（包括單團籍的指揮/管理員）在手機上其實還有空間放團徽，不需要被這條規則改到。
-     :has() 不支援的舊瀏覽器會整條規則失效（這比現在還安全，因為回到團徽常駐顯示） */
-  @media (max-width: 899px){
-    .appbar:has(.team-badge:not(.hidden)) .mark{ display:none; }
-  }
+  /* 這頁的 appbar 沒有後台頁面才有的漢堡鈕／返回鈕／大頭貼，實測過就算雙團籍徽章 +
+     指揮後台鈕同時出現，空間仍然寬裕，團徽不需要隱藏（隱藏規則只留在真的會擠的後台頁面） */
   .brandtext{ display:flex; flex-direction:column; line-height:1.1; }
   .brandtext .name{
     font-family:'Noto Serif TC',serif;
