@@ -89,7 +89,7 @@
     display:flex; align-items:center; justify-content:center;
     font-family:'Noto Serif TC',serif; font-weight:700; font-size:14px;
     border:2px solid var(--paper-raised); box-shadow:0 0 0 1.5px var(--line);
-    padding:0; cursor:pointer;
+    padding:0; cursor:pointer; flex:none;
   }
 
   .staff{
@@ -225,7 +225,7 @@
 
 <script type="module">
   import { initAdminNav } from './admin-nav.js';
-  import { requireAdmin, peekCachedProfile, getSectionLeaderInstruments } from './auth-guard.js';
+  import { requireAdmin, peekCachedProfile, getSectionLeaderInstruments, getActiveTeam } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
@@ -378,6 +378,7 @@
   requireAdmin().then(function(result){
     if (!result) return;
 
+    var activeTeam = getActiveTeam(result.profile);
     var avatarBtn = document.getElementById('avatarBtn');
     avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
     avatarBtn.classList.remove('skel');
@@ -385,14 +386,19 @@
     initTeamSwitcher(result.profile);
     initAdminNav('members');
 
-    onSnapshot(query(collection(db, 'users'), where('status', '==', 'approved')), function(snap){
+    // 9/20：加上 teamIds 篩選，只顯示目前切換中團別（activeTeam）的成員——之前沒篩選，
+    // 兩團的成員會全部混在同一份清單裡
+    onSnapshot(query(collection(db, 'users'), where('status', '==', 'approved'), where('teamIds', 'array-contains', activeTeam)), function(snap){
       membersById = {};
       snap.forEach(function(docSnap){
         var data = docSnap.data();
         membersById[docSnap.id] = {
           name: data.name,
           account: data.account,
-          role: data.role,
+          // role 改讀 teams[activeTeam].role（頂層 role 已經停用，roles-admin.html 只會
+          // 寫 teams.{team}.role，繼續看頂層會看到改角色前的舊值；Owner 的 teams.alumni.role
+          // 遷移時也寫成 'owner'，所以這裡不用另外特判 Owner）
+          role: (data.teams && data.teams[activeTeam] && data.teams[activeTeam].role) || 'member',
           instruments: data.instruments || [],
           phone: data.phone || null,
           birthday: data.birthday || null,

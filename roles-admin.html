@@ -91,7 +91,7 @@
     display:flex; align-items:center; justify-content:center;
     font-family:'Noto Serif TC',serif; font-weight:700; font-size:14px;
     border:2px solid var(--paper-raised); box-shadow:0 0 0 1.5px var(--line);
-    padding:0; cursor:pointer;
+    padding:0; cursor:pointer; flex:none;
   }
 
   .staff{
@@ -902,7 +902,12 @@
     if (sectionToggle){
       var sname = sectionToggle.getAttribute('data-team-section-toggle');
       var sidx = teamDraftSections.indexOf(sname);
-      if (sidx === -1) teamDraftSections.push(sname); else teamDraftSections.splice(sidx, 1);
+      var sOn = sidx === -1;
+      if (sOn) teamDraftSections.push(sname); else teamDraftSections.splice(sidx, 1);
+      sectionToggle.parentElement.querySelectorAll('[data-team-section-toggle="' + sname + '"].checkbox').forEach(function(el){
+        el.classList.toggle('on', sOn);
+        el.textContent = sOn ? '✓' : '';
+      });
       saveTeamRolesBtn.disabled = teamDraftKey() === teamInitialKey;
       return;
     }
@@ -1289,14 +1294,19 @@
     initTeamSwitcher(result.profile);
     initAdminNav('roles');
 
-    onSnapshot(query(collection(db, 'users'), where('status', '==', 'approved')), function(snap){
+    // 9/20：加上 teamIds 篩選，只顯示目前切換中團別（activeTeam）的成員——之前沒篩選，
+    // 兩團的成員會全部混在同一份清單裡
+    onSnapshot(query(collection(db, 'users'), where('status', '==', 'approved'), where('teamIds', 'array-contains', activeTeam)), function(snap){
       membersById = {};
       snap.forEach(function(docSnap){
         var data = docSnap.data();
         membersById[docSnap.id] = {
           name: data.name,
           account: data.account,
-          role: data.role,
+          // role 改讀 teams[activeTeam].role（頂層 role 已經停用，roles-admin.html 只會
+          // 寫 teams.{team}.role，繼續看頂層會看到改角色前的舊值；Owner 的 teams.alumni.role
+          // 遷移時也寫成 'owner'，所以這裡不用另外特判 Owner）
+          role: (data.teams && data.teams[activeTeam] && data.teams[activeTeam].role) || 'member',
           permissions: data.permissions || {},
           sectionLeaderFor: data.sectionLeaderFor || [],
           instruments: data.instruments || [],

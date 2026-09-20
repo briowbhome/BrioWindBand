@@ -558,7 +558,7 @@
 </div>
 
 <script type="module">
-  import { resolveMemberAccess, peekCachedProfile, logout, getSectionLeaderInstruments } from './auth-guard.js';
+  import { resolveMemberAccess, peekCachedProfile, logout, getSectionLeaderInstruments, getActiveTeam } from './auth-guard.js';
   import { initTeamSwitcher } from './team-switcher.js';
   import { showToast } from './toast.js';
   import { showConfirm } from './dialog.js';
@@ -660,11 +660,15 @@
     document.getElementById('versionFooter').textContent = 'v' + APP_VERSION;
 
     // ---------- 角色標籤：非團員（指揮/管理員/Owner）才顯示，文字沿用 members-admin.html／
-    // roles-admin.html 同一套 ROLE_LABELS ----------
+    // roles-admin.html 同一套 ROLE_LABELS。改讀目前團別的 teams[activeTeam].role，
+    // 不是頂層 role——頂層欄位已經停用（roles-admin.html 只會寫 teams.{team}.role），
+    // 繼續看頂層會看到改角色前的舊值 ----------
     var ROLE_LABELS = { member: '團員', conductor: '指揮', admin: '管理員', owner: 'Owner' };
-    if (profile.role && profile.role !== 'member'){
+    var displayActiveTeam = getActiveTeam(profile);
+    var displayRole = (profile.teams && profile.teams[displayActiveTeam] && profile.teams[displayActiveTeam].role) || 'member';
+    if (displayRole !== 'member'){
       var roleBadgeEl = document.getElementById('profileRoleBadge');
-      roleBadgeEl.textContent = ROLE_LABELS[profile.role] || profile.role;
+      roleBadgeEl.textContent = ROLE_LABELS[displayRole] || displayRole;
       roleBadgeEl.classList.remove('hidden');
     }
 
@@ -1197,9 +1201,17 @@
       }
     }, function(err){ console.error('users 監聽失敗', err); });
 
-    // 後台管理／指揮專用／分部長專屬連結：跟 index.html 同一套判斷式
-    var isAdmin = profile.role === 'admin' || profile.role === 'owner';
-    var canSeeConductorPage = isAdmin || profile.role === 'conductor';
+    // 後台管理／指揮專用／分部長專屬連結：跟 index.html 同一套判斷式。
+    // isAdmin／canSeeConductorPage 看「任一團」是否具備該身分（admin 依規劃不會再出現在
+    // 頂層 role，只存在 teams.{team}.role，見 schema.md），跟 auth-guard.js 的
+    // requireAdminOrConductor() 用同一套「任一團符合就算」判斷法，Owner 仍走頂層 role
+    function hasAnyTeamRole(p, role){
+      return !!(p && p.teams && Object.keys(p.teams).some(function(team){
+        return p.teams[team] && p.teams[team].role === role;
+      }));
+    }
+    var isAdmin = profile.role === 'owner' || hasAnyTeamRole(profile, 'admin');
+    var canSeeConductorPage = isAdmin || hasAnyTeamRole(profile, 'conductor');
     var canSeeSectionLeaderPage = isAdmin || getSectionLeaderInstruments(profile).length > 0;
 
     // 團員審核待辦：只有 admin/owner 訂閱，理由跟 index.html 同一套（conductor 沒有審核權限、
