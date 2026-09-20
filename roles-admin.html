@@ -68,10 +68,12 @@
   .admin-nav-btn{ width:30px; height:30px; flex:none; border:none; background:none; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--ink); cursor:pointer; padding:0; }
   .admin-nav-btn:active{ background:rgba(32,36,47,.06); }
   .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
-  /* 團徽在擁擠斷點（<900px，跟 appbar 其他收縮判斷一致）時隱藏，只留團名文字：
-     appbar 太擁時團名比團徽圖示重要 */
+  /* 團徽只在「真的擁擠」時才隱藏：實測過 conductorBtn 單獨顯示時其實空間還很寬裕（因為它是固定 34px），
+     真正會擠的只有雙團籍徽章 team-badge 出現的時候（它是寬度不固定的元素），所以只看這一個條件就夠：
+     大部分單團籍帳號（包括單團籍的指揮/管理員）在手機上其實還有空間放團徽，不需要被這條規則改到。
+     :has() 不支援的舊瀏覽器會整條規則失效（這比現在還安全，因為回到團徽常駐顯示） */
   @media (max-width: 899px){
-    .mark{ display:none; }
+    .appbar:has(.team-badge:not(.hidden)) .mark{ display:none; }
   }
   .brandtext{ display:flex; flex-direction:column; line-height:1.1; }
   .brandtext .name{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:19px; letter-spacing:.02em; }
