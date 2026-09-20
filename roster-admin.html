@@ -65,6 +65,11 @@
   .admin-nav-btn{ width:30px; height:30px; flex:none; border:none; background:none; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--ink); cursor:pointer; padding:0; }
   .admin-nav-btn:active{ background:rgba(32,36,47,.06); }
   .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
+  /* 團徽在擁擠斷點（<900px，跟 appbar 其他收縮判斷一致）時隱藏，只留團名文字：
+     appbar 太擁時團名比團徽圖示重要 */
+  @media (max-width: 899px){
+    .mark{ display:none; }
+  }
   .brandtext{ display:flex; flex-direction:column; line-height:1.1; }
   .brandtext .name{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:19px; letter-spacing:.02em; }
   .brandtext .sub{ font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.14em; color:var(--ink-soft); margin-top:3px; text-transform:uppercase; }

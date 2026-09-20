@@ -66,6 +66,11 @@
   .admin-nav-btn{ width:30px; height:30px; flex:none; border:none; background:none; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--ink); cursor:pointer; padding:0; }
   .admin-nav-btn:active{ background:rgba(32,36,47,.06); }
   .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
+  /* 團徽在擁擠斷點（<900px，跟 appbar 其他收縮判斷一致）時隱藏，只留團名文字：
+     appbar 太擁時團名比團徽圖示重要 */
+  @media (max-width: 899px){
+    .mark{ display:none; }
+  }
   .brandtext{ display:flex; flex-direction:column; line-height:1.1; }
   .brandtext .name{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:19px; letter-spacing:.02em; }
   .brandtext .sub{ font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.14em; color:var(--ink-soft); margin-top:3px; text-transform:uppercase; }
@@ -393,6 +398,11 @@
     cursor:pointer; padding:0;
   }
   .rp-layout-toggle:active{ background:rgba(32,36,47,.06); }
+  /* 這顆按鈕的用意是讓電腦版使用者切換去確認手機版排版長怎樣，手機上本來就是手機版，
+     不需要這顆切換鈕（也省下 appbar 一個圖示的空間），斷點跟下面 JS 的 900px 一致 */
+  @media (max-width: 899px){
+    .rp-layout-toggle{ display:none; }
+  }
 
   .rp-detail-empty{ display:none; }
 
@@ -643,15 +653,19 @@
 
   // ---------- 電腦版/手機版排版手動切換（正式功能，不依螢幕寬度自動判斷）----------
   // 選過一次之後記住在 localStorage；沒選過時的預設值＝目前視窗實際寬度，讓大部分人
-  // 第一次打開就看到符合自己裝置的版面，只有真的要跨版面檢查排版時才需要手動切
+  // 第一次打開就看到符合自己裝置的版面，只有真的要跨版面檢查排版時才需要手動切。
+  // 但切換鈕在窄螢幕（<900px，跟上面 CSS 的 @media 斷點一致）已經隱藏不給按，
+  // 若照舊只認 localStorage，窄螢幕裝置一旦曾經存過 'desktop'（例如桌機瀏覽器縮小視窗
+  // 切過一次）就會卡在沒有按鈕可以切回來的電腦版排版——窄螢幕一律強制视为手機版
   var LAYOUT_MODE_KEY = 'brio_repertoire_layout_mode';
 
   function getInitialLayoutMode(){
+    if (window.innerWidth < 900) return 'mobile';
     try {
       var saved = localStorage.getItem(LAYOUT_MODE_KEY);
       if (saved === 'mobile' || saved === 'desktop') return saved;
     } catch (e) {}
-    return window.innerWidth >= 900 ? 'desktop' : 'mobile';
+    return 'desktop';
   }
 
   function applyLayoutMode(mode){

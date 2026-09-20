@@ -55,6 +55,11 @@
     padding:18px 20px 14px;
   }
   .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
+  /* 團徽在擁擠斷點（<900px，跟 appbar 其他收縮判斷一致）時隱藏，只留團名文字：
+     appbar 太擁時團名比團徽圖示重要 */
+  @media (max-width: 899px){
+    .mark{ display:none; }
+  }
   .brandtext{ display:flex; flex-direction:column; line-height:1.1; }
   .brandtext .name{
     font-family:'Noto Serif TC',serif;
