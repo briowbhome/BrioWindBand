@@ -402,7 +402,7 @@
         var eid = data.eventId;
         if (!eventIdSet[eid]) return;
         if (!checkinsByEvent[eid]) checkinsByEvent[eid] = [];
-        checkinsByEvent[eid].push({ uid: data.uid, name: data.name, account: data.account });
+        checkinsByEvent[eid].push({ uid: data.uid, name: data.name, account: data.account, method: data.method, checkedInAt: data.checkedInAt });
       });
 
       rostersByEvent = {};
@@ -484,6 +484,18 @@
     return map;
   }
 
+  // 9/21：分部明細改成顯示簽到方式＋時間，取代原本的帳號——帳號對幹部來說資訊價值低，
+  // 方式（掃碼／手動補登）跟時間點比較能看出實際狀況（例如是不是幹部代補登的）
+  function formatCheckinMeta(p){
+    var isManual = p.method === 'manual';
+    var label = isManual ? '手動補登' : '掃碼';
+    var color = isManual ? 'var(--brass-deep)' : 'var(--sage)';
+    var time = p.checkedInAt && p.checkedInAt.toDate
+      ? p.checkedInAt.toDate().toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit', hour12:false })
+      : '—';
+    return '<span class="acc" style="color:' + color + ';">' + label + ' · ' + time + '</span>';
+  }
+
   function groupCheckinsByInstrument(checkins){
     var byName = {};
     instrumentsList.forEach(function(inst){
@@ -546,7 +558,7 @@
       var namesHtml = g.people.length === 0
         ? '<div class="sheet-group-empty">尚無人簽到</div>'
         : g.people.map(function(p){
-            return '<div class="sheet-name-row"><span>' + (p.name || p.account || '未知') + '</span><span class="acc">' + (p.account || '') + '</span></div>';
+            return '<div class="sheet-name-row"><span>' + (p.name || p.account || '未知') + '</span>' + formatCheckinMeta(p) + '</div>';
           }).join('');
       return (
         '<div class="sheet-group">' +

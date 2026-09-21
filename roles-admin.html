@@ -1338,8 +1338,6 @@
           // 寫 teams.{team}.role，繼續看頂層會看到改角色前的舊值；Owner 的 teams.alumni.role
           // 遷移時也寫成 'owner'，所以這裡不用另外特判 Owner）
           role: roleInTeam(data, activeTeam),
-          permissions: data.permissions || {},
-          sectionLeaderFor: data.sectionLeaderFor || [],
           instruments: data.instruments || [],
           teams: data.teams || {} // 9/17 新增：團別身分區塊要讀這個，之前漏加，一律預設空物件
         };

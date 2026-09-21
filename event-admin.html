@@ -374,6 +374,11 @@
     font-size:9.5px; font-weight:700; color:var(--burgundy-deep);
     background:#FBF3F3; border:1px solid #EFD4D8; border-radius:999px; padding:1px 6px; margin-left:4px;
   }
+  /* 9/21：標示這筆回報是幹部代填/代改的，跟「已不在名單內」的警示語氣不同，用中性灰階 */
+  .survey-source-tag{
+    font-size:9.5px; font-weight:700; color:var(--ink-soft);
+    background:var(--paper); border:1px solid var(--line); border-radius:999px; padding:1px 6px; margin-left:4px;
+  }
   .survey-status{ flex:none; font-family:'Roboto Mono',monospace; font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; }
   .survey-status.attending{ background:var(--sage-bg); color:var(--sage); }
   .survey-status.leave{ background:#EFE1E3; color:var(--burgundy-deep); }
@@ -2972,7 +2977,7 @@
               '<div class="ci-row">' +
                 '<div style="flex:1;min-width:0;">' +
                   '<div class="ci-name">' + escapeHtml(r.name || r.account || '未知') + '</div>' +
-                  '<div class="ci-sub">' + escapeHtml(r.account || '') + ' · ' + methodLabel + '</div>' +
+                  '<div class="ci-sub">' + methodLabel + '</div>' +
                 '</div>' +
                 '<div class="ci-time ' + timeInfo.cls + '">' + timeInfo.label + '</div>' +
                 '<button type="button" class="ci-remove" data-checkin-remove="' + r.checkinId + '" aria-label="移除">×</button>' +
@@ -3226,7 +3231,11 @@
       name: member ? member.name : '',
       status: status,
       reason: status === 'leave' ? reason : '',
-      respondedAt: serverTimestamp()
+      respondedAt: serverTimestamp(),
+      // 9/21：記錄這筆是幹部代填的，跟團員自己回報區分開來，見 index.html 的自行回報
+      // 那處會寫 source:'self'
+      source: 'admin',
+      recordedBy: currentAdminUid
     });
   }
 
@@ -3340,7 +3349,7 @@
           '<div class="survey-row" data-report-row="' + r.uid + '">' +
             '<div class="survey-row-top">' +
               '<div style="flex:1;min-width:0;">' +
-                '<div class="survey-name">' + escapeHtml(r.name || r.account || '未知') + (outOfRoster ? '<span class="survey-tag">已不在名單內</span>' : '') + '</div>' +
+                '<div class="survey-name">' + escapeHtml(r.name || r.account || '未知') + (outOfRoster ? '<span class="survey-tag">已不在名單內</span>' : '') + (r.source === 'admin' ? '<span class="survey-source-tag">幹部登記</span>' : '') + '</div>' +
                 (r.status === 'leave' && r.reason ? '<div class="survey-reason">' + escapeHtml(r.reason) + '</div>' : '') +
               '</div>' +
               '<span class="survey-status ' + r.status + '">' + (r.status === 'attending' ? '出席' : '請假') + '</span>' +
@@ -3431,7 +3440,10 @@
         uid: uid,
         status: reportEditDraft.status,
         reason: reportEditDraft.status === 'leave' ? reason : '',
-        respondedAt: serverTimestamp()
+        respondedAt: serverTimestamp(),
+        // 9/21：幹部編輯過之後，這筆就算幹部經手過，來源蓋成 admin（即使原本是本人回報）
+        source: 'admin',
+        recordedBy: currentAdminUid
       }, { merge: true }).then(function(){
         closeReportEdit();
         loadReports(eventId);
@@ -3589,7 +3601,6 @@
     initAdminNav('event');
 
     var canManageTypes = result.profile.role === 'owner' ||
-      (result.profile.permissions && result.profile.permissions.canManageEventTypes === true) ||
       hasTeamPermission(result.profile, 'canManageEventTypes');
 
     if (canManageTypes){

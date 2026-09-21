@@ -2248,7 +2248,11 @@
         name: viewerProfile.name,
         status: status,
         reason: status === 'leave' ? reason : '',
-        respondedAt: serverTimestamp()
+        respondedAt: serverTimestamp(),
+        // 9/21：記錄這筆是本人自己送出的，跟幹部代填/代改區分開來，見 event-admin.html
+        // 的 addManualReport()／編輯既有回報那兩處會寫 source:'admin'
+        source: 'self',
+        recordedBy: null
       }).then(function(){
         submitBtn.disabled = false;
         // 9/19 修正：這份資料已經不是常駐 onSnapshot 監聽（見下方 cachedThenFresh 那段

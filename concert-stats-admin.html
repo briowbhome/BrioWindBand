@@ -160,6 +160,22 @@
   .chart-pt{ cursor:pointer; }
   .chart-empty{ padding:30px 8px; text-align:center; font-size:12.5px; color:var(--ink-soft); }
 
+  /* ---------- 團員出席率（9/21，依樂器分組，跟圖表共用同一份 chartMode/selectedInstruments） ---------- */
+  .rate-card{
+    margin:0 20px 20px; background:var(--paper-raised); border:1px solid var(--line);
+    border-radius:var(--radius-lg); box-shadow:var(--shadow-card); padding:16px 14px 10px;
+  }
+  .rate-hint{ margin:0 0 10px; font-size:11px; color:var(--ink-soft); line-height:1.6; }
+  .rate-row{
+    display:grid; grid-template-columns:64px 1fr 62px; align-items:center; gap:10px;
+    padding:8px 0; border-bottom:1px solid var(--line); font-size:12px; color:var(--ink);
+  }
+  .rate-row:last-child{ border-bottom:none; }
+  .rate-name{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .rate-track{ height:6px; background:var(--paper); border-radius:3px; overflow:hidden; }
+  .rate-fill{ height:100%; }
+  .rate-num{ font-family:'Roboto Mono',monospace; font-weight:700; font-size:12px; text-align:right; white-space:nowrap; }
+
   /* ---------- Rehearsal detail bottom sheet（沿用 checkin-stats-admin.html 同一套） ---------- */
   .sheet-overlay{
     position:fixed; inset:0;
@@ -268,19 +284,24 @@
     </div>
 
     <div class="compare-controls hidden" id="compareControls">
-      <p class="compare-label">先選一個指標</p>
+      <p class="compare-label">選擇指標</p>
       <div class="chip-row" id="metricChips">
         <button type="button" class="chip" data-metric="report">出席率</button>
         <button type="button" class="chip" data-metric="checkin">簽到率</button>
       </div>
-      <p class="compare-label">再選要比較的樂器（可複選）</p>
+      <p class="compare-label">選擇要比較的樂器（可複選）</p>
       <div class="chip-row" id="instrumentChips"></div>
     </div>
 
     <div class="chart-card">
-      <p class="chart-hint">由左到右依團練時間排序，點資料點可以看該次的詳細名單</p>
+      <p class="chart-hint">依團練日期排序，點擊資料點可查看該次的詳細名單</p>
       <div class="chart-legend" id="chartLegend"></div>
       <div id="chartWrap"></div>
+    </div>
+
+    <div class="rate-card">
+      <p class="rate-hint">本期團練中每個人的實際出席率 ( 簽到次數 / 應到次數 )</p>
+      <div id="rateListWrap"></div>
     </div>
   </div>
 
@@ -542,7 +563,7 @@
         var data = docSnap.data();
         if (!rehearsalIds[data.eventId]) return;
         if (!checkinsByEvent[data.eventId]) checkinsByEvent[data.eventId] = [];
-        checkinsByEvent[data.eventId].push({ uid: data.uid, name: data.name, account: data.account });
+        checkinsByEvent[data.eventId].push({ uid: data.uid, name: data.name, account: data.account, method: data.method, checkedInAt: data.checkedInAt });
       });
 
       currentConcertId = concertId;
@@ -614,8 +635,6 @@
     renderChart();
   });
 
-  var METRIC_LABEL = { report: '出席率', checkin: '簽到率' };
-
   function buildSeries(){
     if (chartMode === 'overall'){
       return [
@@ -623,14 +642,71 @@
         { name: '簽到率', color: SERIES_COLORS[0], values: currentRehearsals.map(function(r){ return rateFor(r.id, 'checkin'); }) }
       ];
     }
+    // 9/21 修正：依樂器比較模式下，比較的是哪個指標已經由上面 metricChips 選取狀態
+    // 表示了，圖例不用再重複寫一次「・出席率」/「・簽到率」，只留分部名稱
     return selectedInstruments.map(function(name, i){
       var uids = uidsForInstrument(name);
       return {
-        name: name + '・' + METRIC_LABEL[compareMetric],
+        name: name,
         color: SERIES_COLORS[i % SERIES_COLORS.length],
         values: currentRehearsals.map(function(r){ return rateFor(r.id, compareMetric, uids); })
       };
     });
+  }
+
+  // 9/21：個別團員在這場音樂會週期內的出席率——分母是「這個人有被排進應到名單的團練場次」
+  // （不是這個週期全部團練場次），分部練這類活動不是每個人都該去，用全部場次當分母會讓
+  // 只需要參加分部練的人出席率被不合理拉低，跟 rateFor() 對整團出席率的算法（分母是應到
+  // 名單、不是全團）同一個原則
+  function computeMemberRehearsalStats(){
+    var statsByUid = {};
+    currentRehearsals.forEach(function(r){
+      var roster = rostersByEvent[r.id];
+      if (!roster) return;
+      var checkedInSet = {};
+      (checkinsByEvent[r.id] || []).forEach(function(c){ checkedInSet[c.uid] = true; });
+      roster.members.forEach(function(uid){
+        if (!statsByUid[uid]) statsByUid[uid] = { expected: 0, attended: 0 };
+        statsByUid[uid].expected++;
+        if (checkedInSet[uid]) statsByUid[uid].attended++;
+      });
+    });
+    return statsByUid;
+  }
+
+  function renderAttendanceRateList(){
+    var wrapEl = document.getElementById('rateListWrap');
+    var groupNames = chartMode === 'overall' ? availableInstruments : selectedInstruments;
+
+    if (groupNames.length === 0){
+      wrapEl.innerHTML = '<div class="chart-empty">' +
+        (chartMode === 'overall' ? '這場音樂會名單中還沒有登記任何樂器' : '尚未選擇要比較的樂器') +
+        '</div>';
+      return;
+    }
+
+    var statsByUid = computeMemberRehearsalStats();
+    wrapEl.innerHTML = groupNames.map(function(name){
+      var uids = uidsForInstrument(name).filter(function(uid){ return statsByUid[uid] && statsByUid[uid].expected > 0; });
+      uids.sort(function(a, b){
+        return (statsByUid[a].attended / statsByUid[a].expected) - (statsByUid[b].attended / statsByUid[b].expected);
+      });
+      var rowsHtml = uids.length === 0
+        ? '<div class="sheet-group-empty">這個樂器目前沒有可計算的排練場次</div>'
+        : uids.map(function(uid){
+            var s = statsByUid[uid];
+            var pct = Math.round((s.attended / s.expected) * 100);
+            var color = pct >= 80 ? 'var(--sage)' : (pct >= 50 ? 'var(--brass-deep)' : 'var(--burgundy)');
+            return (
+              '<div class="rate-row">' +
+                '<div class="rate-name">' + (nameByUid[uid] || accountByUid[uid] || uid) + '</div>' +
+                '<div class="rate-track"><div class="rate-fill" style="width:' + pct + '%;background:' + color + ';"></div></div>' +
+                '<div class="rate-num">' + s.attended + '/' + s.expected + ' · ' + pct + '%</div>' +
+              '</div>'
+            );
+          }).join('');
+      return '<div class="sheet-group"><div class="sheet-group-label">' + name + ' <span class="cnt">' + uids.length + ' 人</span></div>' + rowsHtml + '</div>';
+    }).join('');
   }
 
   // ---------- SVG 折線圖 ----------
@@ -639,16 +715,17 @@
   function renderChart(){
     var legendEl = document.getElementById('chartLegend');
     var wrapEl = document.getElementById('chartWrap');
+    renderAttendanceRateList();
 
     if (currentRehearsals.length === 0){
       legendEl.innerHTML = '';
-      wrapEl.innerHTML = '<div class="chart-empty">這場音樂會目前沒有關聯任何團練活動</div>';
+      wrapEl.innerHTML = '<div class="chart-empty">尚未關聯任何團練活動</div>';
       return;
     }
     var series = buildSeries();
     if (series.length === 0){
       legendEl.innerHTML = '';
-      wrapEl.innerHTML = '<div class="chart-empty">選一個樂器才會顯示比較線</div>';
+      wrapEl.innerHTML = '<div class="chart-empty">尚未選擇要比較的樂器</div>';
       return;
     }
 
@@ -715,6 +792,17 @@
   });
 
   // ---------- 單次團練明細 sheet（沿用 checkin-stats-admin.html 的分組邏輯） ----------
+  // 9/21：跟 checkin-stats-admin.html 同一處修正——分部明細拿掉帳號，改顯示簽到方式＋時間
+  function formatCheckinMeta(p){
+    var isManual = p.method === 'manual';
+    var label = isManual ? '手動補登' : '掃碼';
+    var color = isManual ? 'var(--brass-deep)' : 'var(--sage)';
+    var time = p.checkedInAt && p.checkedInAt.toDate
+      ? p.checkedInAt.toDate().toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit', hour12:false })
+      : '—';
+    return '<span class="acc" style="color:' + color + ';">' + label + ' · ' + time + '</span>';
+  }
+
   function groupByInstrument(list){
     var byName = {};
     availableInstruments.forEach(function(name){ byName[name] = []; });
@@ -770,7 +858,7 @@
       var namesHtml = g.people.length === 0
         ? '<div class="sheet-group-empty">尚無人簽到</div>'
         : g.people.map(function(p){
-            return '<div class="sheet-name-row"><span>' + (p.name || p.account || '未知') + '</span><span class="acc">' + (p.account || '') + '</span></div>';
+            return '<div class="sheet-name-row"><span>' + (p.name || p.account || '未知') + '</span>' + formatCheckinMeta(p) + '</div>';
           }).join('');
       return '<div class="sheet-group"><div class="sheet-group-label">' + g.name + ' <span class="cnt">' + g.people.length + ' 人</span></div>' + namesHtml + '</div>';
     }).join('');

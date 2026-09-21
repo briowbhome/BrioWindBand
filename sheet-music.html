@@ -221,7 +221,6 @@
 
   function canViewInstrument(profile, instrumentName, assignedInstrumentNames){
     if (isAdminOrConductor(profile)) return true;
-    if (profile.permissions && profile.permissions.canViewAllSheetMusic === true) return true;
     if (hasTeamPermission(profile, 'canViewAllSheetMusic')) return true;
     if (getSectionLeaderInstruments(profile).indexOf(instrumentName) !== -1) return true;
     return !!assignedInstrumentNames[instrumentName];
@@ -230,9 +229,7 @@
   // 總譜（指揮用、全部分部合一的版本）視野跟分部譜不同——不是「自己分部」的概念，
   // 只開放給管理員/擁有者/指揮/canViewAllSheetMusic，分部長跟一般被指派過的團員不算
   function isFullScoreEligible(profile){
-    return isAdminOrConductor(profile) ||
-      (profile.permissions && profile.permissions.canViewAllSheetMusic === true) ||
-      hasTeamPermission(profile, 'canViewAllSheetMusic');
+    return isAdminOrConductor(profile) || hasTeamPermission(profile, 'canViewAllSheetMusic');
   }
 
   function renderFullScoreLink(url){
