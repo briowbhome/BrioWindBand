@@ -2459,7 +2459,8 @@
 
   async function ensureApprovedMembers(){
     if (approvedMembers) return approvedMembers;
-    var snap = await getDocs(query(collection(db, 'users'), where('status', '==', 'approved')));
+    // 9/22 修正：漏加 teamIds 篩選，參與名單勾選清單會把兩團成員混在一起顯示（同 roster-admin.html 那個漏洞）
+    var snap = await getDocs(query(collection(db, 'users'), where('status', '==', 'approved'), where('teamIds', 'array-contains', activeTeam)));
     approvedMembers = snap.docs.map(function(docSnap){
       var data = docSnap.data();
       // instruments 是這輪音樂會參與名單新增的欄位需求（每人這場音樂會的樂器身分預設值），

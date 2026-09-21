@@ -371,7 +371,8 @@
 
   async function ensureApprovedMembers(){
     if (approvedMembers) return approvedMembers;
-    var snap = await getDocs(query(collection(db, 'users'), where('status', '==', 'approved')));
+    // 9/22 修正：漏加 teamIds 篩選，之前建立名單的勾選清單會把兩團成員混在一起顯示
+    var snap = await getDocs(query(collection(db, 'users'), where('status', '==', 'approved'), where('teamIds', 'array-contains', activeTeam)));
     approvedMembers = snap.docs.map(function(docSnap){
       var data = docSnap.data();
       return { uid: docSnap.id, name: data.name, account: data.account };

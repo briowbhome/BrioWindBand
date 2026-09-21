@@ -1356,7 +1356,9 @@
 
     // 座位圖分區設定只有 Owner 看得到/能用（8/19 使用者要求暫時不開放其他人編輯座位圖），
     // 不是 Owner 就整個區塊連 DOM 都不顯示，也不去訂閱這份資料
-    if (!isOwner) return;
+    // 9/22 修正：9/19 收尾計畫把全域 isOwner 旗標拆掉、改用 currentAdminProfile.role 判斷時，
+    // 這裡漏改，isOwner 變成未宣告變數，導致座位圖分區設定整個區塊消失（連 Owner 也看不到）
+    if (!currentAdminProfile || currentAdminProfile.role !== 'owner') return;
     document.getElementById('seatSectionWrap').classList.remove('hidden');
 
     subscribeSeatingSections(db, activeTeam, function(sections){
