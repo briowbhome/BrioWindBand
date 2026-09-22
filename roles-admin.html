@@ -369,7 +369,7 @@
     <div class="field-row">
       <div class="field">
         <label>樂器名稱</label>
-        <input type="text" id="instName" placeholder="例如：低音長笛">
+        <input type="text" id="instName" placeholder="例如：長笛">
       </div>
       <div class="field">
         <label>類別</label>
@@ -394,16 +394,16 @@
       <span class="tw">座位圖分區設定</span>
       <span class="en">Seating Chart</span>
     </div>
-    <p class="lede">指揮頁面座位圖用，決定哪個分區對應哪個樂器、在第幾排、同排內的左右順序跟寬度。「排」是離指揮的遠近，1 是最靠近指揮那排，數字越大越後排；「寬度權重」預設 1（同排平均分配），數字越大這塊佔的角度越寬；同一個樂器可以新增多個分區（例如分兩排坐）。</p>
+    <p class="lede">指揮頁面座位圖用，決定每個樂器的分區、排數、左右順序跟寬度。「排」是離指揮的遠近，1 是最靠近指揮那排，數字越大越後排；「寬度權重」預設 1（同排平均分配），數字越大角度越寬；同一個樂器可以新增多個分區（例如分兩排坐）。</p>
 
     <form class="card" id="seatForm">
       <div class="field-row">
         <div class="field">
-          <label>對應樂器</label>
+          <label>樂器</label>
           <select id="seatInstrument"></select>
         </div>
         <div class="field">
-          <label>第幾排</label>
+          <label>排數</label>
           <input type="number" id="seatRow" min="1" value="1">
         </div>
       </div>
@@ -463,7 +463,6 @@
       <label style="display:block;font-family:'Roboto Mono',monospace;font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px;">團別</label>
       <div class="team-tabs" id="teamTabs"></div>
       <div id="teamRolesBody" style="margin-top:12px;"></div>
-      <button type="button" class="cta-btn hidden" id="saveTeamRolesBtn" style="margin-top:10px;" disabled>儲存這團的變更</button>
       <p class="form-error" id="teamRolesError"></p>
     </div>
     <div class="sheet-footer">
@@ -478,7 +477,7 @@
   import { showToast } from './toast.js';
   import { showConfirm } from './dialog.js';
   import { MESSAGES } from './messages.js';
-  import { requireCanManageRoles, peekCachedProfile, roleInTeam } from './auth-guard.js';
+  import { requireCanManageRoles, peekCachedProfile, roleInTeam, canManageRolesForTeam } from './auth-guard.js';
   import { db, functions } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
@@ -526,12 +525,12 @@
   // （canManageSheetMusic/canViewAllSheetMusic/canManageEventTypes）雖然管的是兩團共用
   // 資源，但「誰被信任管理」改成各團自己決定，搬進 TEAM_PERMISSION_DEFS
   var TEAM_PERMISSION_DEFS = [
-    { key: 'canManageRoles', label: '可調整他人角色/權限（該團）' },
-    { key: 'canDeleteAccounts', label: '可軟刪除現役帳號（該團）' },
-    { key: 'canManageFinance', label: '可管理財務記帳（該團）' },
-    { key: 'canManageSheetMusic', label: '可管理樂譜資料夾（該團）' },
-    { key: 'canViewAllSheetMusic', label: '可檢視全部分部樂譜（該團）' },
-    { key: 'canManageEventTypes', label: '可管理活動類型（該團）' }
+    { key: 'canManageRoles', label: '可調整他人角色/權限' },
+    { key: 'canDeleteAccounts', label: '可軟刪除現役帳號' },
+    { key: 'canManageFinance', label: '可管理財務記帳' },
+    { key: 'canManageSheetMusic', label: '可管理樂譜資料夾' },
+    { key: 'canViewAllSheetMusic', label: '可檢視全部分部樂譜' },
+    { key: 'canManageEventTypes', label: '可管理活動類型' }
   ];
 
   // 職位範本：交接時負責轉移的人不用記得「這個職位要打勾哪幾個旗標」，選職位名稱
@@ -564,17 +563,6 @@
   var teamDraftPositionPresets = [];
   var teamInitialKey = '';
 
-  // firestore.rules 的 canManageRolesFor(team) 在客戶端的對應判斷：能不能動某個團的角色/
-  // 權限，看操作者自己在「那個團」有沒有 canManageRoles，跟操作者在其他團的身分無關（Owner
-  // 例外）。UI 沒跟著這條規則做防呆的話，跨團管理員會看到按鈕、點下去才被 Firestore 用
-  // permission-denied 擋下來，體驗上像是壞掉而不是「這是另一團的治理範圍」，見開發討論
-  function canManageRolesForTeam(profile, team){
-    if (!profile) return false;
-    if (profile.role === 'owner') return true;
-    var teamData = profile.teams && profile.teams[team];
-    return !!(teamData && teamData.permissions && teamData.permissions.canManageRoles === true);
-  }
-
   function permissionsKey(perms, defs){
     return defs.map(function(p){ return p.key + ':' + (!!perms[p.key]); }).sort().join('|');
   }
@@ -595,8 +583,8 @@
   var saveMemberBtn = document.getElementById('saveMemberBtn');
   var teamTabsEl = document.getElementById('teamTabs');
   var teamRolesBodyEl = document.getElementById('teamRolesBody');
-  var saveTeamRolesBtn = document.getElementById('saveTeamRolesBtn');
   var teamRolesErrorEl = document.getElementById('teamRolesError');
+  var teamEditable = false; // 目前這個團別分頁是否處於「有草稿可以編輯」狀態，給 isTeamRolesDirty() 判斷用
 
   function teamDraftKey(){
     return JSON.stringify({
@@ -721,6 +709,16 @@
     return sectionsKey(draftInstruments) !== initialInstrumentsKey;
   }
 
+  function isTeamRolesDirty(){
+    return teamEditable && teamDraftKey() !== teamInitialKey;
+  }
+
+  // 9/22 合併：樂器跟團別身分/權限草稿共用同一顆外層「儲存變更」按鈕，任一邊有未存的
+  // 草稿就要能按，兩邊都乾淨才 disable
+  function updateSaveButtonState(){
+    saveMemberBtn.disabled = !isMemberDirty() && !isTeamRolesDirty();
+  }
+
   function renderTeamTabs(){
     teamTabsEl.innerHTML = ['alumni', 'school'].map(function(team){
       return (
@@ -740,11 +738,12 @@
 
     if (!teamData){
       teamRolesBodyEl.innerHTML =
-        '<p class="lede" style="margin:0 0 10px;">這個人還沒有' + TEAM_LABELS[editingTeam] + '的團籍。</p>' +
+        '<p class="lede" style="margin:0 0 10px;">這個人還沒有加入' + TEAM_LABELS[editingTeam] + '。</p>' +
         (canEdit
           ? '<button type="button" class="cta-btn cta-btn-secondary" id="grantTeamBtn" data-grant-team="' + editingTeam + '">加入這團（預設一般團員）</button>'
           : noPermNotice);
-      saveTeamRolesBtn.classList.add('hidden');
+      teamEditable = false;
+      updateSaveButtonState();
       return;
     }
 
@@ -763,7 +762,8 @@
         '<div class="field"><label>身分組</label><p class="lede" style="margin:0;">' + (ROLE_LABELS[teamDraftRole] || teamDraftRole) + '</p></div>' +
         '<div class="field"><label>額外權限</label><p class="lede" style="margin:0;">' + readonlyPerms + '</p></div>' +
         '<div class="field"><label>分部長</label><p class="lede" style="margin:0;">' + readonlySections + '</p></div>';
-      saveTeamRolesBtn.classList.add('hidden');
+      teamEditable = false;
+      updateSaveButtonState();
       return;
     }
 
@@ -813,8 +813,8 @@
       teamPositionPresetField +
       '<div class="field"><label>分部長（選填）</label><div class="check-list">' + sectionRows + '</div></div>';
 
-    saveTeamRolesBtn.classList.remove('hidden');
-    saveTeamRolesBtn.disabled = true;
+    teamEditable = true;
+    updateSaveButtonState();
   }
 
   function renderMemberSheetBody(){
@@ -842,10 +842,9 @@
         '</div>' +
         '<p class="inst-summary-text">' + instSummary + '</p>' +
         '<div class="check-list' + (instListExpanded ? '' : ' collapsed') + '">' + instRows + '</div>' +
-      '</div>' +
-      '<p class="form-error" id="memberFormError"></p>';
+      '</div>';
 
-    saveMemberBtn.disabled = !isMemberDirty();
+    updateSaveButtonState();
   }
 
   function openMemberSheet(uid){
@@ -860,7 +859,7 @@
     document.getElementById('sheetMemberAccount').textContent = '@' + (m.account || '');
     saveMemberBtn.textContent = '儲存變更';
     renderMemberSheetBody();
-    editingTeam = 'alumni'; // 每次重新打開都從校友團開始
+    editingTeam = activeTeam; // 9/22 修正：之前寫死校友團，跟目前切換中的團別無關，改成看 activeTeam
     renderTeamTabs();
     renderTeamRolesBody();
     resetPasswordWrap.classList.toggle('hidden', uid === currentAdminUid || m.role === 'owner');
@@ -914,7 +913,7 @@
       roleChip.parentElement.querySelectorAll('.role-chip').forEach(function(el){
         el.classList.toggle('selected', el === roleChip);
       });
-      saveTeamRolesBtn.disabled = teamDraftKey() === teamInitialKey;
+      updateSaveButtonState();
       return;
     }
     var permToggle = e.target.closest('[data-team-perm-toggle]');
@@ -925,7 +924,7 @@
         el.classList.toggle('on', teamDraftPermissions[pkey]);
         el.textContent = teamDraftPermissions[pkey] ? '✓' : '';
       });
-      saveTeamRolesBtn.disabled = teamDraftKey() === teamInitialKey;
+      updateSaveButtonState();
       return;
     }
     var sectionToggle = e.target.closest('[data-team-section-toggle]');
@@ -938,7 +937,7 @@
         el.classList.toggle('on', sOn);
         el.textContent = sOn ? '✓' : '';
       });
-      saveTeamRolesBtn.disabled = teamDraftKey() === teamInitialKey;
+      updateSaveButtonState();
       return;
     }
     if (e.target.closest('#teamPositionPresetApplyBtn')){
@@ -957,7 +956,7 @@
         });
       });
       if (teamDraftPositionPresets.indexOf(teamPresetKey) === -1) teamDraftPositionPresets.push(teamPresetKey);
-      saveTeamRolesBtn.disabled = teamDraftKey() === teamInitialKey;
+      updateSaveButtonState();
       return;
     }
     var grantBtn = e.target.closest('[data-grant-team]');
@@ -983,17 +982,30 @@
     }
   });
 
-  saveTeamRolesBtn.addEventListener('click', function(){
+  document.getElementById('memberSheetClose').addEventListener('click', closeMemberSheet);
+  document.getElementById('cancelMemberBtn').addEventListener('click', closeMemberSheet);
+  memberSheetOverlay.addEventListener('click', function(e){
+    if (e.target === memberSheetOverlay) closeMemberSheet();
+  });
+
+  // 9/22 合併：樂器跟「目前這個團別分頁」的身分/權限草稿，一次存檔送出，只留這顆外層
+  // 按鈕。存完不再關閉抽屜（照使用者要求），改成把兩邊草稿的「初始值」同步成剛存進去的
+  // 內容、按鈕狀態歸零——一定要先做這步再讓畫面依賴這些變數重繪，不然畫面會在存檔成功
+  // 的瞬間被舊的（存檔前的）草稿值蓋回去，看起來像是剛存的東西不見了
+  saveMemberBtn.addEventListener('click', function(){
     if (!openMemberId) return;
     var saveUid = openMemberId;
+    var m = membersById[saveUid];
     var team = editingTeam;
-    saveTeamRolesBtn.disabled = true;
-    saveTeamRolesBtn.textContent = '儲存中…';
+    var teamDirty = isTeamRolesDirty();
+
+    saveMemberBtn.disabled = true;
+    saveMemberBtn.textContent = '儲存中…';
     teamRolesErrorEl.classList.remove('show');
 
-    var m = membersById[saveUid];
-    var payload = {
-      teams: Object.assign({}, m.teams || {}, {
+    var payload = { instruments: draftInstruments };
+    if (teamDirty){
+      payload.teams = Object.assign({}, m.teams || {}, {
         [team]: {
           role: teamDraftRole,
           permissions: Object.assign(
@@ -1004,40 +1016,21 @@
           sectionLeaderFor: teamDraftSections,
           positionPresets: teamDraftPositionPresets
         }
-      })
-    };
+      });
+    }
 
     updateDoc(doc(db, 'users', saveUid), payload).then(function(){
-      membersById[saveUid].teams = payload.teams;
-      teamInitialKey = teamDraftKey();
-      saveTeamRolesBtn.textContent = '儲存這團的變更';
+      m.instruments = draftInstruments;
+      initialInstrumentsKey = sectionsKey(draftInstruments);
+      if (payload.teams){
+        m.teams = payload.teams;
+        teamInitialKey = teamDraftKey();
+      }
+      saveMemberBtn.textContent = '儲存變更';
+      updateSaveButtonState();
     }).catch(function(err){
       teamRolesErrorEl.textContent = '儲存失敗（' + err.code + '）';
       teamRolesErrorEl.classList.add('show');
-      saveTeamRolesBtn.disabled = false;
-      saveTeamRolesBtn.textContent = '儲存這團的變更';
-    });
-  });
-
-  document.getElementById('memberSheetClose').addEventListener('click', closeMemberSheet);
-  document.getElementById('cancelMemberBtn').addEventListener('click', closeMemberSheet);
-  memberSheetOverlay.addEventListener('click', function(e){
-    if (e.target === memberSheetOverlay) closeMemberSheet();
-  });
-
-  saveMemberBtn.addEventListener('click', function(){
-    if (!openMemberId) return;
-    var saveUid = openMemberId;
-    saveMemberBtn.disabled = true;
-    saveMemberBtn.textContent = '儲存中…';
-    updateDoc(doc(db, 'users', saveUid), { instruments: draftInstruments }).then(function(){
-      closeMemberSheet();
-    }).catch(function(err){
-      var errEl = document.getElementById('memberFormError');
-      if (errEl){
-        errEl.textContent = '儲存失敗（' + err.code + '）';
-        errEl.classList.add('show');
-      }
       saveMemberBtn.disabled = false;
       saveMemberBtn.textContent = '儲存變更';
     });
@@ -1323,7 +1316,7 @@
     avatarBtn.classList.remove('skel');
     initAccountMenu(result.profile.name);
     initTeamSwitcher(result.profile);
-    initAdminNav('roles');
+    initAdminNav('roles', result.profile, activeTeam);
 
     // 9/20：加上 teamIds 篩選，只顯示目前切換中團別（activeTeam）的成員——之前沒篩選，
     // 兩團的成員會全部混在同一份清單裡

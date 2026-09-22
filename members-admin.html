@@ -384,7 +384,7 @@
     avatarBtn.classList.remove('skel');
     initAccountMenu(result.profile.name);
     initTeamSwitcher(result.profile);
-    initAdminNav('members');
+    initAdminNav('members', result.profile, activeTeam);
 
     // 9/20：加上 teamIds 篩選，只顯示目前切換中團別（activeTeam）的成員——之前沒篩選，
     // 兩團的成員會全部混在同一份清單裡

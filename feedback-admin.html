@@ -362,7 +362,7 @@
     avatarBtn.classList.remove('skel');
     initAccountMenu(result.profile.name);
     initTeamSwitcher(result.profile);
-    initAdminNav('feedback');
+    initAdminNav('feedback', result.profile, result.activeTeam);
 
     loadFeedbackItems().catch(function(err){
       console.error('載入意見回饋失敗', err);

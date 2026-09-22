@@ -168,6 +168,12 @@
   .info-row .k{ flex:none; color:var(--ink-soft); font-family:'Roboto Mono',monospace; font-size:10px; letter-spacing:.05em; }
   .info-row .v{ font-weight:500; color:var(--ink); text-align:right; }
   .survey-namelist{ margin-top:4px; font-size:12px; color:var(--ink); line-height:1.7; }
+  .tpl-preview-group{ margin-top:10px; }
+  .tpl-preview-group:first-child{ margin-top:4px; }
+  .tpl-preview-label{
+    font-family:'Roboto Mono',monospace; font-size:10px; font-weight:700;
+    letter-spacing:.06em; text-transform:uppercase; color:var(--brass-deep); margin-bottom:2px;
+  }
   .info-edit-btn{
     border:1px solid var(--line); background:var(--paper); color:var(--brass-deep);
     border-radius:999px; padding:8px 18px; font-size:12.5px; font-weight:700; cursor:pointer;
@@ -273,6 +279,7 @@
         <div class="survey-namelist" id="templateViewNames"></div>
         <div class="info-edit-row">
           <button type="button" class="info-edit-btn" id="templateEditBtn">✎ 編輯</button>
+          <button type="button" class="info-edit-btn" id="templateApplyBtn">套用到…</button>
           <button type="button" class="info-edit-btn" id="templateDeleteBtn">刪除</button>
         </div>
       </div>
@@ -299,6 +306,39 @@
   </div>
 </div>
 
+<div class="sheet-overlay" id="applySheetOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button type="button" class="sheet-close" id="applySheetClose" aria-label="關閉">×</button>
+      <div class="name" id="applySheetTitle">套用到活動/音樂會</div>
+    </div>
+    <div class="sheet-body">
+      <p class="lede" style="margin:0 0 10px;">勾選要套用這份名單的活動，已經套用過的項目預設勾選；確定後會把選中項目目前的名單整份覆蓋成目前的內容。</p>
+      <div id="applyTargetsLoading" class="empty">讀取中…</div>
+      <div id="applyTargetsBody" class="hidden">
+        <div class="survey-bulk-row">
+          <button type="button" id="applySelectAllBtn">全選</button>
+          <button type="button" id="applyClearAllBtn">全部取消</button>
+        </div>
+        <div class="survey-section-label">即將到來</div>
+        <div class="check-list" id="applyUpcomingList"></div>
+        <button type="button" class="info-edit-btn" id="applyTogglePastBtn" style="margin-top:10px;"></button>
+        <div class="hidden" id="applyPastWrap">
+          <div class="survey-section-label">已結束</div>
+          <p class="lede" style="margin:0 0 8px;">已結束的活動預設不勾選。</p>
+          <div class="check-list" id="applyPastList"></div>
+        </div>
+      </div>
+      <p class="form-error" id="applyFormError"></p>
+    </div>
+    <div class="sheet-footer">
+      <button type="button" class="cta-btn cta-btn-secondary" id="applyCancelBtn">取消</button>
+      <button type="button" class="cta-btn" id="applyConfirmBtn" disabled>套用</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
   import { initAdminNav } from './admin-nav.js';
   import { showToast } from './toast.js';
@@ -308,9 +348,10 @@
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
+  import { applyTemplateToEventRoster, applyTemplateToConcertRoster, diffTemplateMembers } from './roster-templates.js';
   import {
-    collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot,
-    serverTimestamp, getDocs, query, where
+    collection, addDoc, doc, getDoc, updateDoc, deleteDoc, onSnapshot,
+    serverTimestamp, getDocs, query, where, documentId
   } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
   function escapeHtml(s){
@@ -371,13 +412,55 @@
 
   async function ensureApprovedMembers(){
     if (approvedMembers) return approvedMembers;
-    // 9/22 修正：漏加 teamIds 篩選，之前建立名單的勾選清單會把兩團成員混在一起顯示
+    // 9/22 修正：漏加 teamIds 篩選，之前建立名單的勾選清單會把兩團成員混在一起顯示。
+    // instruments 是「套用到活動/音樂會」批次套用音樂會參與名單時，比照 event-admin.html
+    // 既有邏輯抓「新加入的人預設帶入 users.instruments[0]」要用的
     var snap = await getDocs(query(collection(db, 'users'), where('status', '==', 'approved'), where('teamIds', 'array-contains', activeTeam)));
     approvedMembers = snap.docs.map(function(docSnap){
       var data = docSnap.data();
-      return { uid: docSnap.id, name: data.name, account: data.account };
+      return { uid: docSnap.id, name: data.name, account: data.account, instruments: data.instruments || [] };
     });
     return approvedMembers;
+  }
+
+  // 樂器清單快取，兩處要用：①套用到音樂會參與名單時，範本裡全新加入、而且自己資料裡也沒
+  // 設定任何樂器的人，最後備援抓清單第一筆（跟 event-admin.html 的
+  // applyTemplateToConcertRosterUI 同一個規則）；②名單預覽依樂器分區顯示的排序依據
+  var instrumentsListCache;
+  async function ensureInstrumentsList(){
+    if (instrumentsListCache) return instrumentsListCache;
+    var snap = await getDoc(doc(db, 'settings', 'instruments'));
+    instrumentsListCache = snap.exists() ? (snap.data().list || []) : [];
+    return instrumentsListCache;
+  }
+
+  // 依樂器清單順序（家族分類→清單原順序）把 uid 分區，跟 checkin-stats-admin.html 的
+  // groupCheckinsByInstrument 同一套規則：一人可能同時列在多個分區（樂器不分主副修，本來
+  // 就是多選），沒設定樂器的人歸進「未設定樂器」，空分區不顯示（跟簽到統計那邊不同——
+  // 這裡是名單預覽，不是「全團這個樂器有幾人」的統計描述，空分區只會是純噪音）
+  function groupUidsByInstrument(uids){
+    var namesByUid = {};
+    (approvedMembers || []).forEach(function(m){ namesByUid[m.uid] = m; });
+    var byInstrument = {};
+    uids.forEach(function(uid){
+      var member = namesByUid[uid];
+      var instruments = (member && member.instruments && member.instruments.length) ? member.instruments : ['未設定樂器'];
+      instruments.forEach(function(name){
+        if (!byInstrument[name]) byInstrument[name] = [];
+        // 同一個人有多個樂器身分時，會在好幾個分區都出現——不加註記的話容易被誤會成
+        // 名單重複列了同一個人，或看不出跟另一個分區裡同名的人是不是同一位。在每個分區
+        // 的名字後面帶出「這個人在這份名單裡的其他樂器身分」，就地說明，不用另外查
+        var label = member ? member.name : uid;
+        var others = instruments.filter(function(n){ return n !== name; });
+        if (others.length) label += '（' + others.join('、') + '）';
+        byInstrument[name].push(label);
+      });
+    });
+    var orderedNames = (instrumentsListCache || []).map(function(inst){ return inst.name; });
+    if (byInstrument['未設定樂器']) orderedNames.push('未設定樂器');
+    return orderedNames
+      .filter(function(name){ return byInstrument[name] && byInstrument[name].length; })
+      .map(function(name){ return { name: name, names: byInstrument[name] }; });
   }
 
   function renderChecklist(){
@@ -411,7 +494,9 @@
   var templateViewNames = document.getElementById('templateViewNames');
 
   // 唯讀摘要（只有編輯既有名單才會用到，新增名單沒有「唯讀」狀態可看，直接進表單）；
-  // 名單名稱顯示在 sheet 標題（見 openEditSheet），摘要內容不用重複顯示一次
+  // 名單名稱顯示在 sheet 標題（見 openEditSheet），摘要內容不用重複顯示一次。
+  // 9/22 修正：原本整份名單條列一長串名字很不直觀，改成依樂器分區（跟簽到統計等既有頁面
+  // 同一套排序邏輯），大名單也能一眼看出分部人數/構成
   function showTemplateView(t){
     templateViewMode.classList.remove('hidden');
     templateEditForm.classList.add('hidden');
@@ -419,12 +504,19 @@
     document.getElementById('templateSheetTitle').textContent = t.name || '—';
     var members = t.members || [];
     templateViewCount.textContent = members.length + ' 人';
-    var namesByUid = {};
-    (approvedMembers || []).forEach(function(m){ namesByUid[m.uid] = m; });
-    templateViewNames.textContent = members.length === 0 ? '（無）' : members.map(function(uid){
-      var m = namesByUid[uid];
-      return m ? m.name : uid;
-    }).join('、');
+    if (members.length === 0){
+      templateViewNames.innerHTML = '（無）';
+      return;
+    }
+    var groups = groupUidsByInstrument(members);
+    templateViewNames.innerHTML = groups.map(function(g){
+      return (
+        '<div class="tpl-preview-group">' +
+          '<div class="tpl-preview-label">' + escapeHtml(g.name) + '（' + g.names.length + '）</div>' +
+          '<div>' + g.names.map(escapeHtml).join('、') + '</div>' +
+        '</div>'
+      );
+    }).join('');
   }
 
   function showTemplateEditForm(){
@@ -455,7 +547,7 @@
     templateSaveBtn.textContent = '儲存變更';
     templateCancelBtn.classList.remove('hidden');
     showFormError('');
-    await ensureApprovedMembers();
+    await Promise.all([ensureApprovedMembers(), ensureInstrumentsList()]);
     showTemplateView(t);
     templateSheetOverlay.classList.add('active');
   }
@@ -563,6 +655,253 @@
     });
   });
 
+  // ---------- 套用到活動/音樂會（9/22 新增）：不像「編輯活動/音樂會」裡的單一套用入口
+  // 要等已經套用過的項目自己找過來，這裡反過來從範本這邊列出目前這團所有活動/音樂會，
+  // 勾選要（重新）套用的項目，一次批次送出——已經套用過這份範本的項目預設勾選，方便
+  // 「編完範本、同步到既有活動」這個最常見的用途；也可以額外勾選還沒套用過的項目，
+  // 一次把範本套到新地方，隨時可用，不綁在剛編輯完範本之後才能點 ----------
+  var applySheetOverlay = document.getElementById('applySheetOverlay');
+  var applyConfirmBtn = document.getElementById('applyConfirmBtn');
+  var applyTemplateId = null;
+  var applyEventsCache = null; // [{id, kind:'event', title, sortDate}]
+  var applyConcertsCache = null; // 同上，kind:'concert'
+  var applyRostersByTarget = {}; // key `${kind}:${id}` -> { memberUids, sourceTemplateId, existed }
+  var applySelected = {}; // key -> true
+
+  function chunkArray(arr, size){
+    var out = [];
+    for (var i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+    return out;
+  }
+
+  // Firestore `in` 查詢一次最多 30 個值，活動/音樂會數量理論上可能超過，切成多批平行查詢
+  async function fetchRostersByIds(collectionName, ids){
+    var result = {};
+    await Promise.all(chunkArray(ids, 30).map(async function(idsChunk){
+      if (idsChunk.length === 0) return;
+      var snap = await getDocs(query(collection(db, collectionName), where(documentId(), 'in', idsChunk)));
+      snap.forEach(function(docSnap){ result[docSnap.id] = docSnap.data(); });
+    }));
+    return result;
+  }
+
+  // 活動/音樂會清單只在第一次打開「套用到」sheet 時查一次、快取起來——這是幹部偶爾才會用
+  // 的批次動作，不是常駐畫面，沒必要維持常駐監聽增加負擔，跟 ensureApprovedMembers() 同一種取捨
+  async function ensureEventsAndConcerts(){
+    if (applyEventsCache && applyConcertsCache) return;
+    var pair = await Promise.all([
+      getDocs(query(collection(db, 'events'), where('team', 'array-contains', activeTeam))),
+      getDocs(query(collection(db, 'concerts'), where('team', 'array-contains', activeTeam)))
+    ]);
+    applyEventsCache = pair[0].docs.map(function(d){
+      var data = d.data();
+      return { id: d.id, kind: 'event', title: data.title || '（未命名活動）', sortDate: data.date ? data.date.toDate() : null };
+    });
+    applyConcertsCache = pair[1].docs.map(function(d){
+      var data = d.data();
+      var sortDate = data.endDate ? data.endDate.toDate() : (data.startDate ? data.startDate.toDate() : null);
+      return { id: d.id, kind: 'concert', title: data.title || '（未命名音樂會）', sortDate: sortDate };
+    });
+  }
+
+  function applyRowHtml(item){
+    var key = item.kind + ':' + item.id;
+    var on = !!applySelected[key];
+    var dateLabel = item.sortDate ? item.sortDate.toLocaleDateString('zh-TW') : '日期未定';
+    var kindLabel = item.kind === 'event' ? '活動' : '音樂會';
+    var target = applyRostersByTarget[key];
+    var appliedNote = (target && target.sourceTemplateId === applyTemplateId) ? '・已套用這份名單' : '';
+    return (
+      '<div class="check-row">' +
+        '<button type="button" class="checkbox' + (on ? ' on' : '') + '" data-target="' + key + '">' + (on ? '✓' : '') + '</button>' +
+        '<button type="button" class="check-text" data-target="' + key + '">' + escapeHtml(item.title) +
+          '<br><span style="color:var(--ink-soft);font-size:11px;">' + kindLabel + '・' + dateLabel + appliedNote + '</span>' +
+        '</button>' +
+      '</div>'
+    );
+  }
+
+  function updateApplyConfirmState(){
+    applyConfirmBtn.disabled = Object.keys(applySelected).filter(function(k){ return applySelected[k]; }).length === 0;
+  }
+
+  function renderApplyTargets(){
+    var now = new Date();
+    var all = applyEventsCache.concat(applyConcertsCache).sort(function(a, b){
+      return (a.sortDate ? a.sortDate.getTime() : 0) - (b.sortDate ? b.sortDate.getTime() : 0);
+    });
+    var upcoming = all.filter(function(item){ return !item.sortDate || item.sortDate >= now; });
+    var past = all.filter(function(item){ return item.sortDate && item.sortDate < now; });
+
+    document.getElementById('applyUpcomingList').innerHTML = upcoming.length
+      ? upcoming.map(applyRowHtml).join('')
+      : '<div class="empty" style="padding:16px;">目前沒有即將到來的活動</div>';
+
+    var toggleBtn = document.getElementById('applyTogglePastBtn');
+    toggleBtn.textContent = '顯示已結束的活動（' + past.length + '）';
+    toggleBtn.classList.toggle('hidden', past.length === 0);
+    document.getElementById('applyPastList').innerHTML = past.map(applyRowHtml).join('');
+
+    document.getElementById('applyTargetsLoading').classList.add('hidden');
+    document.getElementById('applyTargetsBody').classList.remove('hidden');
+    updateApplyConfirmState();
+  }
+
+  async function openApplySheet(templateId){
+    var t = templatesById[templateId];
+    if (!t) return;
+    applyTemplateId = templateId;
+    applySelected = {};
+    document.getElementById('applySheetTitle').textContent = '套用「' + (t.name || '') + '」到…';
+    document.getElementById('applyFormError').classList.remove('show');
+    document.getElementById('applyPastWrap').classList.add('hidden');
+    document.getElementById('applyTargetsBody').classList.add('hidden');
+    var loadingEl = document.getElementById('applyTargetsLoading');
+    loadingEl.textContent = '讀取中…';
+    loadingEl.classList.remove('hidden');
+    applyConfirmBtn.disabled = true;
+    applySheetOverlay.classList.add('active');
+
+    try {
+      await ensureEventsAndConcerts();
+      var eventIds = applyEventsCache.map(function(e){ return e.id; });
+      var concertIds = applyConcertsCache.map(function(c){ return c.id; });
+      var rosterPair = await Promise.all([
+        fetchRostersByIds('eventRosters', eventIds),
+        fetchRostersByIds('concertRosters', concertIds)
+      ]);
+      var eventRosters = rosterPair[0], concertRosters = rosterPair[1];
+      applyRostersByTarget = {};
+      applyEventsCache.forEach(function(e){
+        var r = eventRosters[e.id];
+        applyRostersByTarget['event:' + e.id] = {
+          memberUids: r ? (r.members || []) : [],
+          sourceTemplateId: r ? (r.sourceTemplateId || null) : null,
+          existed: !!r
+        };
+      });
+      applyConcertsCache.forEach(function(c){
+        var r = concertRosters[c.id];
+        applyRostersByTarget['concert:' + c.id] = {
+          memberUids: r ? (r.members || []).map(function(m){ return m.uid; }) : [],
+          sourceTemplateId: r ? (r.sourceTemplateId || null) : null
+        };
+      });
+      // 預設勾選：目前已經套用這份範本的「即將到來」項目，方便「同步」這個最常見用途。
+      // 已結束的項目即使套用過也不預設勾選——回頭覆蓋已經發生過的活動的名單是特例操作，
+      // 不該是預設行為，需要的話在「已結束」區塊手動勾選，或用上面「全選」一次選取
+      var now = new Date();
+      applyEventsCache.concat(applyConcertsCache).forEach(function(item){
+        var key = item.kind + ':' + item.id;
+        var isPast = item.sortDate && item.sortDate < now;
+        if (!isPast && applyRostersByTarget[key].sourceTemplateId === templateId) applySelected[key] = true;
+      });
+      renderApplyTargets();
+    } catch (err){
+      loadingEl.textContent = '讀取失敗，請關閉重新開一次（' + (err.code || err.message) + '）';
+    }
+  }
+
+  function closeApplySheet(){
+    applySheetOverlay.classList.remove('active');
+  }
+
+  document.getElementById('templateApplyBtn').addEventListener('click', function(){
+    if (editingTemplateId) openApplySheet(editingTemplateId);
+  });
+  document.getElementById('applySheetClose').addEventListener('click', closeApplySheet);
+  document.getElementById('applyCancelBtn').addEventListener('click', closeApplySheet);
+  applySheetOverlay.addEventListener('click', function(e){
+    if (e.target === applySheetOverlay) closeApplySheet();
+  });
+  document.getElementById('applyTogglePastBtn').addEventListener('click', function(){
+    document.getElementById('applyPastWrap').classList.toggle('hidden');
+  });
+  document.getElementById('applySelectAllBtn').addEventListener('click', function(){
+    applyEventsCache.concat(applyConcertsCache).forEach(function(item){
+      applySelected[item.kind + ':' + item.id] = true;
+    });
+    renderApplyTargets();
+  });
+  document.getElementById('applyClearAllBtn').addEventListener('click', function(){
+    applySelected = {};
+    renderApplyTargets();
+  });
+  document.getElementById('applyTargetsBody').addEventListener('click', function(e){
+    var btn = e.target.closest('[data-target]');
+    if (!btn) return;
+    var key = btn.getAttribute('data-target');
+    if (applySelected[key]) delete applySelected[key]; else applySelected[key] = true;
+    var checkboxEl = btn.closest('.check-row').querySelector('.checkbox');
+    var on = !!applySelected[key];
+    checkboxEl.classList.toggle('on', on);
+    checkboxEl.textContent = on ? '✓' : '';
+    updateApplyConfirmState();
+  });
+
+  applyConfirmBtn.addEventListener('click', async function(){
+    var template = templatesById[applyTemplateId];
+    if (!template) return;
+    var selectedKeys = Object.keys(applySelected).filter(function(k){ return applySelected[k]; });
+    if (selectedKeys.length === 0) return;
+    var eventKeys = selectedKeys.filter(function(k){ return k.indexOf('event:') === 0; });
+    var concertKeys = selectedKeys.filter(function(k){ return k.indexOf('concert:') === 0; });
+
+    var itemsByKey = {};
+    applyEventsCache.concat(applyConcertsCache).forEach(function(item){
+      itemsByKey[item.kind + ':' + item.id] = item;
+    });
+
+    var totalAdded = 0, totalRemoved = 0;
+    var eventLabels = [], concertLabels = [];
+    selectedKeys.forEach(function(key){
+      var current = (applyRostersByTarget[key] && applyRostersByTarget[key].memberUids) || [];
+      var diff = diffTemplateMembers(current, template.members);
+      totalAdded += diff.added;
+      totalRemoved += diff.removed;
+      var item = itemsByKey[key];
+      // 只留月/日不帶年份——確認彈窗欄位窄，年份對「即將到來/剛結束」這種短期範圍的
+      // 活動不太有辨識度，帶了反而更容易讓標題那行折成兩行
+      var dateLabel = item.sortDate ? item.sortDate.toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' }) : '日期未定';
+      var label = item.title + '（' + dateLabel + '）';
+      (item.kind === 'event' ? eventLabels : concertLabels).push(label);
+    });
+
+    var msg = MESSAGES.applyRosterTemplateBatch(template.name, eventLabels, concertLabels, totalAdded, totalRemoved);
+    if (!(await showConfirm(msg, { confirmText: '套用' }))) return;
+
+    applyConfirmBtn.disabled = true;
+    applyConfirmBtn.textContent = '套用中…';
+
+    // 只有選到音樂會才需要查成員清單/樂器備援——單純套活動應到名單不需要這些資料
+    var membersLookup = {};
+    var fallbackInstrument = null;
+    if (concertKeys.length){
+      (await ensureApprovedMembers()).forEach(function(m){ membersLookup[m.uid] = m; });
+      var instList = await ensureInstrumentsList();
+      fallbackInstrument = instList[0] ? instList[0].name : null;
+    }
+
+    var results = await Promise.allSettled(selectedKeys.map(function(key){
+      var id = key.slice(key.indexOf(':') + 1);
+      if (key.indexOf('event:') === 0){
+        return applyTemplateToEventRoster(db, id, template, currentAdminUid, applyRostersByTarget[key].existed);
+      }
+      return applyTemplateToConcertRoster(db, id, template, membersLookup, fallbackInstrument, currentAdminUid);
+    }));
+
+    var failed = results.filter(function(r){ return r.status === 'rejected'; }).length;
+    applyConfirmBtn.disabled = false;
+    applyConfirmBtn.textContent = '套用';
+    closeApplySheet();
+    // 單一項目失敗不擋其他項目繼續套用（信任幹部、不做連鎖擋下的既有原則），只在最後回報結果
+    if (failed === 0){
+      showToast('已套用到 ' + selectedKeys.length + ' 個項目');
+    } else {
+      showToast('套用完成，但有 ' + failed + ' 個項目失敗，請到個別活動/音樂會的名單調整分頁重新套用一次', 'error');
+    }
+  });
+
   requireAdminOrTeamAdmin().then(function(result){
     if (!result) return;
     currentAdminUid = result.uid;
@@ -573,7 +912,7 @@
     avatarBtn.classList.remove('skel');
     initAccountMenu(result.profile.name);
     initTeamSwitcher(result.profile);
-    initAdminNav('roster');
+    initAdminNav('roster', result.profile, activeTeam);
 
     onSnapshot(query(collection(db, 'rosterTemplates'), where('team', '==', activeTeam)), function(snap){
       templatesById = {};

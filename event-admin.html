@@ -979,6 +979,7 @@
   import { subscribeEventTypes, COLOR_THEMES, badgeStyle } from './event-types.js';
   import { subscribeRepertoire } from './repertoire.js';
   import { subscribeInstruments } from './instruments.js';
+  import { applyTemplateToEventRoster, applyTemplateToConcertRoster, diffTemplateMembers } from './roster-templates.js';
   import {
     collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot,
     serverTimestamp, Timestamp, getDoc, getDocs, query, where, setDoc
@@ -2061,34 +2062,16 @@
     });
   });
 
-  // ---------- 套用/重新套用名單範本（複製範本的 uid 清單，樂器身分預設沿用既有值，
-  // 新加入的人抓個人資料第一筆樂器；跟 eventRosters 的 applyTemplateToRoster 同一種
-  // 「整份覆蓋、showConfirm() 顯示差異」設計） ----------
-  async function applyTemplateToConcertRoster(concertId, templateId){
+  // ---------- 套用/重新套用名單範本（實際覆蓋邏輯搬進 roster-templates.js 共用，
+  // 這裡只是接上這個頁面自己的本地快取） ----------
+  async function applyTemplateToConcertRosterUI(concertId, templateId){
     var template = rosterTemplatesById[templateId];
     if (!template) return;
     await ensureApprovedMembers();
-    var existingSnap = await getDoc(doc(db, 'concertRosters', concertId));
-    var isNew = !existingSnap.exists();
-    var existingMembers = existingSnap.exists() ? (existingSnap.data().members || []) : [];
-    var existingByUid = {};
-    existingMembers.forEach(function(m){ existingByUid[m.uid] = m.instruments || []; });
-    var newMembers = template.members.map(function(uid){
-      var member = (approvedMembers || []).filter(function(m){ return m.uid === uid; })[0];
-      var instruments = existingByUid.hasOwnProperty(uid)
-        ? existingByUid[uid]
-        : ((member && member.instruments && member.instruments[0]) ? [member.instruments[0]] : (instrumentsList[0] ? [instrumentsList[0].name] : []));
-      // name/account 跟手動編輯名單同一套反正規化欄位（見 concertRosterSaveBtn 的說明）
-      return { uid: uid, instruments: instruments, name: member ? member.name : uid, account: member ? member.account : '' };
-    });
-    var payload = {
-      members: newMembers,
-      sourceTemplateId: templateId,
-      templateAppliedAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    };
-    if (isNew) payload.createdBy = currentAdminUid;
-    await setDoc(doc(db, 'concertRosters', concertId), payload, { merge: true });
+    var membersLookup = {};
+    (approvedMembers || []).forEach(function(m){ membersLookup[m.uid] = m; });
+    var fallbackInstrument = instrumentsList[0] ? instrumentsList[0].name : null;
+    var newMembers = await applyTemplateToConcertRoster(db, concertId, template, membersLookup, fallbackInstrument, currentAdminUid);
     concertRosterMembersCache[concertId] = newMembers;
     concertRosterSourceTemplateCache[concertId] = templateId;
   }
@@ -2121,17 +2104,14 @@
     if (!concertId || !template) return;
 
     var currentMembers = concertRosterMembersCache[concertId] || [];
-    var curSet = {}; currentMembers.forEach(function(m){ curSet[m.uid] = true; });
-    var newSet = {}; template.members.forEach(function(uid){ newSet[uid] = true; });
-    var added = template.members.filter(function(uid){ return !curSet[uid]; }).length;
-    var removed = currentMembers.filter(function(m){ return !newSet[m.uid]; }).length;
+    var diff = diffTemplateMembers(currentMembers.map(function(m){ return m.uid; }), template.members);
 
-    var msg = MESSAGES.applyConcertRosterTemplateDiff(template.name, added, removed);
+    var msg = MESSAGES.applyConcertRosterTemplateDiff(template.name, diff.added, diff.removed);
     if (!(await showConfirm(msg, { confirmText: '套用' }))) return;
 
     var confirmBtn = document.getElementById('concertRosterTemplateConfirmBtn');
     confirmBtn.disabled = true;
-    applyTemplateToConcertRoster(concertId, templateId).then(function(){
+    applyTemplateToConcertRosterUI(concertId, templateId).then(function(){
       document.getElementById('concertRosterTemplatePicker').classList.add('hidden');
       showConcertRosterView();
     }).catch(function(err){
@@ -2197,10 +2177,10 @@
         showInfoView();
       } else {
         // 建立活動的 sheet 存完不關閉，清空欄位、顯示成功提示，方便連續新增多筆；
-        // 有選範本的話，等新活動的 eventId 拿到後才套用（applyTemplateToRoster 失敗也不擋成功提示，
+        // 有選範本的話，等新活動的 eventId 拿到後才套用（applyTemplateToRosterUI 失敗也不擋成功提示，
         // 活動本身已經建立成功，名單套用失敗頂多之後在「名單調整」分頁重新套用一次）
         var applyPromise = selectedRosterTemplateId
-          ? applyTemplateToRoster(newEventRef.id, selectedRosterTemplateId).catch(function(err){
+          ? applyTemplateToRosterUI(newEventRef.id, selectedRosterTemplateId).catch(function(err){
               console.error('建立活動時套用名單範本失敗', err);
             })
           : Promise.resolve();
@@ -2545,19 +2525,12 @@
     updateRosterCounter();
   });
 
-  // ---------- 套用/重新套用名單範本（複製快照，不是即時參照） ----------
-  async function applyTemplateToRoster(eventId, templateId){
+  // ---------- 套用/重新套用名單範本（實際覆蓋邏輯搬進 roster-templates.js 共用，
+  // 這裡只是接上這個頁面自己的本地快取） ----------
+  async function applyTemplateToRosterUI(eventId, templateId){
     var template = rosterTemplatesById[templateId];
     if (!template) return;
-    var isNew = !rostersById[eventId];
-    var payload = {
-      members: template.members,
-      sourceTemplateId: templateId,
-      templateAppliedAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    };
-    if (isNew) payload.createdBy = currentAdminUid;
-    await setDoc(doc(db, 'eventRosters', eventId), payload, { merge: true });
+    await applyTemplateToEventRoster(db, eventId, template, currentAdminUid, !!rostersById[eventId]);
     // 保險：搶在 eventRosters 的 onSnapshot 回來前，先用剛套用的結果更新本地資料。
     // surveyOpenedAt 沿用原本快取值（套用範本不寫這個欄位，merge 不會清掉它，本地快取也不該清掉）
     rostersById[eventId] = {
@@ -2627,16 +2600,13 @@
     if (!eventId || !template) return;
 
     var currentMembers = (rostersById[eventId] && rostersById[eventId].members) || [];
-    var curSet = {}; currentMembers.forEach(function(uid){ curSet[uid] = true; });
-    var newSet = {}; template.members.forEach(function(uid){ newSet[uid] = true; });
-    var added = template.members.filter(function(uid){ return !curSet[uid]; }).length;
-    var removed = currentMembers.filter(function(uid){ return !newSet[uid]; }).length;
+    var diff = diffTemplateMembers(currentMembers, template.members);
 
-    var msg = MESSAGES.applyEventRosterTemplateDiff(template.name, added, removed);
+    var msg = MESSAGES.applyEventRosterTemplateDiff(template.name, diff.added, diff.removed);
     if (!(await showConfirm(msg, { confirmText: '套用' }))) return;
 
     rosterTemplateConfirmBtn.disabled = true;
-    applyTemplateToRoster(eventId, templateId).then(function(){
+    applyTemplateToRosterUI(eventId, templateId).then(function(){
       rosterTemplatePicker.classList.add('hidden');
       showRosterView();
     }).catch(function(err){
@@ -3599,7 +3569,7 @@
     avatarBtn.classList.remove('skel');
     initAccountMenu(result.profile.name);
     initTeamSwitcher(result.profile);
-    initAdminNav('event');
+    initAdminNav('event', result.profile, activeTeam);
 
     var canManageTypes = result.profile.role === 'owner' ||
       hasTeamPermission(result.profile, 'canManageEventTypes');

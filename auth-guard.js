@@ -281,6 +281,20 @@ export function hasTeamPermission(profile, key) {
   }));
 }
 
+// 通用：某人在「指定那一團」（不一定是操作者目前切換中的那一團）是否有某個權限旗標。
+// 跟上面 hasTeamPermission()（任一團符合就算）不同，這個要能查「特定那一團」，供
+// admin-pages.js（後台入口反灰判斷）、roles-admin.html（編輯某個成員的某個團籍分頁）共用
+export function hasTeamPermissionFor(profile, team, key) {
+  var teamData = profile && profile.teams && profile.teams[team];
+  return !!(teamData && teamData.permissions && teamData.permissions[key] === true);
+}
+
+// 通用：某人在「指定那一團」有沒有 canManageRoles（Owner 例外）。9/22 抽出來共用——原本是
+// roles-admin.html 自己的本地函式，admin-pages.js 反灰「權限管理」入口卡片也需要同一份判斷
+export function canManageRolesForTeam(profile, team) {
+  return (!!profile && profile.role === 'owner') || hasTeamPermissionFor(profile, team, 'canManageRoles');
+}
+
 // 通用小函式：這個人在「任一團」的團別身分是不是某個角色（例如 admin/conductor）。
 // 9/20 抽出來共用——原本 profile.html 的 canSeeConductorPage 等判斷式已經用同一套邏輯，
 // 但 index.html/conductor-admin.html/finance-admin.html/repertoire-admin.html/
@@ -338,7 +352,7 @@ export function hasActiveTeamRole(profile, role) {
 
 // 通用小函式：owner 一律放行；不是 owner 的話，看「目前切換中的那一團」的資料是否符合
 // predicate（沒有該團資料就一律不放行）。9/20 抽出來共用——原本 requireAdminOrConductor/
-// requireAdminOrFinanceManager/requireAdminOrTeamAdmin/requireCanManageRoles/
+// requireFinanceManager/requireAdminOrTeamAdmin/requireCanManageRoles/
 // requireSectionLeader 這 5 個函式各自重複「owner 短路 + 沒有 teamData 就擋下來」這幾行，
 // 還各自寫了兩種不同寫法（有的用 !!(teamData && ...)，有的用 if(!teamData) return false）。
 // 統一走這個函式之後，只有 predicate 那一行需要各自不同，其餘骨架只有一份，以後要調整
@@ -350,10 +364,13 @@ function ownerOrActiveTeamPredicate(profile, predicate) {
   return !!(teamData && predicate(teamData));
 }
 
-// 藏譜管理頁面（repertoire-admin.html）用：必須登入、審核通過，且「role 是 admin/owner」或
-// 「被個別授予 canManageSheetMusic 權限」（例如譜務）。刻意跟 requireAdmin() 分開——這個放寬
-// 只給這一個頁面用，不影響其餘 8 個 admin-only 後台頁面的守門邏輯
-export async function requireAdminOrSheetMusicManager() {
+// 藏譜管理頁面（repertoire-admin.html）用：必須登入、審核通過，且「role 是 owner」或「在
+// 任一團被個別授予 canManageSheetMusic 權限」（例如譜務）。9/22 修正：拿掉「role 是 admin
+// 就放行」這條——canManageSheetMusic 是獨立的權限旗標，跟 canManageRoles 對 roles-admin.html
+// 的把關同一個原則，admin 身分本身不該自動繼承這個權限，早期還沒把權限旗標拆細的時候
+// 留下的寬鬆判斷，這輪一併收緊（藏譜資料兩團共用，所以維持看「任一團」，跟 canManageRoles
+// 收緊到只看目前切換中那一團不同，理由見 TEAM_PERMISSION_DEFS 的設計說明）
+export async function requireSheetMusicManager() {
   var user = await waitForAuthUser();
   if (!user) {
     clearProfileCache();
@@ -362,8 +379,7 @@ export async function requireAdminOrSheetMusicManager() {
   }
 
   function isAllowed(p) {
-    return !!p && (p.role === "owner" || hasAnyTeamRole(p, "admin") ||
-      hasTeamPermission(p, 'canManageSheetMusic'));
+    return !!p && (p.role === "owner" || hasTeamPermission(p, 'canManageSheetMusic'));
   }
 
   var profile;
@@ -395,12 +411,13 @@ export async function requireAdminOrSheetMusicManager() {
   return { uid: user.uid, profile: profile, activeTeam: getActiveTeam(profile) };
 }
 
-// 財務管理頁面（finance-admin.html）用：必須登入、審核通過，且「role 是 owner」或「目前
-// 切換中的那一團身分是 admin，或在那一團被個別授予 canManageFinance 權限」（例如財務職位）。
-// 9/20 修正：從「任一團有身分/權限就放行」改成「目前切換中的那一團」——財務資料本來就是
-// 兩團完全獨立結算（見 financeSettings_alumni/school 各自獨立文件），校友團的財務身分
-// 不該讓人切到校內團後還能進財務後台，即使剛好也是校友團的財務管理員
-export async function requireAdminOrFinanceManager() {
+// 財務管理頁面（finance-admin.html）用：必須登入、審核通過，且「role 是 owner」或「在目前
+// 切換中的那一團被個別授予 canManageFinance 權限」（例如財務職位）。9/20 修正：從「任一團
+// 有身分/權限就放行」改成「目前切換中的那一團」——財務資料本來就是兩團完全獨立結算（見
+// financeSettings_alumni/school 各自獨立文件）。9/22 修正：再拿掉「該團 role 是 admin 就
+// 放行」這條——canManageFinance 是獨立的權限旗標，admin 身分不該自動繼承，早期還沒把權限
+// 旗標拆細時留下的寬鬆判斷，這輪收緊成跟 canManageRoles 對 roles-admin.html 同一個原則
+export async function requireFinanceManager() {
   var user = await waitForAuthUser();
   if (!user) {
     clearProfileCache();
@@ -410,7 +427,7 @@ export async function requireAdminOrFinanceManager() {
 
   function isAllowed(p) {
     return ownerOrActiveTeamPredicate(p, function (teamData) {
-      return teamData.role === "admin" || (teamData.permissions && teamData.permissions.canManageFinance === true);
+      return teamData.permissions && teamData.permissions.canManageFinance === true;
     });
   }
 

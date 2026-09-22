@@ -114,6 +114,8 @@
     padding:18px 16px; text-decoration:none; color:var(--ink);
   }
   .dash-card:active{ background:var(--sage-bg); }
+  .dash-card.disabled{ opacity:.45; pointer-events:none; }
+  .dash-card.disabled .dash-sub{ color:var(--burgundy); }
   .dash-icon{
     width:46px; height:46px; border-radius:50%; flex:none;
     display:flex; align-items:center; justify-content:center;
@@ -169,26 +171,34 @@
   import { initTeamSwitcher } from './team-switcher.js';
   import { GROUPS, PAGES } from './admin-pages.js';
 
-  document.getElementById('dashContainer').innerHTML = GROUPS.map(function(g){
-    var cardsHtml = PAGES.filter(function(p){ return p.group === g.key; }).map(function(p){
+  // profile/activeTeam 還沒拿到確定值之前（cachedProfile 沒命中），一律當作放行渲染——
+  // 這只是首次畫面的樂觀顯示，requireAdminOrTeamAdmin() 拿到伺服器端資料後一定會重繪一次
+  // 校正，不會真的漏擋任何操作（頁面本身的 requireXxx() 才是實際防線）
+  function renderDash(profile, activeTeam){
+    document.getElementById('dashContainer').innerHTML = GROUPS.map(function(g){
+      var cardsHtml = PAGES.filter(function(p){ return p.group === g.key; }).map(function(p){
+        var allowed = !profile || !p.canAccess || p.canAccess(profile, activeTeam);
+        return (
+          '<a class="dash-card' + (allowed ? '' : ' disabled') + '"' + (allowed ? ' href="' + p.href + '"' : '') + '>' +
+            '<span class="dash-icon ' + p.color + '">' +
+              '<svg width="20" height="20" viewBox="0 0 24 24" fill="none">' + p.icon + '</svg>' +
+            '</span>' +
+            '<span class="dash-body">' +
+              '<span class="dash-title">' + p.label + '</span>' +
+              '<span class="dash-sub">' + (allowed ? p.sub : (p.deniedSub || p.sub)) + '</span>' +
+            '</span>' +
+            '<svg class="dash-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+          '</a>'
+        );
+      }).join('');
       return (
-        '<a class="dash-card" href="' + p.href + '">' +
-          '<span class="dash-icon ' + p.color + '">' +
-            '<svg width="20" height="20" viewBox="0 0 24 24" fill="none">' + p.icon + '</svg>' +
-          '</span>' +
-          '<span class="dash-body">' +
-            '<span class="dash-title">' + p.label + '</span>' +
-            '<span class="dash-sub">' + p.sub + '</span>' +
-          '</span>' +
-          '<svg class="dash-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
-        '</a>'
+        '<div class="group-label"><span class="g-tw">' + g.label + '</span><span class="g-en">' + g.en + '</span><span class="group-staff"></span></div>' +
+        '<div class="dash-grid">' + cardsHtml + '</div>'
       );
     }).join('');
-    return (
-      '<div class="group-label"><span class="g-tw">' + g.label + '</span><span class="g-en">' + g.en + '</span><span class="group-staff"></span></div>' +
-      '<div class="dash-grid">' + cardsHtml + '</div>'
-    );
-  }).join('');
+  }
+
+  renderDash(null, null);
 
   var cachedProfile = peekCachedProfile();
   if (cachedProfile && cachedProfile.name){
@@ -205,6 +215,7 @@
     avatarBtn.classList.remove('skel');
     initAccountMenu(result.profile.name);
     initTeamSwitcher(result.profile);
+    renderDash(result.profile, result.activeTeam);
   });
 </script>
 </body>

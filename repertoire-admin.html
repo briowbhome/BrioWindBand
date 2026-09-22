@@ -636,7 +636,7 @@
   import { showToast } from './toast.js';
   import { showConfirm } from './dialog.js';
   import { MESSAGES } from './messages.js';
-  import { requireAdminOrSheetMusicManager, peekCachedProfile, hasActiveTeamRole } from './auth-guard.js';
+  import { requireSheetMusicManager, peekCachedProfile, hasActiveTeamRole } from './auth-guard.js';
   import { db, storage } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
@@ -2231,7 +2231,7 @@
     });
   });
 
-  requireAdminOrSheetMusicManager().then(function(result){
+  requireSheetMusicManager().then(function(result){
     if (!result) return;
     currentAdminUid = result.uid;
 
@@ -2249,7 +2249,7 @@
     initTeamSwitcher(result.profile);
     if (isAdmin) {
       document.getElementById('adminNavBtn').classList.remove('hidden');
-      initAdminNav('repertoire');
+      initAdminNav('repertoire', result.profile, result.activeTeam);
     } else {
       var backBtn = document.getElementById('backBtn');
       backBtn.setAttribute('href', 'index.html');

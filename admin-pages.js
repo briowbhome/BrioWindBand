@@ -1,6 +1,15 @@
 // 後台頁面清單，admin-index.html（首頁分區卡片）跟 admin-nav.js（側滑分區抽屜）共用同一份，
 // 只是各自渲染成不同的視覺（卡片 vs 文字列表）。之後要調整分組、順序或新增頁面，只要改這裡，
 // 兩邊會自動跟著變，不用再手動同步兩份清單。
+//
+// 9/22 新增 canAccess：兩邊入口本來無條件全部顯示，但部分頁面實際的門檻（auth-guard.js 的
+// requireXxx()）比「該團 admin」更嚴格（例如權限管理要 canManageRoles、財務管理要
+// canManageFinance、藏譜管理要 canManageSheetMusic），沒有額外判斷的話，一般幹部會看到
+// 卡片、點進去卻被彈回首頁。canAccess(profile, activeTeam) 要跟對應頁面自己的 requireXxx()
+// 邏輯保持一致——沒有掛這個欄位的頁面預設一律放行（門檻不比 admin-index 自己的
+// requireAdminOrTeamAdmin() 更嚴格，不會有這個問題）。
+import { canManageRolesForTeam, hasTeamPermissionFor, hasTeamPermission } from './auth-guard.js';
+
 export const GROUPS = [
   { key: 'members', label: '成員管理', en: 'Members' },
   { key: 'operations', label: '團務相關', en: 'Operations' },
@@ -21,7 +30,9 @@ export const PAGES = [
   {
     key: 'roles', group: 'members', href: 'roles-admin.html', color: 'plum',
     label: '權限管理', sub: '調整成員角色、權限、樂器清單',
-    icon: '<path d="M12 2l7 3v6c0 4.8-3 8.6-7 11-4-2.4-7-6.2-7-11V5l7-3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'
+    icon: '<path d="M12 2l7 3v6c0 4.8-3 8.6-7 11-4-2.4-7-6.2-7-11V5l7-3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
+    deniedSub: '需要角色管理權限',
+    canAccess: function (profile, activeTeam) { return canManageRolesForTeam(profile, activeTeam); }
   },
   {
     key: 'event', group: 'operations', href: 'event-admin.html', color: 'brass',
@@ -36,12 +47,16 @@ export const PAGES = [
   {
     key: 'repertoire', group: 'operations', href: 'repertoire-admin.html', color: 'teal',
     label: '藏譜管理', sub: '建立與編輯曲目資料',
-    icon: '<path d="M9 18V5l11-2v13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" stroke="currentColor" stroke-width="1.6"/><circle cx="17" cy="16" r="3" stroke="currentColor" stroke-width="1.6"/>'
+    icon: '<path d="M9 18V5l11-2v13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" stroke="currentColor" stroke-width="1.6"/><circle cx="17" cy="16" r="3" stroke="currentColor" stroke-width="1.6"/>',
+    deniedSub: '需要藏譜管理權限',
+    canAccess: function (profile, activeTeam) { return !!(profile && profile.role === 'owner') || hasTeamPermission(profile, 'canManageSheetMusic'); }
   },
   {
     key: 'finance', group: 'operations', href: 'finance-admin.html', color: 'brass',
     label: '財務管理', sub: '記帳本與團費繳費追蹤',
-    icon: '<circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v10M15 9h-4.5a1.5 1.5 0 0 0 0 3h3a1.5 1.5 0 0 1 0 3h-4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'
+    icon: '<circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v10M15 9h-4.5a1.5 1.5 0 0 0 0 3h3a1.5 1.5 0 0 1 0 3h-4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
+    deniedSub: '需要財務管理權限',
+    canAccess: function (profile, activeTeam) { return !!(profile && profile.role === 'owner') || hasTeamPermissionFor(profile, activeTeam, 'canManageFinance'); }
   },
   {
     key: 'announce', group: 'more', href: 'announce-admin.html', color: 'navy',

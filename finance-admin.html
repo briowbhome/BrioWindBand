@@ -477,7 +477,7 @@
   import { showToast } from './toast.js';
   import { showConfirm } from './dialog.js';
   import { MESSAGES } from './messages.js';
-  import { requireAdminOrFinanceManager, peekCachedProfile, hasActiveTeamRole } from './auth-guard.js';
+  import { requireFinanceManager, peekCachedProfile, hasActiveTeamRole } from './auth-guard.js';
   import { db } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
@@ -1363,7 +1363,7 @@
     avatarBtnEarly.textContent = cachedProfile.name.charAt(0);
   }
 
-  requireAdminOrFinanceManager().then(function (result) {
+  requireFinanceManager().then(function (result) {
     if (!result) return;
     currentAdminUid = result.uid;
     activeTeam = result.activeTeam;
@@ -1379,7 +1379,7 @@
     initTeamSwitcher(result.profile);
     if (isAdmin) {
       document.getElementById('adminNavBtn').classList.remove('hidden');
-      initAdminNav('finance');
+      initAdminNav('finance', result.profile, result.activeTeam);
     } else {
       var backBtn = document.getElementById('backBtn');
       backBtn.setAttribute('href', 'index.html');

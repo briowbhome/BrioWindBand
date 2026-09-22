@@ -3070,11 +3070,18 @@
       }, function(err){ console.error('users 監聽失敗', err); });
 
       // 團員審核待辦：只有 admin-tier（含團別版）訂閱，conductor 沒有審核權限、不會看到
-      // 這項，firestore.rules 對 users collection 的 list 現在是 isAdminTierFor(team)，
-      // 這裡的角色判斷只是避免非 admin-tier 白打一次一定會被拒絕的查詢
+      // 這項。9/22 修正：firestore.rules 的 users list 規則收緊成依團別範圍後，查詢也要
+      // 跟著限定「自己管得到的團」，不然單一團的管理員這裡會被整批拒絕（不是靜默篩掉）——
+      // 這同時修正了一個既有的計數失準：原本沒篩選時，單一團管理員的紅點數字會把自己
+      // 完全管不到的另一團待審核人數也算進去，跟 review-admin.html 清單看到的範圍對不上
       if (viewerProfile.role === 'owner' || hasAnyTeamRole(viewerProfile, 'admin')){
+        var pendingReviewTeams = viewerProfile.role === 'owner'
+          ? ['alumni', 'school']
+          : Object.keys(viewerProfile.teams || {}).filter(function(team){
+              return viewerProfile.teams[team] && viewerProfile.teams[team].role === 'admin';
+            });
         cachedThenFresh('brio_cache_pendingReviewCount_' + viewerUid, function(){
-          return getDocs(query(collection(db, 'users'), where('status', '==', 'pending'))).then(function(snap){
+          return getDocs(query(collection(db, 'users'), where('status', '==', 'pending'), where('teamIds', 'array-contains-any', pendingReviewTeams))).then(function(snap){
             return snap.size;
           });
         }, function(count){

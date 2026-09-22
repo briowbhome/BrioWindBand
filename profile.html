@@ -1219,8 +1219,16 @@
       !!(myActiveTeamData && Array.isArray(myActiveTeamData.sectionLeaderFor) && myActiveTeamData.sectionLeaderFor.length > 0);
 
     if (isAdmin){
+      // 9/22 修正：firestore.rules 的 users list 規則收緊成依團別範圍後，查詢要跟著限定
+      // 「自己管得到的團」，不然單一團管理員會被整批拒絕；同時修正紅點數字把管不到的
+      // 另一團待審核人數也算進去的既有計數失準，見 index.html 同一處的說明
+      var pendingReviewTeams = profile.role === 'owner'
+        ? ['alumni', 'school']
+        : Object.keys(profile.teams || {}).filter(function(team){
+            return profile.teams[team] && profile.teams[team].role === 'admin';
+          });
       cachedThenFresh('brio_cache_pendingReviewCount_' + result.uid, function(){
-        return getDocs(query(collection(db, 'users'), where('status', '==', 'pending'))).then(function(snap){
+        return getDocs(query(collection(db, 'users'), where('status', '==', 'pending'), where('teamIds', 'array-contains-any', pendingReviewTeams))).then(function(snap){
           return snap.size;
         });
       }, function(count){

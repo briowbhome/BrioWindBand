@@ -635,7 +635,7 @@
     avatarBtn.classList.remove('skel');
     initAccountMenu(result.profile.name);
     initTeamSwitcher(result.profile);
-    initAdminNav('announce');
+    initAdminNav('announce', result.profile, activeTeam);
 
     // 9/19 追加修正：「更新」分類公告（App 軟體版本異動）跟團別無關，不管目前切到哪一團
     // 都要能在後台看到並管理，用 or() 讓它不受 activeTeam 過濾

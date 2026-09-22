@@ -48,13 +48,16 @@ function ensureStyle() {
     '.admin-nav-item:not(.current):active{background:rgba(32,36,47,.06);}' +
     '.admin-nav-item .ani{width:18px;height:18px;flex:none;color:var(--ink-soft);}' +
     '.admin-nav-item.current{background:var(--sage-bg);color:var(--sage);font-weight:700;}' +
-    '.admin-nav-item.current .ani{color:var(--sage);}';
+    '.admin-nav-item.current .ani{color:var(--sage);}' +
+    '.admin-nav-item.disabled{opacity:.4;pointer-events:none;}';
   document.head.appendChild(style);
 }
 
 // 掛在 appbar 返回箭頭左側的漢堡按鈕上（頁面 HTML 要先放一顆 id="adminNavBtn" 的按鈕）。
-// currentKey 對應 admin-pages.js 裡 PAGES 清單的 key，用來把目前頁面那一項標示成不可點的「current」樣式
-export function initAdminNav(currentKey) {
+// currentKey 對應 admin-pages.js 裡 PAGES 清單的 key，用來把目前頁面那一項標示成不可點的「current」樣式。
+// 9/22 新增 profile/activeTeam（選填）：沒有額外門檻的項目一律放行，跟 admin-index.html
+// 首頁卡片同一套 canAccess 判斷，避免抽屜裡看得到某項但點進去被 requireXxx() 彈回首頁
+export function initAdminNav(currentKey, profile, activeTeam) {
   var trigger = document.getElementById('adminNavBtn');
   if (!trigger) return;
 
@@ -71,9 +74,10 @@ export function initAdminNav(currentKey) {
     GROUPS.map(function (g) {
       var itemsHtml = PAGES.filter(function (p) { return p.group === g.key; }).map(function (p) {
         var isCurrent = p.key === currentKey;
+        var allowed = isCurrent || !profile || !p.canAccess || p.canAccess(profile, activeTeam);
         return (
-          '<a class="admin-nav-item' + (isCurrent ? ' current' : '') + '"' +
-            (isCurrent ? '' : ' href="' + p.href + '"') + '>' +
+          '<a class="admin-nav-item' + (isCurrent ? ' current' : '') + (allowed ? '' : ' disabled') + '"' +
+            (isCurrent || !allowed ? '' : ' href="' + p.href + '"') + '>' +
             '<svg class="ani" viewBox="0 0 24 24" fill="none">' + p.icon + '</svg>' +
             p.label +
           '</a>'

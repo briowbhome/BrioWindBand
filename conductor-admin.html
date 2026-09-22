@@ -424,7 +424,9 @@
     concertInstrumentsByUid = await ensureConcertRosterInstruments(concertId);
 
     if (rosterMembers && rosterMembers.length > 0){
-      var usersSnap = await getDocs(query(collection(db, 'users'), where('status', '==', 'approved')));
+      // 9/22 補上：firestore.rules 的 users list 規則收緊成依團別範圍後，沒有這個篩選的查詢
+      // 會被整批拒絕（不是靜默篩掉），不只是多讀不必要的資料而已
+      var usersSnap = await getDocs(query(collection(db, 'users'), where('status', '==', 'approved'), where('teamIds', 'array-contains', activeTeam)));
       membersInstrumentsByUid = {};
       membersNameByUid = {};
       usersSnap.forEach(function(docSnap){
@@ -1009,7 +1011,7 @@
     // 導覽選單沒有意義，只有 admin-tier 才顯示漢堡圖示、掛上 initAdminNav()
     if (isAdmin) {
       document.getElementById('adminNavBtn').classList.remove('hidden');
-      initAdminNav('conductor');
+      initAdminNav('conductor', result.profile, result.activeTeam);
     }
 
     // 這兩個請求跟 eventTypes 監聽無關，身分驗證一通過就直接發出去，不用等 eventTypes

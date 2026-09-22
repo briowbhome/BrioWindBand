@@ -461,7 +461,9 @@
       instrumentsList = instSnap.exists() ? (instSnap.data().list || []) : [];
     }
     if (!membersInstrumentsByUid){
-      var usersSnap = await getDocs(query(collection(db, 'users'), where('status', '==', 'approved')));
+      // 9/22 補上：firestore.rules 的 users list 規則收緊成依團別範圍後，沒有這個篩選的查詢
+      // 會被整批拒絕（不是靜默篩掉），不只是多讀不必要的資料而已
+      var usersSnap = await getDocs(query(collection(db, 'users'), where('status', '==', 'approved'), where('teamIds', 'array-contains', activeTeam)));
       membersInstrumentsByUid = {};
       usersSnap.forEach(function(docSnap){
         var data = docSnap.data();

@@ -171,8 +171,19 @@ service cloud.firestore {
       // 幹部/指揮依團別讀取／列出所有團員資料。9/19 收尾計畫：拿掉了原本並存的全域
       // isAdminTier()/isConductor() fallback——查證過現有 7 個既有幹部/指揮/Owner 帳號
       // 的團別版角色都跟全域值一致，這條規則已經完整涵蓋
-      allow get, list: if isAdminTierFor('alumni') || isAdminTierFor('school')
-        || isConductorFor('alumni') || isConductorFor('school');
+      //
+      // 9/22 收緊：原本「任一團 admin/指揮都能讀取全部 users」的範圍比對應的寫入規則
+      // （看「目標所屬團」）寬——任一團的幹部技術上能讀到完全不相干的另一團申請人/團員
+      // 原始資料（動不了，只是讀得到）。使用者確認後收緊成跟寫入規則同一個原則：只放行
+      // 「目標所屬的那個團」自己有 admin/conductor 身分的人。雙團籍目標（teamIds 不只
+      // 一個值）只要其中一團符合就放行，寫法比照上面 128-131 行既有的「依 teamIds 逐一
+      // 比對」模式——不能直接比照 121 行用 teamIds[0]，那個寫法的安全前提是「這個時候
+      // teamIds 保證只有一個值」（見該行註解），這裡不成立。收緊前先做過一輪全站排查，
+      // 確認所有查 users collection 的地方都已經依 teamIds 篩選成請求者自己管得到的範圍，
+      // 不會有查詢因為這條規則收緊而被整批拒絕，細節見 schema.md「9/22」章節
+      allow get, list: if
+        (resource.data.teamIds.hasAny(['alumni']) && (isAdminTierFor('alumni') || isConductorFor('alumni'))) ||
+        (resource.data.teamIds.hasAny(['school']) && (isAdminTierFor('school') || isConductorFor('school')));
 
       // 註冊：只能建立「自己」的文件，狀態一定要 pending，且 teamIds 剛好一個值、teams
       // 底下只能有這一個團的鍵、那個團的內容只能有 role 且必須是 member——不能連帶塞入
