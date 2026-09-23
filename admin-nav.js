@@ -49,7 +49,15 @@ function ensureStyle() {
     '.admin-nav-item .ani{width:18px;height:18px;flex:none;color:var(--ink-soft);}' +
     '.admin-nav-item.current{background:var(--sage-bg);color:var(--sage);font-weight:700;}' +
     '.admin-nav-item.current .ani{color:var(--sage);}' +
-    '.admin-nav-item.disabled{opacity:.4;pointer-events:none;}';
+    '.admin-nav-item.disabled{opacity:.4;pointer-events:none;}' +
+    // 9/23 新增：電腦版排版（手動開關，見 repertoire-admin.html 的 body.layout-desktop）
+    // 下側欄常駐顯示，不是點了才滑出的覆蓋式抽屜——不需要背景遮罩、也不需要 show 這個
+    // class 才顯示，這裡的選擇器故意比 .show 更高優先權（body+兩個 class），保證電腦版
+    // 下一律強制常駐，不受使用者有沒有點過漢堡按鈕影響。這輪刻意不做收合，之後哪個頁面
+    // 要接上電腦版排版，只要一樣切 body.layout-desktop 就能直接沿用這份共用樣式，
+    // 不用每頁各自重做一次側欄
+    'body.layout-desktop .admin-nav-overlay{display:none;}' +
+    'body.layout-desktop .admin-nav-drawer{transform:none;box-shadow:none;border-right:1px solid var(--line);}';
   document.head.appendChild(style);
 }
 

@@ -44,7 +44,6 @@
     position:relative;
     display:flex;
     flex-direction:column;
-    padding-top: env(safe-area-inset-top);
   }
 
   .hidden{ display:none !important; }
@@ -58,7 +57,17 @@
   }
   .rp-skel-lines{ flex:1; display:flex; flex-direction:column; gap:7px; padding-top:2px; }
 
-  .appbar{ display:flex; align-items:center; gap:12px; padding:18px 20px 14px; }
+  /* 9/23 新增：appBar 鎖定在頂部，往下滑動內容時不會跟著移出畫面。safe-area 的
+     padding-top 原本放在 .app 身上（只影響第一次進頁面、還沒捲動時的起始位置），
+     改搬到這裡——sticky 元素往上貼齊時是貼齊它自己的 top 值，不是父層的 padding，
+     搬過來才能讓瀏海/動態島那段空間在捲動後也維持正確留白，不會被吃掉。z-index 故意
+     訂在 admin-nav.js 的抽屜/遮罩（90/91）跟 sheet-overlay（80）之下，手機版點開側滑
+     選單或任何 sheet 時還是要蓋過 appBar，只需要高過一般內容 */
+  .appbar{
+    display:flex; align-items:center; gap:12px; padding:18px 20px 14px;
+    padding-top: calc(18px + env(safe-area-inset-top));
+    position:sticky; top:0; z-index:40; background:var(--paper);
+  }
   /* 這頁的漢堡按鈕有 .hidden 擋著、理論上等身分驗證完成後跟 initAdminNav() 同一輪同步
      JS 一起執行，不會有 flash，但為了跟其他 admin-nav 頁面一致（那些頁面沒有 .hidden、
      初次繪製就會露出這顆按鈕，需要這份樣式先擋著避免看到瀏覽器原生方框），這裡也補上
@@ -108,6 +117,19 @@
     border-radius:999px; padding:6px 14px; font-size:11.5px; font-weight:700; cursor:pointer;
   }
   .add-btn:active{ background:var(--sage-bg); }
+
+  .rp-filter-bar{ display:flex; gap:10px; margin:0 20px 12px; }
+  .rp-filter-bar .search-row{ flex:1; margin:0; position:relative; }
+  .rp-filter-bar .search-row input{
+    width:100%; border:1px solid var(--line); background:var(--paper-raised);
+    border-radius:999px; padding:10px 14px 10px 38px; font-size:13px; color:var(--ink);
+  }
+  .rp-filter-bar .search-row input::placeholder{ color:#B4AD97; }
+  .rp-filter-bar .search-row svg{ position:absolute; left:13px; top:50%; transform:translateY(-50%); opacity:.5; }
+  .rp-filter-bar select{
+    flex:none; max-width:132px; border:1px solid var(--line); background:var(--paper-raised);
+    border-radius:999px; padding:10px 14px; font-size:12.5px; color:var(--ink); cursor:pointer;
+  }
 
   .list{
     margin:0 20px 24px;
@@ -244,6 +266,9 @@
   .parts-header{ display:flex; align-items:center; justify-content:space-between; margin:16px 0 8px; }
   .parts-header .survey-section-label{ margin:0; }
   .parts-header-actions{ display:flex; align-items:center; gap:8px; }
+  /* 電腦版右側常駐欄的小標題——手機版這排操作是跟「分部欄位」同一列的按鈕，
+     不需要另外的標題文字，預設隱藏，只在電腦版把整組搬到右側欄位時才顯示 */
+  .rp-rail-label{ display:none; }
 
   .batch-map-row{ display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid var(--line); }
   .batch-map-remove{
@@ -410,12 +435,34 @@
 
   /* ---------- 電腦版排版（手動切換，不依螢幕寬度自動判斷）----------
      這輪只做藏譜管理試點：左欄曲目清單、右欄詳情，右欄預設空狀態，點了曲目才顯示內容。
-     刻意不用 media query——這是使用者手動開關的正式功能，不是純粹依視窗寬度的 RWD */
-  body.layout-desktop .app{ max-width:960px; }
-  body.layout-desktop .rp-layout{ display:flex; align-items:stretch; gap:0; }
+     刻意不用 media query——這是使用者手動開關的正式功能，不是純粹依視窗寬度的 RWD。
+     9/23 修正：原本 .app 沿用跟手機版一樣的「置中固定寬度」容器模式（只是把 460px
+     改成 960px），超寬螢幕下左右會留很大一片空白，使用者反映不合理。改成內容區完全
+     滿版：拿掉 max-width，改用 padding-left 讓出 admin-nav.js 常駐側欄（264px 寬，見
+     該檔案 9/23 新增的 body.layout-desktop 樣式）的位置——用 padding 不是 margin，
+     是刻意搭配全站共用的 *{box-sizing:border-box}，讓 .app 原本就有的 width:100% 把
+     這段 padding 算在 100% 之內，不會多出 264px 撐出水平捲軸。
+     9/23 再修正：原本清單用 max-height:calc(100vh - 200px) 這種憑印象猜的數字卡高度，
+     清單一多估計值不夠，會撐開整個頁面出現頁面捲軸，而不是清單自己捲動。改成「上方
+     固定高度區塊 + 下方區塊用剩餘所有高度」的 flex 版面：.app 改成 height（不是
+     min-height）+ overflow:hidden，不讓整頁本身出現捲軸；appBar/標題/搜尋列這幾個
+     不會變長的區塊 flex:none 固定住；.rp-layout 用 flex:1; min-height:0 填滿剩餘高度，
+     裡面的曲目清單、詳情面板的分部清單各自 overflow-y:auto 自己捲，互不影響 */
+  body.layout-desktop{ padding-bottom:0; } /* 這頁沒有底部分頁列，48px 底部留白是團員端頁面樣式殘留，電腦版順手拿掉 */
+  body.layout-desktop .app{
+    max-width:none; padding-left:264px;
+    height:100vh; height:100dvh; overflow:hidden;
+  }
+  body.layout-desktop .admin-nav-btn{ display:none; } /* 側欄常駐顯示，不需要再切換 */
+  body.layout-desktop .appbar,
+  body.layout-desktop .staff,
+  body.layout-desktop .section-label,
+  body.layout-desktop .lede,
+  body.layout-desktop .rp-filter-bar{ flex:none; }
+  body.layout-desktop .rp-layout{ display:flex; align-items:stretch; gap:0; flex:1; min-height:0; overflow:hidden; }
   body.layout-desktop .list{
     width:300px; flex:none; margin:0; border-radius:0; border:none; border-right:1px solid var(--line);
-    box-shadow:none; max-height:calc(100vh - 200px); overflow-y:auto;
+    box-shadow:none; height:100%; overflow-y:auto;
   }
   body.layout-desktop .rp-detail-empty.show{
     flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -427,8 +474,86 @@
   body.layout-desktop #pieceSheetOverlay.active{ display:flex; }
   body.layout-desktop #pieceSheetOverlay .sheet{
     width:100%; max-width:none; max-height:none; border-radius:0; box-shadow:none; border-left:1px solid var(--line);
+    height:100%;
   }
   body.layout-desktop #pieceSheetOverlay .sheet-handle{ display:none; }
+
+  /* ---------- 詳情面板內部（9/23 新增）：標題/曲名/作曲家這些不會變長的內容固定，
+     分部清單自己捲動，「新增分部」「樂譜操作」這類一次性動作搬到右側常駐欄，
+     不佔垂直空間。用 CSS Grid 命名區域＋display:contents 讓 .parts-header／
+     .field（分部欄位那組）「消失」成透明容器，把它們原本包住的子元素（標籤/操作按鈕）
+     直接暴露成 grid 的子項目分別擺放，不用真的搬動 DOM、手機版排版完全不受影響 ---------- */
+  body.layout-desktop .sheet-body{
+    display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden; padding:0;
+  }
+  body.layout-desktop #pieceViewMode,
+  body.layout-desktop #pieceEditForm{
+    flex:1; min-height:0; display:grid; grid-template-columns:1fr 260px;
+  }
+  /* 9/23 三度調整：上一版把編輯/刪除拆成兩顆各自獨立的格子項目，疊成直排，但這樣會
+     連帶把按鈕自己原本的 pill 樣式（.info-edit-btn／.part-sheet-btn 都是
+     border-radius:999px、內容多寬就多寬）硬套 width:100% 撐成長條，形狀跑掉；
+     同一條規則還順手覆寫了按鈕自己的 background，把它們原本的顏色也改掉了。
+     改回「兩顆按鈕各自留在原本的容器裡，容器整個當成一個格子項目」——
+     .info-edit-row 本來就是 display:flex;gap:8px 的橫排容器（編輯/刪除本來就會自動
+     並排），不用拆開，只要整個容器塞進右欄自己的一列就好，按鈕維持原本的樣式/顏色，
+     只有容器的邊框/背景/間距是電腦版才加的。.parts-header-actions 同理，裡面的
+     「樂譜操作」標籤＋兩顆上傳按鈕維持直排（flex-direction:column），但一樣是「整個
+     容器」佔一列，不拆成個別項目。左欄的 #pieceViewParts 橫跨這兩列＋最後的彈性列，
+     高度還是對齊右欄疊起來的總高度，不會有標籤下方留白的問題 */
+  body.layout-desktop #pieceViewMode{
+    grid-template-columns:1fr 260px;
+    grid-template-rows:auto auto auto auto auto 1fr;
+  }
+  body.layout-desktop #pieceViewMode > .info-row{ grid-column:1/3; grid-row:1; margin:0; padding:14px 24px; }
+  body.layout-desktop #pieceViewMode > #fullScoreViewRow:not(:empty){ grid-column:1/3; grid-row:2; padding:0 24px 10px; }
+  body.layout-desktop #pieceViewMode > .parts-header{ display:contents; }
+  body.layout-desktop #pieceViewMode > .parts-header > .survey-section-label{ grid-column:1/2; grid-row:3; padding:14px 24px 8px; }
+  body.layout-desktop #pieceViewMode > .parts-header > .parts-header-actions{
+    grid-column:2/3; grid-row:4; display:flex; flex-direction:column; gap:8px; align-items:stretch;
+    margin:0; padding:16px 20px 10px; border-left:1px solid var(--line); background:var(--paper-raised);
+  }
+  /* 上傳按鈕原本是 inline-block 的 pill，靠 align-items:stretch 讓它們撐滿容器寬度，
+     跟下面編輯/刪除兩顆並排按鈕的總寬度對齊——只調寬度，不碰按鈕自己的顏色/圓角，
+     不會重演上次寬度/底色一起被覆寫跑版的問題 */
+  body.layout-desktop #pieceViewMode > .parts-header > .parts-header-actions > .part-sheet-btn{
+    width:100%; box-sizing:border-box; text-align:center;
+  }
+  body.layout-desktop #pieceViewMode > .info-edit-row{
+    grid-column:2/3; grid-row:5; align-items:center;
+    margin:0; padding:10px 20px 18px; border-left:1px solid var(--line); background:var(--paper-raised);
+  }
+  body.layout-desktop #pieceViewMode > #pieceViewParts{ grid-column:1/2; grid-row:4/7; min-height:0; overflow-y:auto; padding:0 24px 18px; }
+
+  body.layout-desktop #pieceEditForm{
+    grid-template-rows:auto auto auto 1fr auto;
+    grid-template-areas:
+      "title     composer"
+      "error     error"
+      "partlabel partlabel"
+      "main      rail"
+      "extra     rail";
+  }
+  body.layout-desktop #pieceEditForm > #pieceTitleField{ grid-area:title; margin:0; padding:16px 12px 16px 24px; }
+  body.layout-desktop #pieceEditForm > #pieceComposerField{ grid-area:composer; margin:0; padding:16px 24px 16px 12px; }
+  body.layout-desktop #pieceEditForm > #piecePartsField{ display:contents; }
+  body.layout-desktop #pieceEditForm > #piecePartsField > label{ grid-area:partlabel; padding:8px 24px; margin:0; }
+  body.layout-desktop #pieceEditForm > #piecePartsField > #partGroups{ grid-area:main; min-height:0; overflow-y:auto; padding:0 24px 12px; }
+  body.layout-desktop #pieceEditForm > #piecePartsField > .part-add-row{
+    grid-area:rail; display:flex; flex-direction:column; gap:10px; align-items:stretch;
+    padding:18px 20px; margin:0; border-left:1px solid var(--line); background:var(--paper-raised);
+  }
+  /* select/input/button 原本是橫排時用 flex:1 平分寬度，直排之後要改成 flex:none，
+     不然會在這個很高的側欄裡被平分垂直空間，變成三顆等高的怪異長條 */
+  body.layout-desktop #pieceEditForm > #piecePartsField > .part-add-row select,
+  body.layout-desktop #pieceEditForm > #piecePartsField > .part-add-row input,
+  body.layout-desktop #pieceEditForm > #piecePartsField > .part-add-row .part-add-btn{ flex:none; }
+  body.layout-desktop #pieceEditForm > #createSheetMusicField{ grid-area:extra; margin:0; padding:12px 24px; }
+  body.layout-desktop #pieceEditForm > #pieceFormError{ grid-area:error; margin:0 24px; }
+  /* 取消／儲存變更維持在 .sheet-footer（跟全站其他頁面一致，選項 A），
+     這個區塊在 .sheet-body 之外，不受上面的 grid 影響，不用額外處理 */
+
+  body.layout-desktop .rp-rail-label{ display:block; }
 </style>
 </head>
 <body>
@@ -465,6 +590,16 @@
   </div>
   <p class="lede">藏譜資料庫，可以直接在這裡設定曲目與分部資訊。</p>
 
+  <div class="rp-filter-bar" id="rpFilterBar">
+    <div class="search-row">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#4A4F5C" stroke-width="1.8"/><path d="M20 20l-3.5-3.5" stroke="#4A4F5C" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <input type="text" id="pieceSearchInput" placeholder="搜尋曲名或作曲/編曲者">
+    </div>
+    <select id="pieceInstrumentFilter" aria-label="依樂器篩選">
+      <option value="">全部樂器</option>
+    </select>
+  </div>
+
   <div class="rp-layout" id="rpLayout">
     <div class="list" id="pieceList"></div>
     <div class="rp-detail-empty show" id="pieceDetailEmpty">
@@ -485,6 +620,7 @@
         <div class="parts-header">
           <span class="survey-section-label">分部欄位</span>
           <div class="parts-header-actions">
+            <div class="rp-rail-label">樂譜操作</div>
             <button type="button" class="part-sheet-btn batch" id="batchUploadBtn">上傳多個樂譜</button>
             <button type="button" class="part-sheet-btn batch split-upload-btn" id="splitUploadBtn">分割檔案上傳</button>
           </div>
@@ -496,18 +632,19 @@
         </div>
       </div>
       <div id="pieceEditForm">
-        <div class="field">
+        <div class="field" id="pieceTitleField">
           <label>曲名</label>
           <input type="text" id="pieceTitle" placeholder="例如：星際大戰組曲" required>
         </div>
-        <div class="field">
+        <div class="field" id="pieceComposerField">
           <label>作曲/編曲者（選填）</label>
           <input type="text" id="pieceComposer" placeholder="例如：John Williams">
         </div>
-        <div class="field">
+        <div class="field" id="piecePartsField">
           <label>分部欄位</label>
           <div id="partGroups"></div>
           <div class="part-add-row">
+            <div class="rp-rail-label">新增分部</div>
             <select id="partInstrumentSelect"></select>
             <input type="text" id="partLabelInput" placeholder="例如：單簧管 1st">
             <button type="button" class="part-add-btn" id="partAddBtn">＋ 新增</button>
@@ -703,6 +840,8 @@
   var piecesById = {};
   var piecesList = [];
   var piecesLoaded = false;
+  var pieceSearchQuery = '';
+  var pieceInstrumentFilterValue = '';
   var editingPieceId = null; // null = 新增模式
   var draftParts = []; // [{partId, instrumentName, label}]，編輯中的分部欄位草稿
   var instrumentsList = [];
@@ -938,13 +1077,31 @@
     pieceList.innerHTML = '<div class="empty">讀取失敗，請重新整理再試一次</div>';
   }
 
+  // 搜尋比對曲名/作曲編曲者，樂器篩選比對分部欄位裡有沒有這個樂器——兩個條件都是 AND，
+  // 同時輸入關鍵字又選樂器時要兩者都符合才列出
+  function matchesPieceFilters(p){
+    if (pieceInstrumentFilterValue && !(p.parts || []).some(function(part){ return part.instrumentName === pieceInstrumentFilterValue; })){
+      return false;
+    }
+    if (pieceSearchQuery){
+      var haystack = ((p.title || '') + ' ' + (p.composer || '')).toLowerCase();
+      if (haystack.indexOf(pieceSearchQuery) === -1) return false;
+    }
+    return true;
+  }
+
   function renderPieceList(){
     if (!piecesLoaded) return;
     if (piecesList.length === 0){
       pieceList.innerHTML = '<div class="empty">目前還沒有任何曲目</div>';
       return;
     }
-    pieceList.innerHTML = piecesList.map(function(p){
+    var filtered = piecesList.filter(matchesPieceFilters);
+    if (filtered.length === 0){
+      pieceList.innerHTML = '<div class="empty">找不到符合搜尋/篩選條件的曲目</div>';
+      return;
+    }
+    pieceList.innerHTML = filtered.map(function(p){
       return (
         '<div class="rp-item">' +
           '<button type="button" class="rp-open" data-open-piece="' + p.id + '">' +
@@ -955,6 +1112,26 @@
       );
     }).join('');
   }
+
+  function renderPieceInstrumentFilterOptions(){
+    var select = document.getElementById('pieceInstrumentFilter');
+    var current = select.value;
+    select.innerHTML = '<option value="">全部樂器</option>' + instrumentsList.map(function(inst){
+      return '<option value="' + escapeHtml(inst.name) + '">' + escapeHtml(inst.name) + '</option>';
+    }).join('');
+    if (current && instrumentsList.some(function(i){ return i.name === current; })){
+      select.value = current;
+    }
+  }
+
+  document.getElementById('pieceSearchInput').addEventListener('input', function(e){
+    pieceSearchQuery = e.target.value.trim().toLowerCase();
+    renderPieceList();
+  });
+  document.getElementById('pieceInstrumentFilter').addEventListener('change', function(e){
+    pieceInstrumentFilterValue = e.target.value;
+    renderPieceList();
+  });
 
   function showFormError(message){
     var el = document.getElementById('pieceFormError');
@@ -2270,6 +2447,8 @@
     subscribeInstruments(db, function(list){
       instrumentsList = list;
       renderPartInstrumentOptions();
+      renderPieceInstrumentFilterOptions();
+      renderPieceList(); // 樂器篩選下拉選單重繪不影響已選值，但曲目分部裡用到的樂器名稱可能受影響，保險重繪一次
     }, false, function(err){ console.error('instruments 監聽失敗', err); });
   });
 </script>

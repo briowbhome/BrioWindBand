@@ -70,10 +70,27 @@
     triggered = false;
   }, { passive: true });
 
+  // 收回指示器：拉到一半沒放開就放棄，或整個手勢被取消時都要呼叫——不能只是靜默不管，
+  // 指示器會停在上一次還是正 delta 時的位置卡住不動
+  function resetIndicator() {
+    if (indicator) indicator.style.transform = 'translate(-50%,-40px)';
+  }
+
   document.addEventListener('touchmove', function (e) {
     if (startY == null) return;
     var delta = e.touches[0].clientY - startY;
-    if (delta <= 0 || (scrollParent && scrollParent.scrollTop > 0)) { startY = null; return; }
+    if (delta <= 0 || (scrollParent && scrollParent.scrollTop > 0)) {
+      // 9/23 修正：手指往回滑（delta 由正轉負/回到 0）時，原本只是把 startY 設回 null、
+      // 靜默 return，沒有把指示器收回去。同一次觸控後續的 touchmove 都會被上面
+      // 「startY == null」那行擋掉，不會再有機會收回；如果瀏覽器接手變成原生捲動、
+      // 這次觸控收尾時觸發的是 touchcancel 不是 touchend（方向反轉時常見），
+      // 下面 touchend 那段收回邏輯完全不會執行，指示器（含它的陰影）就真的卡在畫面上，
+      // 要等下一次成功觸發或放棄的下拉手勢才會被蓋掉
+      if (pulling) resetIndicator();
+      startY = null;
+      pulling = false;
+      return;
+    }
 
     pulling = true;
     e.preventDefault(); // 蓋掉原生彈跳效果，改用自己的視覺回饋
@@ -84,14 +101,22 @@
 
   document.addEventListener('touchend', function () {
     if (!pulling) { startY = null; return; }
-    var el = ensureIndicator();
     if (triggered) {
+      var el = ensureIndicator();
       el.classList.add('spin');
       el.style.transform = 'translate(-50%,30px)';
       location.reload();
     } else {
-      el.style.transform = 'translate(-50%,-40px)';
+      resetIndicator();
     }
+    startY = null;
+    pulling = false;
+  }, { passive: true });
+
+  // 9/23 新增：手勢被瀏覽器取消時（例如上面提到的方向反轉、交還捲動控制權給原生行為）
+  // 觸發的是這個事件，不是 touchend，原本完全沒有處理，是指示器卡住的另一個成因
+  document.addEventListener('touchcancel', function () {
+    if (pulling) resetIndicator();
     startY = null;
     pulling = false;
   }, { passive: true });
