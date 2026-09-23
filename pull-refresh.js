@@ -14,6 +14,12 @@
 
   var PULL_THRESHOLD = 70; // 拉超過這個距離放開才觸發重整
   var MAX_PULL = 110;
+  // 9/23 追加修正：指示器收合時原本位移 -40px，圓形本體 36px 高 + box-shadow（4px 位移
+  // +12px 模糊，實際暈開範圍粗抓「位移+模糊」約 16px）合計要位移超過 52px 才能讓陰影
+  // 完全移出視窗上緣，-40px 不夠深，陰影的模糊尾端會一直露在頂部邊界，不是只有取消
+  // 手勢那個瞬間才這樣——只要指示器 DOM 建立過（拉過一次），平常收合狀態就一直存在這個
+  // 殘留陰影。改成 -64px，留一點安全餘裕
+  var HIDDEN_Y = -64;
   var startY = null;
   var pulling = false;
   var triggered = false;
@@ -42,7 +48,7 @@
     var style = document.createElement('style');
     style.textContent =
       '.pull-refresh-indicator{position:fixed;top:0;left:50%;' +
-      'transform:translate(-50%,-40px);width:36px;height:36px;border-radius:50%;' +
+      'transform:translate(-50%,' + HIDDEN_Y + 'px);width:36px;height:36px;border-radius:50%;' +
       'background:var(--paper-raised,#FBFAF4);box-shadow:0 4px 12px rgba(32,36,47,.2);' +
       'display:flex;align-items:center;justify-content:center;z-index:600;' +
       'transition:transform .15s ease;}' +
@@ -73,7 +79,7 @@
   // 收回指示器：拉到一半沒放開就放棄，或整個手勢被取消時都要呼叫——不能只是靜默不管，
   // 指示器會停在上一次還是正 delta 時的位置卡住不動
   function resetIndicator() {
-    if (indicator) indicator.style.transform = 'translate(-50%,-40px)';
+    if (indicator) indicator.style.transform = 'translate(-50%,' + HIDDEN_Y + 'px)';
   }
 
   document.addEventListener('touchmove', function (e) {
@@ -95,7 +101,7 @@
     pulling = true;
     e.preventDefault(); // 蓋掉原生彈跳效果，改用自己的視覺回饋
     var dist = Math.min(delta, MAX_PULL);
-    ensureIndicator().style.transform = 'translate(-50%,' + (dist - 40) + 'px)';
+    ensureIndicator().style.transform = 'translate(-50%,' + (dist + HIDDEN_Y) + 'px)';
     triggered = delta >= PULL_THRESHOLD;
   }, { passive: false });
 

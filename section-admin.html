@@ -315,7 +315,7 @@
     });
     var slot = document.getElementById('pieceListSlot');
     if (relevant.length === 0){
-      slot.innerHTML = '<div class="empty">這場音樂會目前沒有曲子用到你負責的聲部</div>';
+      slot.innerHTML = '<div class="empty">這場音樂會目前沒有曲子用到你的聲部</div>';
       return;
     }
     slot.innerHTML = relevant.map(function(cp){
@@ -404,12 +404,12 @@
             '<button type="button" class="part-remove" data-unassign="' + part.partId + '|' + uid + '" aria-label="移除指派">×</button>' +
           '</div>'
         );
-      }).join('') || '<div class="part-empty">尚未指派任何人</div>';
+      }).join('') || '<div class="part-empty">尚未指派</div>';
       return '<div class="survey-section-label">' + escapeHtml(part.label) + '</div><div class="check-list">' + rows + '</div>';
     }).join('');
 
     var unassignedHtml = unassigned.length === 0
-      ? '<div class="part-empty">參與名單中這個樂器的人都已經指派完畢</div>'
+      ? '<div class="part-empty">( 無 )</div>'
       : unassigned.map(function(m){
           var name = namesByUid[m.uid] || m.uid;
           var pillsHtml = parts.map(function(part){
@@ -431,7 +431,7 @@
     var canSave = isViewerAdminTier || viewerSectionLeaderFor.indexOf(openInstrumentName) !== -1;
     document.getElementById('assignmentSlot').innerHTML =
       partsHtml +
-      '<div class="survey-section-label">尚未指派（參與名單中此樂器的成員）</div><div class="check-list">' + unassignedHtml + '</div>' +
+      '<div class="survey-section-label">尚未指派</div><div class="check-list">' + unassignedHtml + '</div>' +
       (canSave ? '' : '<div class="part-empty">這個樂器分部不在你的管理範圍內，無法儲存</div>') +
       '<div class="survey-edit-actions">' +
         '<button type="button" id="assignmentCancelBtn">取消</button>' +
