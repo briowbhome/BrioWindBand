@@ -93,6 +93,11 @@ export async function loginAccount({ account, password }) {
     await signOut(auth);
     throw new Error("此帳號已被停用，請洽幹部");
   }
+  // 10/1：所有團籍都被移出（roles-admin.html「移出團籍」）的帳號，status 會變成 removed
+  if (profile.status === "removed") {
+    await signOut(auth);
+    throw new Error("此帳號已移除，請洽幹部");
+  }
 
   return { uid: uid, profile: profile };
 }

@@ -297,6 +297,62 @@
   .reset-pw-confirm:disabled{ opacity:.5; cursor:default; }
   .reset-pw-cancel{ background:none; color:var(--ink-soft); border:1px solid var(--line) !important; }
 
+  /* 10/1：移出團籍按鈕，跟重設密碼同一列。淡底用 color-mix 從 --burgundy 推出來，校內團
+     覆寫 --burgundy 後會自動跟著變；不支援 color-mix 的舊瀏覽器退回 --paper */
+  .acct-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+  .remove-member-trigger{
+    display:inline-flex; align-items:center; gap:6px;
+    border:1px solid var(--burgundy);
+    background:var(--paper);
+    background:color-mix(in srgb, var(--burgundy) 9%, var(--paper-raised));
+    color:var(--burgundy);
+    border-radius:var(--radius-sm); padding:9px 14px; font-size:12.5px; font-weight:700; cursor:pointer;
+  }
+  .remove-member-trigger svg{ flex:none; }
+  .remove-member-trigger:disabled{ opacity:.55; cursor:default; }
+  /* 反灰但仍可點（點了跳 toast 說明原因），所以不能用 disabled 屬性 */
+  .remove-member-trigger.is-disabled{ border-color:var(--line); background:var(--paper); color:var(--ink-soft); opacity:.6; cursor:default; }
+
+  /* 10/1：已移除成員（預設收合）。虛線框＋灰頭像，跟現役清單在視覺上分開 */
+  .removed-toggle{
+    display:flex; align-items:center; gap:8px;
+    width:calc(100% - 40px); margin:0 20px 10px;
+    padding:10px 14px; border:1px dashed var(--line); border-radius:var(--radius-md);
+    background:transparent; color:var(--ink-soft); cursor:pointer; font-family:inherit; text-align:left;
+  }
+  .removed-toggle-title{ font-size:13px; font-weight:700; color:var(--ink); }
+  .removed-toggle-count{ font-family:'Roboto Mono',monospace; font-size:11px; }
+  .removed-toggle .chev{ margin-left:auto; transition:transform .18s ease; }
+  .removed-toggle.open .chev{ transform:rotate(180deg); }
+  .member-row.removed-row{ cursor:default; }
+  .removed-row .m-avatar{ background:var(--line); color:var(--ink-soft); }
+  .removed-main{ min-width:0; }
+  .removed-meta{ font-size:10.5px; color:var(--ink-soft); margin-top:2px; }
+  .restore-btn{
+    margin-left:auto; flex:none; display:inline-flex; align-items:center; gap:5px;
+    border:1px solid var(--brass); background:var(--paper); color:var(--brass-deep);
+    border-radius:999px; padding:6px 11px; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit;
+  }
+  .restore-btn:disabled{ opacity:.55; cursor:default; }
+  @media (prefers-reduced-motion: reduce){ .removed-toggle .chev{ transition:none; } }
+
+  /* 10/1：移除／復原進行中的全畫面遮罩，樣式比照 repertoire-admin.html 的切割上傳進度遮罩。
+     z-index 蓋過 sheet（80）、toast（95）、確認視窗（96），擋住所有按鈕 */
+  .busy-overlay{
+    position:fixed; inset:0; z-index:98;
+    background:rgba(251,250,244,.86);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .busy-box{ display:flex; flex-direction:column; align-items:center; gap:12px; }
+  .busy-spinner{
+    width:34px; height:34px; border-radius:50%;
+    border:3px solid var(--line); border-top-color:var(--brass);
+    animation:busy-spin .8s linear infinite;
+  }
+  @keyframes busy-spin{ to{ transform:rotate(360deg); } }
+  .busy-text{ font-size:13px; font-weight:600; color:var(--ink); }
+  @media (prefers-reduced-motion: reduce){ .busy-spinner{ animation-duration:2.4s; } }
+
   /* ---------- Instrument list ---------- */
   .inst-group-label{
     padding:10px 16px 4px; font-family:'Roboto Mono',monospace; font-size:10px;
@@ -358,6 +414,17 @@
   <p class="lede">點擊成員調整角色與權限。</p>
 
   <div class="list" id="memberList"></div>
+
+  <!-- 10/1：已移除成員，只有該團有 canDeleteAccounts（或 Owner）才顯示，JS 移除 hidden -->
+  <div id="removedMembersSection" class="hidden">
+    <button type="button" class="removed-toggle" id="removedToggle" aria-expanded="false" aria-controls="removedList">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10" cy="8" r="3.6" stroke="currentColor" stroke-width="1.6"/><path d="M3.5 19.5c.8-3.4 3.4-5.2 6.5-5.2 1.3 0 2.5.3 3.5.9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M16 16.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span class="removed-toggle-title">已移除成員</span>
+      <span class="removed-toggle-count" id="removedCount">（0）</span>
+      <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="list hidden" id="removedList"></div>
+  </div>
 
   <div class="section-label">
     <span class="tw">樂器/聲部清單</span>
@@ -442,12 +509,19 @@
       <div class="account" id="sheetMemberAccount">—</div>
     </div>
     <div class="sheet-body" id="memberSheetBody"></div>
-    <!-- 重設密碼獨立於 memberSheetBody 之外，避免角色/權限的每次勾選重繪把已經打開的
+    <!-- 重設密碼／移出團籍獨立於 memberSheetBody 之外，避免角色/權限的每次勾選重繪把已經打開的
          表單／已輸入的密碼一起清掉——只有 Owner／canManageRoles 才進得了這頁，這裡不用
          再重複判斷權限，伺服器端（Cloud Function）還是會再驗證一次 -->
     <div class="reset-pw-wrap hidden" id="resetPasswordWrap" style="padding:0 20px 14px;">
-      <label style="display:block;font-family:'Roboto Mono',monospace;font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px;">帳號安全</label>
-      <button type="button" class="reset-pw-trigger" id="resetPasswordBtn">重設密碼</button>
+      <label style="display:block;font-family:'Roboto Mono',monospace;font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px;">帳號管理</label>
+      <div class="acct-actions">
+        <button type="button" class="reset-pw-trigger" id="resetPasswordBtn">重設密碼</button>
+        <!-- 10/1：移出團籍，作用對象固定是頁面的 activeTeam（不是 sheet 內團別分頁的 editingTeam） -->
+        <button type="button" class="remove-member-trigger hidden" id="removeMemberBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10" cy="8" r="3.6" stroke="currentColor" stroke-width="1.6"/><path d="M3.5 19.5c.8-3.4 3.4-5.2 6.5-5.2 1.3 0 2.5.3 3.5.9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M16 16.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <span id="removeMemberBtnText">移出</span>
+        </button>
+      </div>
       <div id="resetPasswordForm" class="hidden" style="margin-top:10px;">
         <input type="password" id="resetPasswordInput" placeholder="輸入新密碼（至少 6 碼）">
         <div class="reset-pw-actions">
@@ -472,12 +546,20 @@
   </div>
 </div>
 
+<!-- 10/1：移除／復原進行中的遮罩，JS 的 showBusy()/hideBusy() 控制 -->
+<div class="busy-overlay hidden" id="busyOverlay" role="status" aria-live="polite">
+  <div class="busy-box">
+    <div class="busy-spinner"></div>
+    <div class="busy-text" id="busyText">處理中…</div>
+  </div>
+</div>
+
 <script type="module">
   import { initAdminNav } from './admin-nav.js';
   import { showToast } from './toast.js';
   import { showConfirm } from './dialog.js';
   import { MESSAGES } from './messages.js';
-  import { requireCanManageRoles, peekCachedProfile, roleInTeam, canManageRolesForTeam } from './auth-guard.js';
+  import { requireCanManageRoles, peekCachedProfile, roleInTeam, canManageRolesForTeam, hasTeamPermissionFor } from './auth-guard.js';
   import { db, functions } from './firebase-init.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
@@ -489,6 +571,8 @@
   import { httpsCallable } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-functions.js';
 
   var resetMemberPasswordFn = httpsCallable(functions, 'resetMemberPassword');
+  var removeTeamMembershipFn = httpsCallable(functions, 'removeTeamMembership');
+  var restoreTeamMembershipFn = httpsCallable(functions, 'restoreTeamMembership');
 
   var MEMBER_SKELETON_HTML = [1, 2, 3].map(function(){
     return (
@@ -643,6 +727,200 @@
       resetPasswordError.classList.add('show');
     });
   });
+
+  // ---------- 10/1：移出團籍 ----------
+  // 前端判斷只決定按鈕顯示/反灰，真正的權限檢查在 Cloud Function（membership.js）
+  var removeMemberBtn = document.getElementById('removeMemberBtn');
+  var removeMemberBtnText = document.getElementById('removeMemberBtnText');
+
+  function isCurrentOwner(){
+    return !!currentAdminProfile && currentAdminProfile.role === 'owner';
+  }
+  function canDeleteAccountsIn(team){
+    return isCurrentOwner() || hasTeamPermissionFor(currentAdminProfile, team, 'canDeleteAccounts');
+  }
+  // 目標在該團是管理員時，只有 Owner 或該團管理員能移出/復原（設計 (b)）
+  function canActOnAdminIn(team){
+    return isCurrentOwner() || roleInTeam(currentAdminProfile, team) === 'admin';
+  }
+
+  // 10/1 調整：作用對象跟著 sheet 裡選中的團別分頁（editingTeam），不是頁面的 activeTeam——
+  // 在校友團頁面打開某人、切到校內團分頁時，按鈕要變成「移出校內團」並改看校內團的權限
+  function renderRemoveMemberBtn(uid){
+    var m = membersById[uid];
+    var team = editingTeam;
+    var visible = !!m && uid !== currentAdminUid && !m.isOwner &&
+      !!(m.teams && m.teams[team]) && canDeleteAccountsIn(team);
+    var blocked = visible && roleInTeam(m, team) === 'admin' && !canActOnAdminIn(team);
+    removeMemberBtn.classList.toggle('hidden', !visible);
+    removeMemberBtn.classList.toggle('is-disabled', blocked);
+    removeMemberBtn.setAttribute('aria-disabled', blocked ? 'true' : 'false');
+    removeMemberBtn.disabled = false;
+    removeMemberBtnText.textContent = '移出' + TEAM_LABELS[team];
+  }
+
+  // 移除／復原進行中的全畫面遮罩，擋住其他按鈕避免重複或交錯操作
+  var busyOverlay = document.getElementById('busyOverlay');
+  var busyText = document.getElementById('busyText');
+  function showBusy(text){
+    busyText.textContent = text;
+    busyOverlay.classList.remove('hidden');
+  }
+  function hideBusy(){
+    busyOverlay.classList.add('hidden');
+  }
+
+  removeMemberBtn.addEventListener('click', function(){
+    var uid = openMemberId;
+    var m = uid && membersById[uid];
+    if (!m) return;
+    var team = editingTeam;
+    var teamLabel = TEAM_LABELS[team];
+
+    if (removeMemberBtn.classList.contains('is-disabled')){
+      showToast('此成員是' + teamLabel + '管理員，需由' + teamLabel + '管理員執行移除');
+      return;
+    }
+
+    var isLastTeam = (m.teamIds || []).length <= 1;
+    var message = isLastTeam
+      ? '移除後帳號將無法登入。可在下方『已移除成員』復原。'
+      : '移除後此成員將無法查看' + teamLabel + '的內容，可在下方『已移除成員』復原。';
+
+    showConfirm(message, { danger: true, confirmText: '移除' }).then(function(ok){
+      if (!ok) return;
+      removeMemberBtn.disabled = true;
+      removeMemberBtnText.textContent = '移除中…';
+      showBusy('移除中…');
+      removeTeamMembershipFn({ uid: uid, team: team }).then(function(){
+        hideBusy();
+        showToast('已將 ' + (m.name || '') + ' 移出' + teamLabel, 'success');
+        if (openMemberId === uid) closeMemberSheet();
+      }).catch(function(err){
+        hideBusy();
+        showToast((err && err.message) ? err.message : '移除失敗，請稍後再試', 'error');
+        removeMemberBtn.disabled = false;
+        removeMemberBtnText.textContent = '移出' + teamLabel;
+      });
+    });
+  });
+
+  // ---------- 10/1：已移除成員 ----------
+  var removedSection = document.getElementById('removedMembersSection');
+  var removedToggle = document.getElementById('removedToggle');
+  var removedListEl = document.getElementById('removedList');
+  var removedCountEl = document.getElementById('removedCount');
+  var removedMembers = [];
+  var removedExpanded = false;
+
+  var RESTORE_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4.5 4.5v4h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  function escapeHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+
+  function formatRemovedDate(ts){
+    var d = ts && typeof ts.toDate === 'function' ? ts.toDate() : null;
+    if (!d) return '';
+    return (d.getMonth() + 1) + '/' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function renderRemovedMembers(){
+    removedCountEl.textContent = '（' + removedMembers.length + '）';
+    removedToggle.classList.toggle('open', removedExpanded);
+    removedToggle.setAttribute('aria-expanded', removedExpanded ? 'true' : 'false');
+    removedListEl.classList.toggle('hidden', !removedExpanded);
+
+    if (removedMembers.length === 0){
+      removedListEl.innerHTML = '<div class="empty">目前沒有已移除的成員</div>';
+      return;
+    }
+    removedListEl.innerHTML = removedMembers.map(function(r){
+      var date = formatRemovedDate(r.removedAt);
+      var meta = (date ? date + ' ' : '') + (r.removedByName ? '由 ' + r.removedByName + ' ' : '') + '移出';
+      return (
+        '<div class="member-item">' +
+          '<div class="member-row removed-row">' +
+            '<div class="m-avatar">' + escapeHtml(r.name ? r.name.charAt(0) : '?') + '</div>' +
+            '<div class="removed-main">' +
+              '<div class="m-name">' + escapeHtml(r.name || '—') + '</div>' +
+              '<div class="m-account">' + escapeHtml(r.account || '') + '</div>' +
+              '<div class="removed-meta">' + escapeHtml(meta) + '</div>' +
+            '</div>' +
+            '<button type="button" class="restore-btn" data-restore-member="' + escapeHtml(r.uid) + '">' + RESTORE_ICON + '復原</button>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  removedToggle.addEventListener('click', function(){
+    removedExpanded = !removedExpanded;
+    renderRemovedMembers();
+  });
+
+  removedListEl.addEventListener('click', function(e){
+    var btn = e.target.closest('[data-restore-member]');
+    if (!btn || btn.disabled) return;
+    var uid = btn.getAttribute('data-restore-member');
+    var r = removedMembers.filter(function(x){ return x.uid === uid; })[0];
+    if (!r) return;
+    var teamLabel = TEAM_LABELS[activeTeam];
+
+    if (r.snapshotRole === 'admin' && !canActOnAdminIn(activeTeam)){
+      showToast('此成員原本是' + teamLabel + '管理員，需由' + teamLabel + '管理員執行復原');
+      return;
+    }
+
+    showConfirm('要將' + (r.name || '') + '復原回' + teamLabel + '嗎？\n原本的角色與權限會一併恢復。', { confirmText: '復原' }).then(function(ok){
+      if (!ok) return;
+      btn.disabled = true;
+      showBusy('復原中…');
+      restoreTeamMembershipFn({ uid: uid, team: activeTeam }).then(function(){
+        // 成功後這列會被下面的 onSnapshot 自動拿掉、成員清單自動出現，不用手動更新
+        hideBusy();
+        showToast('已將 ' + (r.name || '') + ' 復原回' + teamLabel, 'success');
+      }).catch(function(err){
+        hideBusy();
+        showToast((err && err.message) ? err.message : '復原失敗，請稍後再試', 'error');
+        btn.disabled = false;
+      });
+    });
+  });
+
+  function subscribeRemovedMembers(){
+    // 只有有權限的人才訂閱——沒權限的人送出這個查詢會被規則整批拒絕
+    if (!canDeleteAccountsIn(activeTeam)) return;
+    removedSection.classList.remove('hidden');
+    renderRemovedMembers();
+    onSnapshot(query(collection(db, 'users'), where('removedTeamIds', 'array-contains', activeTeam)), function(snap){
+      removedMembers = [];
+      snap.forEach(function(docSnap){
+        var data = docSnap.data();
+        var entry = (data.removedTeams || {})[activeTeam] || {};
+        removedMembers.push({
+          uid: docSnap.id,
+          name: data.name,
+          account: data.account,
+          removedAt: entry.removedAt || null,
+          removedByName: entry.removedByName || '',
+          snapshotRole: (entry.snapshot && entry.snapshot.role) || 'member'
+        });
+      });
+      removedMembers.sort(function(a, b){
+        var ta = a.removedAt && typeof a.removedAt.toMillis === 'function' ? a.removedAt.toMillis() : 0;
+        var tb = b.removedAt && typeof b.removedAt.toMillis === 'function' ? b.removedAt.toMillis() : 0;
+        return tb - ta;
+      });
+      renderRemovedMembers();
+    }, function(err){
+      console.error('讀取已移除成員失敗', err);
+      removedListEl.innerHTML = '<div class="empty">讀取已移除成員失敗，請重新整理</div>';
+    });
+  }
+
   memberList.innerHTML = MEMBER_SKELETON_HTML;
   instList.innerHTML = INST_SKELETON_HTML;
   seatList.innerHTML = SEAT_SKELETON_HTML;
@@ -863,6 +1141,7 @@
     renderTeamTabs();
     renderTeamRolesBody();
     resetPasswordWrap.classList.toggle('hidden', uid === currentAdminUid || m.role === 'owner');
+    renderRemoveMemberBtn(uid);
     resetResetPasswordForm();
     memberSheetOverlay.classList.add('active');
   }
@@ -901,6 +1180,7 @@
     editingTeam = tab.getAttribute('data-edit-team');
     renderTeamTabs();
     renderTeamRolesBody();
+    renderRemoveMemberBtn(openMemberId);
   });
 
   teamRolesBodyEl.addEventListener('click', function(e){
@@ -1332,12 +1612,16 @@
           // 遷移時也寫成 'owner'，所以這裡不用另外特判 Owner）
           role: roleInTeam(data, activeTeam),
           instruments: data.instruments || [],
+          teamIds: data.teamIds || [], // 10/1：移出確認視窗要判斷「是不是最後一個團籍」
+          isOwner: data.role === 'owner', // 10/1：移出按鈕跟著 editingTeam 判斷，不能再靠 activeTeam 的 role 認 Owner
           teams: data.teams || {} // 9/17 新增：團別身分區塊要讀這個，之前漏加，一律預設空物件
         };
       });
       membersLoaded = true;
       renderMembers();
     }, renderMembersError);
+
+    subscribeRemovedMembers();
 
     subscribeInstruments(db, function(list){
       instrumentsList = list;

@@ -109,6 +109,10 @@ async function loadProfileWithRetry(uid) {
   }
 }
 
+function teamIdsKey(profile) {
+  return ((profile && Array.isArray(profile.teamIds)) ? profile.teamIds.slice() : []).sort().join("|");
+}
+
 // 先回快取（如果有）讓畫面秒開，背景一定會重新打一次 Firestore 確認最新狀態，
 // 有落差時透過 onStale 通知呼叫端做登出/導轉處理
 function resolveProfile(uid, onStale) {
@@ -117,6 +121,12 @@ function resolveProfile(uid, onStale) {
     writeProfileCache(uid, profile);
     applyTeamTheme(profile);
     if (cached && onStale) onStale(profile);
+    // 10/1：團籍被移出（或被加入）時 status 不一定會變，上面的 onStale 抓不到。快取裡的
+    // teamIds 跟最新的不同、status 又沒變（status 有變交給 onStale 登出，不要搶著重新整理）
+    // 時，快取已經在上面換成最新值，直接重新整理讓整頁照新的團籍重畫（切換徽章、activeTeam）
+    if (cached && profile && cached.status === profile.status && teamIdsKey(cached) !== teamIdsKey(profile)) {
+      location.reload();
+    }
     return profile;
   });
   if (cached) {
