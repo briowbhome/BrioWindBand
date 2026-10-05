@@ -805,7 +805,10 @@
           </div>
         </div>
         <div id="rosterEditMode" class="hidden">
-          <div class="survey-section-label" id="rosterCounterLabel">應到名單</div>
+          <div class="survey-section-row" style="margin-top:0;">
+            <div class="survey-section-label" id="rosterCounterLabel">應到名單</div>
+            <span class="removed-hint hidden" id="rosterRemovedHint"></span>
+          </div>
           <div class="survey-bulk-row">
             <button type="button" id="rosterSelectAllBtn">全選</button>
             <button type="button" id="rosterClearAllBtn">全部取消</button>
@@ -945,7 +948,10 @@
           </div>
         </div>
         <div id="concertRosterEditMode" class="hidden">
-          <div class="survey-section-label" id="concertRosterCounterLabel">參與名單</div>
+          <div class="survey-section-row" style="margin-top:0;">
+            <div class="survey-section-label" id="concertRosterCounterLabel">參與名單</div>
+            <span class="removed-hint hidden" id="concertRosterRemovedHint"></span>
+          </div>
           <input type="text" class="concert-roster-search" id="concertRosterSearchInput" placeholder="搜尋姓名或帳號">
           <div class="survey-bulk-row">
             <button type="button" id="concertRosterSelectAllBtn">全選</button>
@@ -980,6 +986,7 @@
   import { subscribeRepertoire } from './repertoire.js';
   import { subscribeInstruments } from './instruments.js';
   import { applyTemplateToEventRoster, applyTemplateToConcertRoster, diffTemplateMembers } from './roster-templates.js';
+  import { loadRemovedMemberNames, removedMemberLabel, REMOVED_TAG_HTML, removedDividerHtml, removedHintText } from './removed-members.js';
   import {
     collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot,
     serverTimestamp, Timestamp, getDoc, getDocs, query, where, setDoc
@@ -1669,18 +1676,28 @@
 
   function renderAssignmentPanel(parts, eligibleMembers){
     var namesByUid = namesByUidFromApprovedMembers();
+    // 10/1：已指派的人名字依序取現役成員、音樂會名單快照、已移除成員姓名；已移除的加標籤
+    var snapshotNames = {};
+    (concertRosterMembersCache[openConcertId] || []).forEach(function(m){
+      var snapName = concertSnapshotName(m);
+      if (snapName) snapshotNames[m.uid] = snapName;
+    });
+    function assignedNameHtml(uid){
+      var name = namesByUid[uid] || snapshotNames[uid] || removedMemberLabel(uid, removedNamesCache);
+      return escapeHtml(name) + (isActiveMemberUid(uid) ? '' : REMOVED_TAG_HTML);
+    }
     var assignedUidSet = {};
     Object.keys(assignmentDraft).forEach(function(partId){
       assignmentDraft[partId].forEach(function(uid){ assignedUidSet[uid] = true; });
     });
-    var unassigned = eligibleMembers.filter(function(m){ return !assignedUidSet[m.uid]; });
+    // 10/1：已移除成員不列進「尚未指派」候選
+    var unassigned = eligibleMembers.filter(function(m){ return !assignedUidSet[m.uid] && isActiveMemberUid(m.uid); });
 
     var partsHtml = parts.map(function(part){
       var rows = assignmentDraft[part.partId].map(function(uid){
-        var name = namesByUid[uid] || uid;
         return (
           '<div class="check-row">' +
-            '<span class="assign-name">' + escapeHtml(name) + '</span>' +
+            '<span class="assign-name">' + assignedNameHtml(uid) + '</span>' +
             '<button type="button" class="part-remove" data-unassign="' + part.partId + '|' + uid + '" aria-label="移除指派">×</button>' +
           '</div>'
         );
@@ -1736,6 +1753,7 @@
 
     try {
       await ensureApprovedMembers();
+      await ensureRemovedNames();
       var members = await loadConcertRosterMembers(concertId);
       var sectionSnap = await getDoc(doc(db, 'concerts', concertId, 'pieces', pieceId, 'sections', instrumentName));
       if (openConcertId !== concertId || openPieceId !== pieceId || openInstrumentName !== instrumentName) return;
@@ -1835,16 +1853,22 @@
     if (!openConcertId) return;
     var members = concertRosterMembersCache[openConcertId] || [];
     var namesByUid = namesByUidFromApprovedMembers();
-    document.getElementById('concertRosterViewCount').textContent = members.length + ' 人';
+    var removedCount = members.filter(function(m){ return !isActiveMemberUid(m.uid); }).length;
+    document.getElementById('concertRosterViewCount').textContent =
+      members.length + ' 人' + (removedCount ? '（含 ' + removedCount + ' 位已移除）' : '');
     if (members.length === 0){
       document.getElementById('concertRosterViewNames').textContent = '（無）';
     } else {
       var grouped = groupRosterMembersByInstrument(members);
       document.getElementById('concertRosterViewNames').innerHTML = grouped.order.map(function(instrumentName){
-        var namesText = grouped.byInstrument[instrumentName].map(function(m){ return namesByUid[m.uid] || m.uid; }).join('、');
+        // 10/1：名字優先用名單快照（帳號已硬刪除也有真名），已移除成員加標籤
+        var namesHtml = grouped.byInstrument[instrumentName].map(function(m){
+          var name = concertSnapshotName(m) || namesByUid[m.uid] || removedMemberLabel(m.uid, removedNamesCache);
+          return escapeHtml(name) + (isActiveMemberUid(m.uid) ? '' : REMOVED_TAG_HTML);
+        }).join('、');
         return (
           '<div class="roster-group-label">' + escapeHtml(instrumentName) + '</div>' +
-          '<div class="roster-group-members">' + escapeHtml(namesText) + '</div>'
+          '<div class="roster-group-members">' + namesHtml + '</div>'
         );
       }).join('');
     }
@@ -1864,6 +1888,7 @@
     document.getElementById('concertRosterViewNames').textContent = '';
     try {
       await ensureApprovedMembers();
+      await ensureRemovedNames(); // 快照名字壞掉的已移除成員要靠這份補真名
       var snap = await getDoc(doc(db, 'concertRosters', concertId));
       if (openConcertId !== concertId) return;
       var data = snap.exists() ? snap.data() : null;
@@ -1890,7 +1915,7 @@
   function renderConcertRosterChecklist(){
     var checklist = document.getElementById('concertRosterChecklist');
     var visibleMembers = visibleConcertRosterMembers();
-    checklist.innerHTML = visibleMembers.length === 0
+    var activeHtml = visibleMembers.length === 0
       ? '<div class="part-empty">找不到符合條件的團員</div>'
       : visibleMembers.map(function(m){
       var on = concertRosterDraftMap.hasOwnProperty(m.uid);
@@ -1934,11 +1959,29 @@
         '</div>'
       );
     }).join('');
+    // 10/1：已移除成員另列在最後，樂器唯讀，只能取消/重新勾選；不受搜尋框影響
+    var removedHtml = concertRosterRemovedMembers.length === 0 ? '' : removedDividerHtml() + concertRosterRemovedMembers.map(function(m){
+      var on = concertRosterDraftMap.hasOwnProperty(m.uid);
+      return (
+        '<div class="check-row">' +
+          '<button type="button" class="checkbox' + (on ? ' on' : '') + '" data-concert-roster-toggle="' + m.uid + '">' + (on ? '✓' : '') + '</button>' +
+          '<span class="assign-name removed-name">' + escapeHtml(concertSnapshotName(m) || removedMemberLabel(m.uid, removedNamesCache)) + REMOVED_TAG_HTML + '</span>' +
+          '<span class="removed-inst">' + escapeHtml((m.instruments || []).join('、')) + '</span>' +
+        '</div>'
+      );
+    }).join('');
+    checklist.innerHTML = activeHtml + removedHtml;
   }
 
   function updateConcertRosterCounter(){
+    var draftUids = Object.keys(concertRosterDraftMap);
+    var activeCount = draftUids.filter(isActiveMemberUid).length;
+    var removedCount = draftUids.length - activeCount;
     document.getElementById('concertRosterCounterLabel').textContent =
-      '參與名單（' + Object.keys(concertRosterDraftMap).length + ' / ' + (approvedMembers || []).length + ' 人）';
+      '參與名單（' + activeCount + ' / ' + (approvedMembers || []).length + ' 人）';
+    var hint = document.getElementById('concertRosterRemovedHint');
+    hint.textContent = removedHintText(removedCount);
+    hint.classList.toggle('hidden', removedCount === 0);
   }
 
   document.getElementById('concertRosterEditBtn').addEventListener('click', function(){
@@ -1946,6 +1989,9 @@
     var members = concertRosterMembersCache[openConcertId] || [];
     concertRosterDraftMap = {};
     members.forEach(function(m){ concertRosterDraftMap[m.uid] = (m.instruments || []).slice(); });
+    concertRosterRemovedMembers = members.filter(function(m){ return !isActiveMemberUid(m.uid); }).map(function(m){
+      return { uid: m.uid, name: m.name, account: m.account, instruments: (m.instruments || []).slice() };
+    });
     concertRosterSearchTerm = '';
     concertRosterOnlySelected = false;
     document.getElementById('concertRosterSearchInput').value = '';
@@ -1975,10 +2021,15 @@
     if (concertRosterDraftMap.hasOwnProperty(uid)){
       delete concertRosterDraftMap[uid];
     } else {
-      var member = (approvedMembers || []).filter(function(m){ return m.uid === uid; })[0];
-      concertRosterDraftMap[uid] = (member && member.instruments && member.instruments[0])
-        ? [member.instruments[0]]
-        : (instrumentsList[0] ? [instrumentsList[0].name] : []);
+      var removedEntry = concertRosterRemovedMembers.filter(function(m){ return m.uid === uid; })[0];
+      if (removedEntry){
+        concertRosterDraftMap[uid] = removedEntry.instruments.slice();
+      } else {
+        var member = (approvedMembers || []).filter(function(m){ return m.uid === uid; })[0];
+        concertRosterDraftMap[uid] = (member && member.instruments && member.instruments[0])
+          ? [member.instruments[0]]
+          : (instrumentsList[0] ? [instrumentsList[0].name] : []);
+      }
     }
     renderConcertRosterChecklist();
     updateConcertRosterCounter();
@@ -2041,9 +2092,20 @@
     var concertId = openConcertId;
     // 名字/帳號一併反正規化寫進名單文件：分部長（非 admin-tier）沒有 users 的 list 權限，
     // section-admin.html 只能靠這裡存下來的 name/account 顯示人名，不能自己去讀 users
+    // 10/1 修正：已移除成員不在 approvedMembers 裡，原本會被寫成 name: uid、把快照真名蓋掉，
+    // 改成沿用名單快取裡原本的 name/account
+    var prevByUid = {};
+    (concertRosterMembersCache[concertId] || []).forEach(function(x){ prevByUid[x.uid] = x; });
     var members = Object.keys(concertRosterDraftMap).map(function(uid){
       var m = (approvedMembers || []).filter(function(x){ return x.uid === uid; })[0];
-      return { uid: uid, instruments: concertRosterDraftMap[uid], name: m ? m.name : uid, account: m ? m.account : '' };
+      var prev = prevByUid[uid];
+      return {
+        uid: uid,
+        instruments: concertRosterDraftMap[uid],
+        // 快照名字已經壞掉（等於 uid）時改用已移除成員姓名，順便把舊資料修好
+        name: m ? m.name : (concertSnapshotName(prev) || (removedNamesCache && removedNamesCache[uid]) || uid),
+        account: m ? m.account : (prev && prev.account ? prev.account : '')
+      };
     });
     var saveBtn = document.getElementById('concertRosterSaveBtn');
     saveBtn.disabled = true;
@@ -2355,6 +2417,7 @@
   var rosterSheetOverlay = document.getElementById('rosterSheetOverlay');
   var rosterChecklist = document.getElementById('rosterChecklist');
   var rosterCounterLabel = document.getElementById('rosterCounterLabel');
+  var rosterRemovedHint = document.getElementById('rosterRemovedHint');
   var rosterSaveBtn = document.getElementById('rosterSaveBtn');
   var rosterReportsSlot = document.getElementById('rosterReportsSlot');
   var rosterViewMode = document.getElementById('rosterViewMode');
@@ -2450,6 +2513,27 @@
     return approvedMembers;
   }
 
+  // ---------- 10/1：名單裡的已移除成員（見 removed-members.js） ----------
+  var removedNamesCache = null; // {uid: name}，整頁只查一次
+  async function ensureRemovedNames(){
+    if (removedNamesCache) return removedNamesCache;
+    removedNamesCache = await loadRemovedMemberNames(db, activeTeam);
+    return removedNamesCache;
+  }
+  // 現役成員快取還沒載入時一律當成現役，不能在載入中把所有人都判成已移除
+  function isActiveMemberUid(uid){
+    if (!approvedMembers) return true;
+    return approvedMembers.some(function(m){ return m.uid === uid; });
+  }
+  // 音樂會名單快照裡的姓名。10/1 之前的舊版程式在存檔／套用範本時，會把已移除成員的
+  // name 寫成 uid——這種已經壞掉的快照視同沒有名字，讓呼叫端改用已移除成員姓名，存檔時
+  // 也會把真名寫回去修好
+  function concertSnapshotName(m){
+    return (m && m.name && m.name !== m.uid) ? m.name : '';
+  }
+  var rosterRemovedUids = []; // 進入名單編輯時名單裡的已移除成員；取消勾選後仍留在畫面上，才能勾回來
+  var concertRosterRemovedMembers = []; // 進入音樂會名單編輯時名單裡的已移除成員 {uid,name,account,instruments}
+
   function rosterDirty(){
     var roster = rostersById[openRosterEventId];
     var saved = roster ? roster.members : [];
@@ -2460,13 +2544,17 @@
 
   function updateRosterCounter(){
     var total = (approvedMembers || []).length;
-    var count = Object.keys(rosterDraftSet || {}).length;
-    rosterCounterLabel.textContent = '應到名單（' + count + ' / ' + total + ' 人）';
+    var draftUids = Object.keys(rosterDraftSet || {});
+    var activeCount = draftUids.filter(isActiveMemberUid).length;
+    var removedCount = draftUids.length - activeCount;
+    rosterCounterLabel.textContent = '應到名單（' + activeCount + ' / ' + total + ' 人）';
+    rosterRemovedHint.textContent = removedHintText(removedCount);
+    rosterRemovedHint.classList.toggle('hidden', removedCount === 0);
     rosterSaveBtn.disabled = !rosterDirty();
   }
 
   function renderRosterChecklist(){
-    rosterChecklist.innerHTML = (approvedMembers || []).map(function(m){
+    var activeHtml = (approvedMembers || []).map(function(m){
       var on = !!rosterDraftSet[m.uid];
       return (
         '<div class="check-row">' +
@@ -2475,6 +2563,17 @@
         '</div>'
       );
     }).join('');
+    // 10/1：已移除成員另列在最後，維持草稿裡的勾選狀態，可以取消勾選後存檔清掉
+    var removedHtml = rosterRemovedUids.length === 0 ? '' : removedDividerHtml() + rosterRemovedUids.map(function(uid){
+      var on = !!rosterDraftSet[uid];
+      return (
+        '<div class="check-row">' +
+          '<button type="button" class="checkbox' + (on ? ' on' : '') + '" data-uid="' + uid + '">' + (on ? '✓' : '') + '</button>' +
+          '<button type="button" class="check-text removed-name" data-uid="' + uid + '">' + escapeHtml(removedMemberLabel(uid, removedNamesCache)) + REMOVED_TAG_HTML + '</button>' +
+        '</div>'
+      );
+    }).join('');
+    rosterChecklist.innerHTML = activeHtml + removedHtml;
   }
 
   // 把 rosterDraftSet 重置回目前已存檔的名單（沒存過就是空名單，不預設全體——之後名單來源
@@ -2499,18 +2598,22 @@
     rosterFooter.classList.add('hidden');
     if (!openRosterEventId) return;
     var uids = resetRosterDraftFromSaved();
+    rosterRemovedUids = [];
+    var removedCount = uids.filter(function(uid){ return !isActiveMemberUid(uid); }).length;
     var roster = rostersById[openRosterEventId];
     var namesByUid = {};
     (approvedMembers || []).forEach(function(m){ namesByUid[m.uid] = m; });
-    rosterViewCount.textContent = roster ? (roster.members.length + ' 人') : '尚未建立名單';
+    rosterViewCount.textContent = roster
+      ? (roster.members.length + ' 人' + (removedCount ? '（含 ' + removedCount + ' 位已移除）' : ''))
+      : '尚未建立名單';
     rosterEditBtn.textContent = roster ? '✎ 編輯名單' : '✎ 建立名單';
     rosterApplyTemplateBtn.textContent = (roster && roster.sourceTemplateId) ? '重新套用名單' : '套用名單';
     var sourceTemplate = roster && roster.sourceTemplateId ? rosterTemplatesById[roster.sourceTemplateId] : null;
     rosterSourceRow.classList.toggle('hidden', !(roster && roster.sourceTemplateId));
     rosterSourceLabel.textContent = sourceTemplate ? sourceTemplate.name : '（來源名單已刪除）';
-    rosterViewNames.textContent = uids.length === 0 ? '（無）' : uids.map(function(uid){
+    rosterViewNames.innerHTML = uids.length === 0 ? '（無）' : uids.map(function(uid){
       var m = namesByUid[uid];
-      return m ? m.name : uid;
+      return m ? escapeHtml(m.name) : escapeHtml(removedMemberLabel(uid, removedNamesCache)) + REMOVED_TAG_HTML;
     }).join('、');
   }
 
@@ -2521,6 +2624,7 @@
     rosterViewMode.classList.add('hidden');
     rosterEditMode.classList.remove('hidden');
     rosterFooter.classList.remove('hidden');
+    rosterRemovedUids = Object.keys(rosterDraftSet || {}).filter(function(uid){ return !isActiveMemberUid(uid); });
     renderRosterChecklist();
     updateRosterCounter();
   });
@@ -2640,6 +2744,7 @@
     renderSurveyToggle(); // 名單資料是即時監聽、本來就有，不用等 loadReports 才能畫這塊
 
     await ensureApprovedMembers();
+    await ensureRemovedNames();
     showRosterView();
 
     loadReports(eventId);
@@ -3101,7 +3206,7 @@
     var namesByUid = {};
     (approvedMembers || []).forEach(function(m){ namesByUid[m.uid] = m; });
     return (roster ? roster.members : [])
-      .filter(function(uid){ return !reportedUids[uid]; })
+      .filter(function(uid){ return !reportedUids[uid] && isActiveMemberUid(uid); })
       .map(function(uid){
         var m = namesByUid[uid];
         return { uid: uid, name: m ? m.name : uid, account: m ? m.account : '' };
@@ -3305,7 +3410,8 @@
 
     var attendingCount = reports.filter(function(r){ return r.status === 'attending'; }).length;
     var leaveCount = reports.filter(function(r){ return r.status === 'leave'; }).length;
-    var notReported = (roster ? roster.members : []).filter(function(uid){ return !reportedUids[uid]; });
+    // 10/1：已移除且未回報的人不算「尚未回報」（已回報的照常列在上方回報清單）
+    var notReported = (roster ? roster.members : []).filter(function(uid){ return !reportedUids[uid] && isActiveMemberUid(uid); });
 
     var namesByUid = {};
     (approvedMembers || []).forEach(function(m){ namesByUid[m.uid] = m; });

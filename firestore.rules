@@ -198,9 +198,11 @@ service cloud.firestore {
       // 成員」區塊需要這條。只放行「該團有 canDeleteAccounts 的人（或 Owner）」——跟能按
       // 復原的人是同一群。刻意寫成獨立的 allow 而不是併進上面那條：沒有 removedTeamIds
       // 欄位的舊文件在這裡會算出錯誤，獨立成一條才不會影響上面既有規則的判斷結果
+      // 10/1 放寬：該團 admin 也放行（名單頁要顯示已移除成員的真名，這些人移出前 admin
+      // 本來就讀得到）。不放行指揮——conductor-admin.html 只需要排除他們，不需要名字
       allow get, list: if
-        (resource.data.removedTeamIds.hasAny(['alumni']) && canDeleteAccountsFor('alumni')) ||
-        (resource.data.removedTeamIds.hasAny(['school']) && canDeleteAccountsFor('school'));
+        (resource.data.removedTeamIds.hasAny(['alumni']) && (canDeleteAccountsFor('alumni') || isAdminTierFor('alumni'))) ||
+        (resource.data.removedTeamIds.hasAny(['school']) && (canDeleteAccountsFor('school') || isAdminTierFor('school')));
 
       // 註冊：只能建立「自己」的文件，狀態一定要 pending，且 teamIds 剛好一個值、teams
       // 底下只能有這一個團的鍵、那個團的內容只能有 role 且必須是 member——不能連帶塞入

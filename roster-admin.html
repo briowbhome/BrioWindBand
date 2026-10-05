@@ -187,6 +187,9 @@
     letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft);
     margin:16px 0 8px;
   }
+  /* 10/1：「成員」標題列右側放已移除成員提示，比照 event-admin.html 的 .survey-section-row */
+  .survey-section-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin:16px 0 8px; }
+  .survey-section-row .survey-section-label{ margin:0; }
   .survey-bulk-row{ display:flex; gap:8px; margin-bottom:8px; }
   .survey-bulk-row button{
     border:1px solid var(--line); background:var(--paper); color:var(--ink-soft);
@@ -289,7 +292,10 @@
           <input type="text" id="templateName" placeholder="例如：第六屆校友團" required>
         </div>
 
-        <div class="survey-section-label">成員</div>
+        <div class="survey-section-row">
+          <div class="survey-section-label">成員</div>
+          <span class="removed-hint hidden" id="templateRemovedHint"></span>
+        </div>
         <div class="survey-bulk-row">
           <button type="button" id="templateSelectAllBtn">全選</button>
           <button type="button" id="templateClearAllBtn">全部取消</button>
@@ -349,6 +355,7 @@
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
   import { applyTemplateToEventRoster, applyTemplateToConcertRoster, diffTemplateMembers } from './roster-templates.js';
+  import { loadRemovedMemberNames, removedMemberLabel, REMOVED_TAG_HTML, removedDividerHtml, removedHintText } from './removed-members.js';
   import {
     collection, addDoc, doc, getDoc, updateDoc, deleteDoc, onSnapshot,
     serverTimestamp, getDocs, query, where, documentId
@@ -423,6 +430,19 @@
     return approvedMembers;
   }
 
+  // ---------- 10/1：名單裡的已移除成員（見 removed-members.js） ----------
+  var removedNamesCache = null;
+  async function ensureRemovedNames(){
+    if (removedNamesCache) return removedNamesCache;
+    removedNamesCache = await loadRemovedMemberNames(db, activeTeam);
+    return removedNamesCache;
+  }
+  function isActiveMemberUid(uid){
+    if (!approvedMembers) return true;
+    return approvedMembers.some(function(m){ return m.uid === uid; });
+  }
+  var templateRemovedUids = []; // 進入範本編輯時名單裡的已移除成員
+
   // 樂器清單快取，兩處要用：①套用到音樂會參與名單時，範本裡全新加入、而且自己資料裡也沒
   // 設定任何樂器的人，最後備援抓清單第一筆（跟 event-admin.html 的
   // applyTemplateToConcertRosterUI 同一個規則）；②名單預覽依樂器分區顯示的排序依據
@@ -442,8 +462,13 @@
     var namesByUid = {};
     (approvedMembers || []).forEach(function(m){ namesByUid[m.uid] = m; });
     var byInstrument = {};
+    var removedLabels = []; // 10/1：已移除成員不參與樂器分組，統一放最後一組
     uids.forEach(function(uid){
       var member = namesByUid[uid];
+      if (!member){
+        removedLabels.push(removedMemberLabel(uid, removedNamesCache));
+        return;
+      }
       var instruments = (member && member.instruments && member.instruments.length) ? member.instruments : ['未設定樂器'];
       instruments.forEach(function(name){
         if (!byInstrument[name]) byInstrument[name] = [];
@@ -458,14 +483,16 @@
     });
     var orderedNames = (instrumentsListCache || []).map(function(inst){ return inst.name; });
     if (byInstrument['未設定樂器']) orderedNames.push('未設定樂器');
-    return orderedNames
+    var groups = orderedNames
       .filter(function(name){ return byInstrument[name] && byInstrument[name].length; })
-      .map(function(name){ return { name: name, names: byInstrument[name] }; });
+      .map(function(name){ return { name: name, names: byInstrument[name], removed: false }; });
+    if (removedLabels.length) groups.push({ name: '已不在團內', names: removedLabels, removed: true });
+    return groups;
   }
 
   function renderChecklist(){
     var checklist = document.getElementById('templateChecklist');
-    checklist.innerHTML = (approvedMembers || []).map(function(m){
+    var activeHtml = (approvedMembers || []).map(function(m){
       var on = !!draftSet[m.uid];
       return (
         '<div class="check-row">' +
@@ -474,6 +501,25 @@
         '</div>'
       );
     }).join('');
+    // 10/1：已移除成員另列在最後，維持勾選狀態，可以取消勾選後存檔清掉
+    var removedHtml = templateRemovedUids.length === 0 ? '' : removedDividerHtml() + templateRemovedUids.map(function(uid){
+      var on = !!draftSet[uid];
+      return (
+        '<div class="check-row">' +
+          '<button type="button" class="checkbox' + (on ? ' on' : '') + '" data-uid="' + uid + '">' + (on ? '✓' : '') + '</button>' +
+          '<button type="button" class="check-text removed-name" data-uid="' + uid + '">' + escapeHtml(removedMemberLabel(uid, removedNamesCache)) + REMOVED_TAG_HTML + '</button>' +
+        '</div>'
+      );
+    }).join('');
+    checklist.innerHTML = activeHtml + removedHtml;
+    updateTemplateRemovedHint();
+  }
+
+  function updateTemplateRemovedHint(){
+    var removedCount = Object.keys(draftSet).filter(function(uid){ return !isActiveMemberUid(uid); }).length;
+    var hint = document.getElementById('templateRemovedHint');
+    hint.textContent = removedHintText(removedCount);
+    hint.classList.toggle('hidden', removedCount === 0);
   }
 
   function showFormError(message){
@@ -503,7 +549,8 @@
     templateFormFooter.classList.add('hidden');
     document.getElementById('templateSheetTitle').textContent = t.name || '—';
     var members = t.members || [];
-    templateViewCount.textContent = members.length + ' 人';
+    var removedCount = members.filter(function(uid){ return !isActiveMemberUid(uid); }).length;
+    templateViewCount.textContent = members.length + ' 人' + (removedCount ? '（含 ' + removedCount + ' 位已移除）' : '');
     if (members.length === 0){
       templateViewNames.innerHTML = '（無）';
       return;
@@ -512,8 +559,8 @@
     templateViewNames.innerHTML = groups.map(function(g){
       return (
         '<div class="tpl-preview-group">' +
-          '<div class="tpl-preview-label">' + escapeHtml(g.name) + '（' + g.names.length + '）</div>' +
-          '<div>' + g.names.map(escapeHtml).join('、') + '</div>' +
+          '<div class="tpl-preview-label"' + (g.removed ? ' style="color:var(--burgundy-deep);"' : '') + '>' + escapeHtml(g.name) + '（' + g.names.length + '）</div>' +
+          '<div' + (g.removed ? ' class="removed-name"' : '') + '>' + g.names.map(function(n){ return escapeHtml(n) + (g.removed ? REMOVED_TAG_HTML : ''); }).join('、') + '</div>' +
         '</div>'
       );
     }).join('');
@@ -528,6 +575,7 @@
   async function openCreateSheet(){
     editingTemplateId = null;
     draftSet = {};
+    templateRemovedUids = []; // 新增範本沒有已移除成員
     templateNameInput.value = '';
     document.getElementById('templateSheetTitle').textContent = '新增名單';
     templateSaveBtn.textContent = '建立名單';
@@ -547,7 +595,7 @@
     templateSaveBtn.textContent = '儲存變更';
     templateCancelBtn.classList.remove('hidden');
     showFormError('');
-    await Promise.all([ensureApprovedMembers(), ensureInstrumentsList()]);
+    await Promise.all([ensureApprovedMembers(), ensureInstrumentsList(), ensureRemovedNames()]);
     showTemplateView(t);
     templateSheetOverlay.classList.add('active');
   }
@@ -559,6 +607,7 @@
     draftSet = {};
     (t.members || []).forEach(function(uid){ draftSet[uid] = true; });
     templateNameInput.value = t.name || '';
+    templateRemovedUids = Object.keys(draftSet).filter(function(uid){ return !isActiveMemberUid(uid); });
     renderChecklist();
     showTemplateEditForm();
   });
@@ -594,6 +643,7 @@
     var on = !!draftSet[uid];
     checkboxEl.classList.toggle('on', on);
     checkboxEl.textContent = on ? '✓' : '';
+    updateTemplateRemovedHint();
   });
 
   document.getElementById('templateSelectAllBtn').addEventListener('click', function(){

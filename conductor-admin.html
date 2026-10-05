@@ -434,6 +434,14 @@
         membersInstrumentsByUid[docSnap.id] = data.instruments || [];
         membersNameByUid[docSnap.id] = { name: data.name, account: data.account };
       });
+
+      // 10/1：已移除（不在該團現役成員裡）且未回報的人從應到名單排除，分區人數、尚未回報數、
+      // 分區 sheet 都基於排除後的名單；已回報的照常保留（回報本身有姓名快照，是真實紀錄）
+      var reportedSet = {};
+      reports.forEach(function(r){ reportedSet[r.uid] = true; });
+      rosterMembers = rosterMembers.filter(function(uid){
+        return membersNameByUid.hasOwnProperty(uid) || reportedSet[uid];
+      });
     }
   }
 
@@ -696,7 +704,10 @@
         var m = membersNameByUid[uid] || {};
         var isAttending = attendingUids.indexOf(uid) !== -1;
         var statusText = isAttending ? '出席' : (reports.some(function(r){ return r.uid === uid && r.status === 'leave'; }) ? '請假' : '尚未回報');
-        return '<div class="sheet-name-row"><span>' + (m.name || uid) + '</span><span class="st">' + statusText + '</span></div>';
+        // 10/1：已移除但已回報的人不在現役成員表裡，名字改從回報快照取
+        var reported = reports.filter(function(r){ return r.uid === uid; })[0];
+        var displayName = m.name || (reported && reported.name) || uid;
+        return '<div class="sheet-name-row"><span>' + displayName + '</span><span class="st">' + statusText + '</span></div>';
       }).join('');
     }
     zoneSheetOverlay.classList.add('active');

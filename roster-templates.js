@@ -35,7 +35,12 @@ export async function applyTemplateToConcertRoster(db, concertId, template, memb
   (existingSnap.exists() ? (existingSnap.data().members || []) : []).forEach(function (m) {
     existingByUid[m.uid] = m.instruments || [];
   });
-  var newMembers = template.members.map(function (uid) {
+  // 10/1：範本裡的已移除成員（不在呼叫端傳入的現役成員查表裡）不帶進音樂會名單——沒有
+  // 可用的姓名/樂器資料，原本會被寫成 name: uid。兩個呼叫端（event-admin.html、
+  // roster-admin.html）傳入的 membersLookup 都是該團現役成員
+  var newMembers = template.members.filter(function (uid) {
+    return membersLookup.hasOwnProperty(uid);
+  }).map(function (uid) {
     var member = membersLookup[uid];
     var instruments = existingByUid.hasOwnProperty(uid)
       ? existingByUid[uid]
