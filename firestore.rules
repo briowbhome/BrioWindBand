@@ -73,6 +73,37 @@ service cloud.firestore {
           teamProfile(team).permissions.canDeleteAccounts == true);
     }
 
+    // ---------- 表單（10/6 新增，見 docs/superpowers/specs/2026-10-06-forms-design.md）----------
+    // formData() 跨文件讀表單本體；同一個請求裡重複讀同一份文件，只算一次 get() 額度
+    function formData(formId) {
+      return get(/databases/$(database)/documents/forms/$(formId)).data;
+    }
+
+    // 「表單開放中」的定義，要跟 forms-core.js 的 isFormOpen() 保持一致
+    function formIsOpen(f) {
+      return f.status == 'open' && (f.closesAt == null || request.time < f.closesAt);
+    }
+
+    function isTeamMemberOf(team) {
+      return isApprovedMember() && hasTeam(team);
+    }
+
+    // 訪客用分享連結填表時的 Firebase 匿名身分（沒有 users 文件）
+    function isAnonymous() {
+      return request.auth != null && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
+    function validResponseShape(d) {
+      return d.keys().hasOnly(['uid', 'name', 'proxyBy', 'boundUid', 'answers', 'submittedAt', 'updatedAt'])
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 50
+        && d.answers is map;
+    }
+
+    // 自己的回應（uid 是自己）或自己代填的回應（proxyBy 是自己）
+    function ownsResponse(d) {
+      return request.auth != null && (d.uid == request.auth.uid || d.proxyBy == request.auth.uid);
+    }
+
     function canManageFinanceFor(team) {
       return isOwner() ||
         (hasTeam(team) &&
@@ -222,7 +253,9 @@ service cloud.firestore {
         && request.resource.data.teamIds[0] in ['alumni', 'school']
         && request.resource.data.teams.keys().hasOnly([request.resource.data.teamIds[0]])
         && request.resource.data.teams[request.resource.data.teamIds[0]].keys().hasOnly(['role'])
-        && request.resource.data.teams[request.resource.data.teamIds[0]].role == 'member';
+        && request.resource.data.teams[request.resource.data.teamIds[0]].role == 'member'
+        // 10/6 表單功能：匿名身分（訪客填表用）必須先升級成帳密帳號，才能建立團員資料
+        && !isAnonymous();
 
       // 角色與權限調整（團別版）：只持有「該團」canManageRoles 的人（或 Owner），
       // 一次只能改動 teams 裡的其中一團，不能同時動兩團，也不能連帶動到任何其他欄位
@@ -521,6 +554,82 @@ service cloud.firestore {
     match /concertRosters/{concertId} {
       allow get, list: if hasProfile();
       allow create, update, delete: if isAdminTierFor(concertTeamOf(concertId));
+    }
+
+    // ---------- 表單（10/6 新增）----------
+    // team 是單一字串（不是陣列）：團員首頁查詢 where team == X && status == 'open'，
+    // list 規則才能從查詢條件證明「每一筆都是自己那一團、而且不是草稿」
+    match /forms/{formId} {
+      allow get: if isAdminTierFor(resource.data.team)
+        || (resource.data.status != 'draft'
+            && (resource.data.allowGuest == true || isTeamMemberOf(resource.data.team)));
+      allow list: if isAdminTierFor(resource.data.team)
+        || (resource.data.status != 'draft' && isTeamMemberOf(resource.data.team));
+      allow create: if isAdminTierFor(request.resource.data.team);
+      allow update: if isAdminTierFor(resource.data.team)
+        && request.resource.data.team == resource.data.team;
+      // 不開放刪除，改用 archived 封存（可還原）
+
+      match /responses/{responseId} {
+        // 自己的回應文件 ID 就是自己的 uid：文件還不存在時也要讀得到，首頁才能判斷「還沒填」
+        allow get: if isAdminTierFor(formData(formId).team)
+          || (request.auth != null && responseId == request.auth.uid)
+          || (resource != null && ownsResponse(resource.data));
+        allow list: if isAdminTierFor(formData(formId).team)
+          || (request.auth != null && resource.data.proxyBy == request.auth.uid);
+
+        allow create: if validResponseShape(request.resource.data) && (
+          isAdminTierFor(formData(formId).team)
+          // 自己的回應：文件 ID 等於自己的 uid，資料庫層級保證一人一份
+          || (request.auth != null
+              && responseId == request.auth.uid
+              && request.resource.data.uid == request.auth.uid
+              && request.resource.data.proxyBy == null
+              && request.resource.data.boundUid == null
+              && formIsOpen(formData(formId))
+              && (isTeamMemberOf(formData(formId).team)
+                  || (isAnonymous() && formData(formId).allowGuest == true)))
+          // 代填：限該團已核准團員；ID 必須是 20 字元的自動 ID，避免故意用別人的 uid 當 ID
+          // 占掉對方「自己的回應」的位置
+          || (isTeamMemberOf(formData(formId).team)
+              && formIsOpen(formData(formId))
+              && responseId.size() == 20
+              && request.resource.data.proxyBy == request.auth.uid
+              && request.resource.data.uid == null
+              && request.resource.data.boundUid == null)
+        );
+
+        // 本人修改：表單要開放中、這份回應還沒有收款紀錄、身分欄位不能動。
+        // 刻意不檢查帳號狀態——待審核的人（剛升級的訪客）要能改自己的報名
+        allow update: if validResponseShape(request.resource.data) && (
+          isAdminTierFor(formData(formId).team)
+          || (ownsResponse(resource.data)
+              && formIsOpen(formData(formId))
+              && !exists(/databases/$(database)/documents/forms/$(formId)/payments/$(responseId))
+              && request.resource.data.uid == resource.data.uid
+              && request.resource.data.proxyBy == resource.data.proxyBy
+              && request.resource.data.boundUid == resource.data.boundUid)
+        );
+
+        allow delete: if isAdminTierFor(formData(formId).team)
+          || (ownsResponse(resource.data)
+              && formIsOpen(formData(formId))
+              && !exists(/databases/$(database)/documents/forms/$(formId)/payments/$(responseId)));
+      }
+
+      // 收款紀錄：文件 ID 等於回應 ID，每份回應一本帳，只有幹部能寫。
+      // 本人可以讀自己的（填寫頁只用來判斷要不要鎖定，畫面不顯示金額）
+      match /payments/{responseId} {
+        allow get: if isAdminTierFor(formData(formId).team)
+          || (request.auth != null && responseId == request.auth.uid)
+          || (request.auth != null
+              && get(/databases/$(database)/documents/forms/$(formId)/responses/$(responseId)).data.proxyBy == request.auth.uid);
+        allow list: if isAdminTierFor(formData(formId).team);
+        allow create, update: if isAdminTierFor(formData(formId).team)
+          && request.resource.data.keys().hasOnly(['name', 'entries', 'updatedAt'])
+          && request.resource.data.entries is list;
+        allow delete: if isAdminTierFor(formData(formId).team);
+      }
     }
 
     // Bug 回報／功能許願池：團員只能新增（寫自己 submitterUid），完全不能讀取——

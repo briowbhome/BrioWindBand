@@ -164,6 +164,20 @@
     font-size:15.5px;
   }
 
+  /* ---------- 開放中的表單（10/6 新增）---------- */
+  .forms-home{ margin:0 0 6px; }
+  .fh-card{ display:flex; align-items:center; gap:12px; margin:0 20px 10px; padding:13px 14px; border-radius:var(--radius-md); text-decoration:none; }
+  .fh-card.todo{ background:var(--burgundy); color:#F2EFE5; }
+  .fh-card.done{ background:var(--paper-raised); border:1px solid var(--line); color:var(--ink); }
+  .fh-ic{ width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex:none; }
+  .fh-card.todo .fh-ic{ background:rgba(242,239,229,.16); }
+  .fh-card.done .fh-ic{ background:var(--sage-bg); color:var(--sage); }
+  .fh-body{ display:block; flex:1; min-width:0; }
+  .fh-title{ display:block; font-weight:700; font-size:13.5px; }
+  .fh-meta{ display:block; font-size:11px; margin-top:2px; opacity:.85; }
+  .fh-card.done .fh-meta{ color:var(--ink-soft); opacity:1; }
+  .fh-go{ font-size:11.5px; font-weight:700; white-space:nowrap; }
+
   /* ---------- 個人焦點／團務總覽 分頁 ---------- */
   .seg-tabs{
     display:flex; gap:6px; margin:2px 20px 14px;
@@ -891,6 +905,13 @@
     <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </button>
 
+  <!-- 開放中的表單（10/6 新增）：只有已核准團員、而且這一團有開放中的表單時才顯示。
+       還沒填的用醒目卡片，已填的用淡色卡片（點進去可以修改或補代填） -->
+  <div class="forms-home hidden" id="formsHome">
+    <div class="section-label"><span class="tw">開放中的表單</span></div>
+    <div id="formsHomeList"></div>
+  </div>
+
   <!-- 練習資訊 Hero：卡片本身（深色票券樣式＋大字日期）已經足夠說明這是下一次團練，
        不再另外加一條「下一次團練」標籤，避免每個區塊上面都疊一條小標籤 -->
   <div class="hero">
@@ -1170,6 +1191,8 @@
   import { cachedThenFresh } from './data-cache.js';
   import { db } from './firebase-init.js';
   import { VAPID_PUBLIC_KEY } from './push-config.js';
+  import { listOpenFormsForMember, loadResponse } from './forms.js';
+  import { hasItemsQuestion, formatDeadline, escapeHtml as escapeFormHtml } from './forms-core.js';
   import {
     collection, query, where, or, orderBy, limit, onSnapshot, Timestamp,
     doc, getDoc, getDocs, setDoc, deleteDoc, serverTimestamp
@@ -2831,6 +2854,51 @@
       qrZoomOverlay.classList.remove('active');
     });
 
+    // ---------- 開放中的表單（10/6 新增，見 docs/superpowers/specs/2026-10-06-forms-design.md）----------
+    var FORM_ICONS = {
+      bowl: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3.5 11.5h17a8.5 8.5 0 0 1-17 0z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8 8c0-1.5 1-2 1-3.5M12 8c0-1.5 1-2 1-3.5M16 8c0-1.5 1-2 1-3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+      music: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 17.5V6l10-2v11.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="17.5" r="2.5" stroke="currentColor" stroke-width="1.7"/><circle cx="16.5" cy="15.5" r="2.5" stroke="currentColor" stroke-width="1.7"/></svg>',
+      form: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="5" y="3.5" width="14" height="17" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M9 8h6M9 12h6M9 16h3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+      check: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    };
+
+    function formClosesMs(f){
+      return f.closesAt && f.closesAt.toMillis ? f.closesAt.toMillis() : 8.64e15;
+    }
+
+    function loadHomeForms(uid, team){
+      listOpenFormsForMember(team).then(function(forms){
+        return Promise.all(forms.map(function(f){
+          return loadResponse(f.id, uid).then(function(r){ return { form: f, done: !!r }; });
+        }));
+      }).then(renderHomeForms).catch(function(err){
+        console.error('開放中的表單 載入失敗', err);
+      });
+    }
+
+    function renderHomeForms(items){
+      var wrap = document.getElementById('formsHome');
+      if (!items.length){ wrap.classList.add('hidden'); return; }
+      items.sort(function(a, b){
+        if (a.done !== b.done) return a.done ? 1 : -1;
+        return formClosesMs(a.form) - formClosesMs(b.form);
+      });
+      document.getElementById('formsHomeList').innerHTML = items.map(function(it){
+        var f = it.form;
+        var deadline = f.closesAt ? formatDeadline(f.closesAt) : '';
+        var icon = it.done ? FORM_ICONS.check
+          : (hasItemsQuestion(f) ? FORM_ICONS.bowl : (f.linkedTo && f.linkedTo.type === 'concert' ? FORM_ICONS.music : FORM_ICONS.form));
+        var meta = it.done
+          ? (deadline ? '已填寫・可修改到 ' + deadline : '已填寫・截止前可以修改')
+          : '尚未填寫' + (deadline ? '・' + deadline + ' 截止' : '');
+        return '<a class="fh-card ' + (it.done ? 'done' : 'todo') + '" href="form.html?id=' + encodeURIComponent(f.id) + '">' +
+          '<span class="fh-ic">' + icon + '</span>' +
+          '<span class="fh-body"><span class="fh-title">' + escapeFormHtml(f.title) + '</span><span class="fh-meta">' + meta + '</span></span>' +
+          '<span class="fh-go">' + (it.done ? '修改' : '填寫') + '</span></a>';
+      }).join('');
+      wrap.classList.remove('hidden');
+    }
+
     // ---------- 身分驗證：訪客（未登入）／審核中／已核准，決定要不要打開個人化功能 ----------
     resolveMemberAccess().then(function(access){
       if (!access) return; // 未通過驗證（被拒絕/停用等），resolveMemberAccess 已經處理導轉
@@ -2895,6 +2963,8 @@
       renderFeeDueBanner();
       renderNotifDot();
       renderNotifSheet();
+      // 開放中的表單：只有已核准團員讀得到（規則 isTeamMemberOf），審核中不顯示
+      if (viewerState === 'approved') loadHomeForms(viewerUid, getActiveTeam(viewerProfile));
 
       // 審核中也算真團員（讀取權限跟已核准一樣），一併載入，跟團務總覽分頁對審核中開放的既有原則一致。
       // 不在這裡直接跑：這組讀取只有「團務總覽」分頁用得到，掛成 lazy loader，等使用者第一次

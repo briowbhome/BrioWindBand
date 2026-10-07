@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>布利歐管樂團｜表單</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#F2EFE5">
+<link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+<script src="./pwa-register.js" defer></script>
+<link rel="stylesheet" href="./theme.css">
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% -10%, #EFE9D6 0%, transparent 45%),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Noto Sans TC','Noto Sans',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    min-height:100dvh;
+    display:flex;
+    justify-content:center;
+  }
+  button, a, input, textarea, select{ -webkit-tap-highlight-color: transparent; font-family:inherit; }
+  :focus-visible{ outline:2.5px solid var(--brass-deep); outline-offset:2px; border-radius:6px; }
+  .app{
+    width:100%; max-width:460px; min-height:100vh; min-height:100dvh;
+    background:var(--paper); display:flex; flex-direction:column;
+    padding-top: env(safe-area-inset-top);
+  }
+  .hidden{ display:none !important; }
+
+  .appbar{ display:flex; align-items:center; gap:12px; padding:18px 20px 10px; }
+  .back-btn{ width:30px; height:30px; flex:none; display:flex; align-items:center; justify-content:center; color:var(--ink); text-decoration:none; }
+  .brand-link{ display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; }
+  .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
+  .brandtext{ display:flex; flex-direction:column; line-height:1.1; }
+  .brandtext .name{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:19px; letter-spacing:.02em; }
+  .brandtext .sub{ font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.14em; color:var(--ink-soft); margin-top:3px; text-transform:uppercase; }
+
+  .page-state{ margin:48px 24px; text-align:center; color:var(--ink-soft); font-size:13.5px; line-height:1.7; }
+  .guest-banner{ margin:4px 20px 12px; background:var(--ink); color:var(--paper); border-radius:var(--radius-md); padding:12px 14px; display:flex; align-items:center; gap:10px; }
+  .guest-banner .tx{ flex:1; font-size:12px; line-height:1.5; }
+  .guest-banner .tx b{ display:block; font-size:13px; }
+  .guest-banner button{ border:none; background:var(--paper); color:var(--ink); border-radius:999px; padding:7px 14px; font-size:12px; font-weight:700; cursor:pointer; flex:none; }
+  .form-head{ margin:4px 20px 12px; background:var(--paper-raised); border:1px solid var(--line); border-top:4px solid var(--burgundy); border-radius:var(--radius-md); padding:14px 16px; }
+  .form-head h1{ font-family:'Noto Serif TC',serif; margin:0 0 6px; font-size:17px; line-height:1.4; text-wrap:balance; }
+  .form-desc{ margin:0; font-size:12.5px; line-height:1.75; color:var(--ink-soft); white-space:pre-wrap; word-break:break-word; }
+  .form-desc a{ color:var(--brass-deep); font-weight:700; }
+  .chips{ display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+  .chip{ display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:700; border-radius:999px; padding:2px 8px; white-space:nowrap; }
+  .chip.sage{ background:var(--sage-bg); color:var(--sage); }
+  .chip.brass{ background:rgba(184,134,58,.14); color:var(--brass-deep); }
+  .chip.red{ background:#FBF3F3; color:var(--burgundy-deep); border:1px solid #EFD4D8; }
+  .chip.line{ background:var(--paper); color:var(--ink-soft); border:1px solid var(--line); }
+  .due-summary{ margin:0 20px 12px; display:flex; justify-content:space-between; align-items:baseline; gap:10px; background:var(--paper-raised); border:1px solid var(--line); border-radius:var(--radius-md); padding:11px 14px; font-size:12.5px; }
+  .due-summary b{ font-family:'Roboto Mono',monospace; font-size:17px; }
+  .lock-note{ margin:0 20px 12px; background:var(--sage-bg); color:var(--sage); border-radius:var(--radius-sm); padding:10px 12px; font-size:12.5px; display:flex; gap:8px; align-items:flex-start; line-height:1.55; }
+  #ownFields{ margin:0 20px; }
+  .withdraw-btn{ display:block; margin:2px auto 12px; border:none; background:none; color:var(--burgundy); font-size:12px; font-weight:700; cursor:pointer; padding:8px; }
+  .label{ font-family:'Roboto Mono',monospace; font-size:10.5px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft); }
+  .small-btn{ display:inline-flex; align-items:center; gap:5px; border:1px solid var(--line); background:var(--paper); color:var(--ink-soft); border-radius:999px; padding:6px 12px; font-size:11.5px; font-weight:700; cursor:pointer; }
+  .proxy-box{ margin:6px 20px 18px; border:1px dashed var(--line); border-radius:var(--radius-md); padding:12px 14px; }
+  .proxy-hd{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .proxy-row{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; border:none; border-top:1px solid var(--line); background:none; padding:10px 0; font-size:12.5px; cursor:pointer; color:var(--ink); }
+  .proxy-row .nm{ display:block; flex:1; min-width:0; font-weight:700; }
+  .proxy-row .sub{ display:block; font-size:11px; font-weight:400; color:var(--ink-soft); margin-top:1px; }
+  .proxy-row .amt{ font-family:'Roboto Mono',monospace; font-size:12px; font-weight:600; }
+  .proxy-row svg{ color:var(--ink-soft); flex:none; }
+  .proxy-empty{ font-size:12px; color:var(--ink-soft); padding:4px 0; line-height:1.6; }
+
+  .due-bar{ position:sticky; bottom:0; margin-top:auto; border-top:1px solid var(--line); background:var(--paper-raised); padding:10px 20px calc(12px + env(safe-area-inset-bottom)); display:flex; align-items:center; gap:10px; }
+  .due-bar .lbl{ font-size:10.5px; color:var(--ink-soft); }
+  .due-bar .amt{ font-family:'Roboto Mono',monospace; font-weight:700; font-size:17px; }
+  .due-bar .sp{ flex:1; }
+  .primary-btn{ border:none; background:var(--burgundy); color:#F2EFE5; border-radius:999px; padding:11px 22px; font-size:13.5px; font-weight:700; cursor:pointer; }
+  .primary-btn:disabled{ opacity:.55; cursor:default; }
+  .ghost-btn{ border:1px solid var(--line); background:var(--paper); color:var(--ink-soft); border-radius:999px; padding:11px 18px; font-size:13px; font-weight:700; cursor:pointer; }
+  .ghost-btn.danger{ color:var(--burgundy); border-color:#EFD4D8; background:#FBF3F3; }
+
+  .success{ display:flex; flex-direction:column; align-items:center; text-align:center; padding:26px 24px 8px; }
+  .success .ring{ width:54px; height:54px; border-radius:50%; background:var(--sage-bg); color:var(--sage); display:flex; align-items:center; justify-content:center; margin-bottom:12px; }
+  .success h2{ font-family:'Noto Serif TC',serif; margin:0 0 4px; font-size:17px; }
+  .success p{ margin:0; font-size:12.5px; color:var(--ink-soft); line-height:1.7; }
+  .invite{ margin:16px 20px 24px; background:var(--paper-raised); border:1px solid var(--line); border-radius:var(--radius-md); padding:14px 16px; }
+  .invite b{ font-size:14px; }
+  .invite ul{ margin:8px 0 12px; padding:0; list-style:none; display:flex; flex-direction:column; gap:6px; }
+  .invite li{ display:flex; gap:8px; align-items:center; font-size:12.5px; color:var(--ink-soft); }
+  .invite li svg{ color:var(--sage); flex:none; }
+  .prefill{ background:var(--paper); border-radius:var(--radius-sm); padding:9px 11px; font-size:12px; line-height:1.8; color:var(--ink-soft); margin-bottom:12px; }
+  .prefill b{ color:var(--ink); font-size:12px; }
+  .invite .btns{ display:flex; gap:8px; }
+  .invite .btns button{ flex:1; }
+
+  .sheet-overlay{ position:fixed; inset:0; z-index:80; background:rgba(32,36,47,.45); display:none; align-items:flex-end; justify-content:center; }
+  .sheet-overlay.active{ display:flex; }
+  .sheet{ width:100%; max-width:460px; max-height:90vh; background:var(--paper); border-radius:20px 20px 0 0; display:flex; flex-direction:column; box-shadow:0 -10px 30px rgba(32,36,47,.3); }
+  .sheet-handle{ width:36px; height:4px; background:var(--line); border-radius:999px; margin:10px auto 2px; flex:none; }
+  .sheet-header{ position:relative; padding:6px 44px 12px 20px; border-bottom:1px solid var(--line); flex:none; }
+  .sheet-header .name{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:16px; }
+  .sheet-close{ position:absolute; top:4px; right:10px; width:30px; height:30px; border-radius:50%; border:none; background:none; color:var(--ink-soft); cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .sheet-body{ overflow-y:auto; padding:14px 20px 8px; flex:1; min-height:0; }
+  .sheet-footer{ display:flex; align-items:center; gap:10px; padding:12px 20px calc(12px + env(safe-area-inset-bottom)); border-top:1px solid var(--line); background:var(--paper-raised); flex:none; }
+  .sheet-footer .primary-btn{ margin-left:auto; }
+  .lock-inline{ flex:1; font-size:12px; color:var(--sage); }
+</style>
+</head>
+<body>
+<div class="app" id="appRoot">
+  <div class="appbar">
+    <a class="back-btn" href="index.html" aria-label="回首頁">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="m15 5-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <a class="brand-link" href="index.html">
+      <img class="mark" src="assets/BrioLogo.jpg" alt="布利歐管樂團 Logo">
+      <div class="brandtext">
+        <div class="name">布利歐管樂團</div>
+        <div class="sub">Brio Wind Band</div>
+      </div>
+    </a>
+  </div>
+
+  <div class="page-state" id="pageLoading">載入中…</div>
+  <div class="page-state hidden" id="pageMessage"></div>
+
+  <div class="hidden" id="formPage">
+    <div class="guest-banner hidden" id="guestBanner">
+      <div class="tx"><b>已經是團員了嗎？</b>先登入再填，報名會直接記在你的帳號上。</div>
+      <button type="button" id="guestLoginBtn">登入</button>
+    </div>
+    <div class="form-head" id="formHead"></div>
+    <div class="due-summary hidden" id="dueSummary"></div>
+    <div class="lock-note hidden" id="lockNote">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="5.5" y="10.5" width="13" height="9.5" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      <span>已收款，如需修改請洽幹部。</span>
+    </div>
+    <div id="ownFields"></div>
+    <button type="button" class="withdraw-btn hidden" id="withdrawBtn">撤回我的回應</button>
+    <div class="proxy-box hidden" id="proxyBox">
+      <div class="proxy-hd">
+        <span class="label" id="proxyLabel"></span>
+        <button type="button" class="small-btn" id="proxyAddBtn">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>新增
+        </button>
+      </div>
+      <div id="proxyList"></div>
+    </div>
+  </div>
+
+  <div class="hidden" id="successPage">
+    <div class="success">
+      <div class="ring"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <h2>已收到你的回應</h2>
+      <p id="successText"></p>
+    </div>
+    <div class="invite">
+      <b>要順便建立帳號嗎？</b>
+      <ul>
+        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>團練簽到、請假回報</li>
+        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>查看自己分部的樂譜</li>
+        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>換手機也能修改這份回應</li>
+      </ul>
+      <div class="prefill" id="prefillText"></div>
+      <div class="btns">
+        <button type="button" class="ghost-btn" id="skipAccountBtn">略過</button>
+        <button type="button" class="primary-btn" id="createAccountBtn">建立帳號</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="due-bar hidden" id="dueBar">
+    <div id="dueBox"><div class="lbl">我的應付（不含代填）</div><div class="amt" id="dueAmt">$0</div></div>
+    <div class="sp"></div>
+    <button type="button" class="primary-btn" id="submitBtn">送出</button>
+  </div>
+</div>
+
+<!-- 代填 sheet：新增或修改一份「幫其他人填」的回應 -->
+<div class="sheet-overlay" id="proxySheetOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button type="button" class="sheet-close" id="proxySheetClose" aria-label="關閉">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <div class="name" id="proxySheetTitle"></div>
+    </div>
+    <div class="sheet-body"><div id="proxyFields"></div></div>
+    <div class="sheet-footer" id="proxySheetFooter"></div>
+  </div>
+</div>
+
+<script type="module">
+  // 表單填寫頁（10/6 新增）。App 內入口和分享連結都開這一頁，依身分分成：
+  // 該團已核准團員（可代填）／已登入但不是該團成員或待審核（只能改自己既有的回應）／
+  // 訪客（allowGuest 表單，按送出時才以 Firebase 匿名身分登入）
+  import { auth, db } from './firebase-init.js';
+  import { onAuthStateChanged, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+  import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+  import { showToast } from './toast.js';
+  import { showConfirm } from './dialog.js';
+  import { subscribeInstruments } from './instruments.js';
+  import {
+    loadForm, loadResponse, loadMyProxyResponses, hasPayment, loadLinkedTitle,
+    createOwnResponse, createProxyResponse, updateResponse, deleteResponse
+  } from './forms.js';
+  import {
+    isFormOpen, hasItemsQuestion, findInstrumentQuestion, computeDue, itemsSummary,
+    validateAnswers, cleanAnswers, linkifyText, escapeHtml, formatMoney, formatDeadline, TEAM_LABELS
+  } from './forms-core.js';
+  import { renderFields, readFields } from './form-fields.js';
+
+  var PREFILL_KEY = 'brio_form_register_prefill'; // login.html 讀同一個 key
+  var ICON_CLOCK = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="2"/><path d="M12 7.5V12l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  var ICON_CHECK = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var ICON_EDIT = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 19l1-4L15.5 5.5a2 2 0 0 1 3 3L9 18z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>';
+
+  var formId = new URLSearchParams(location.search).get('id');
+  var state = {
+    user: null, profile: null, form: null, open: false,
+    isMember: false, isGuest: false, nameFromProfile: false,
+    own: null, ownLocked: false,
+    proxies: [], proxyLocked: {},
+    instruments: [], linkedTitle: ''
+  };
+
+  var ownFieldsEl = document.getElementById('ownFields');
+  var submitBtn = document.getElementById('submitBtn');
+
+  function tsMs(ts){ return ts && ts.toMillis ? ts.toMillis() : 0; }
+
+  // 不經過 auth-guard.js：這一頁要能看到匿名身分本身（auth-guard 會把匿名身分當成未登入）
+  function waitForAuth(){
+    return new Promise(function(resolve){
+      var unsubscribe = onAuthStateChanged(auth, function(user){
+        unsubscribe();
+        resolve(user);
+      });
+    });
+  }
+
+  function goToLogin(){
+    location.href = 'login.html?redirect=' + encodeURIComponent(location.pathname + location.search);
+  }
+
+  function showMessage(text){
+    document.getElementById('pageLoading').classList.add('hidden');
+    document.getElementById('formPage').classList.add('hidden');
+    document.getElementById('dueBar').classList.add('hidden');
+    var el = document.getElementById('pageMessage');
+    el.textContent = text;
+    el.classList.remove('hidden');
+  }
+
+  // 樂器清單只讀一次（不持續監聽，不然清單一變動就會重畫、把填到一半的內容洗掉）
+  function loadInstrumentNames(){
+    return new Promise(function(resolve){
+      var done = false;
+      var unsubscribe = subscribeInstruments(db, function(list){
+        if (done) return;
+        done = true;
+        resolve(list.map(function(x){ return x.name; }));
+        setTimeout(function(){ if (unsubscribe) unsubscribe(); }, 0);
+      }, false, function(){
+        if (!done){ done = true; resolve([]); }
+      });
+    });
+  }
+
+  async function loadOwnState(){
+    state.own = state.user ? await loadResponse(formId, state.user.uid) : null;
+    state.ownLocked = state.own ? await hasPayment(formId, state.own.id) : false;
+  }
+
+  async function loadProxyState(){
+    var list = await loadMyProxyResponses(formId, state.user.uid);
+    list.sort(function(a, b){ return tsMs(a.submittedAt) - tsMs(b.submittedAt); });
+    var locks = await Promise.all(list.map(function(p){ return hasPayment(formId, p.id); }));
+    state.proxies = list;
+    state.proxyLocked = {};
+    list.forEach(function(p, i){ state.proxyLocked[p.id] = locks[i]; });
+  }
+
+  async function boot(){
+    if (!formId){ showMessage('找不到這張表單'); return; }
+    var user = await waitForAuth();
+    state.user = user;
+    var realUser = !!(user && !user.isAnonymous);
+    if (realUser){
+      try {
+        var snap = await getDoc(doc(db, 'users', user.uid));
+        state.profile = snap.exists() ? snap.data() : null;
+      } catch (e){
+        state.profile = null;
+      }
+    }
+
+    try {
+      state.form = await loadForm(formId);
+    } catch (err){
+      // 讀不到：沒登入（或只有匿名身分）就先去登入；已登入代表不是這一團、也不開放訪客
+      if (!realUser){ goToLogin(); return; }
+      showMessage('找不到這張表單，或你沒有權限查看');
+      return;
+    }
+    var f = state.form;
+    if (!f || f.archived || f.status === 'draft'){ showMessage('找不到這張表單'); return; }
+    if (!realUser && !f.allowGuest){ goToLogin(); return; }
+
+    state.open = isFormOpen(f, Date.now());
+    state.isGuest = !realUser;
+    state.isMember = !!(realUser && state.profile && state.profile.status === 'approved' &&
+      (state.profile.teamIds || []).indexOf(f.team) !== -1);
+    state.nameFromProfile = !!(realUser && state.profile && state.profile.name);
+
+    try {
+      var loaded = await Promise.all([
+        findInstrumentQuestion(f) ? loadInstrumentNames() : Promise.resolve([]),
+        loadLinkedTitle(f.linkedTo),
+        loadOwnState(),
+        state.isMember ? loadProxyState() : Promise.resolve()
+      ]);
+      state.instruments = loaded[0];
+      state.linkedTitle = loaded[1] || '';
+    } catch (err){
+      console.error('讀取回應失敗', err);
+      showMessage('讀取失敗，請重新整理再試一次');
+      return;
+    }
+
+    if (realUser && !state.isMember && !state.own){
+      showMessage('這張表單只開放給' + (TEAM_LABELS[f.team] || '') + '團員填寫');
+      return;
+    }
+    renderAll();
+  }
+
+  function editableOwn(){ return state.open && !state.ownLocked; }
+  function needsName(){ return !state.nameFromProfile; }
+
+  function renderAll(){
+    var f = state.form;
+    document.getElementById('pageLoading').classList.add('hidden');
+    document.getElementById('successPage').classList.add('hidden');
+    document.getElementById('formPage').classList.remove('hidden');
+    document.getElementById('guestBanner').classList.toggle('hidden', !state.isGuest);
+    renderHead();
+    var editable = editableOwn();
+    renderFields(ownFieldsEl, f, state.own ? state.own.answers : {}, {
+      readOnly: !editable,
+      showName: needsName(),
+      name: state.own ? state.own.name : '',
+      nameHint: state.isGuest ? '請填寫真實姓名，方便幹部確認' : '',
+      instruments: state.instruments
+    });
+    document.getElementById('lockNote').classList.toggle('hidden', !state.ownLocked);
+    document.getElementById('withdrawBtn').classList.toggle('hidden', !(state.own && editable));
+    document.getElementById('dueBar').classList.toggle('hidden', !editable);
+    document.getElementById('dueBox').classList.toggle('hidden', !hasItemsQuestion(f));
+    submitBtn.textContent = state.own ? '儲存修改' : '送出';
+    updateDue();
+    renderDueSummary();
+    renderProxies();
+  }
+
+  function renderHead(){
+    var f = state.form;
+    var chips = [];
+    if (!state.open) chips.push('<span class="chip red">已截止</span>');
+    else if (f.closesAt) chips.push('<span class="chip brass">' + ICON_CLOCK + formatDeadline(f.closesAt) + ' 截止</span>');
+    if (state.own) chips.push('<span class="chip sage">' + ICON_CHECK + '已填寫</span>');
+    if (state.linkedTitle) chips.push('<span class="chip line">' + escapeHtml(state.linkedTitle) + '</span>');
+    document.getElementById('formHead').innerHTML =
+      '<h1>' + escapeHtml(f.title) + '</h1>' +
+      (f.description ? '<p class="form-desc">' + linkifyText(f.description) + '</p>' : '') +
+      (chips.length ? '<div class="chips">' + chips.join('') + '</div>' : '');
+    document.title = '布利歐管樂團｜' + f.title;
+  }
+
+  function updateDue(){
+    if (!hasItemsQuestion(state.form) || !editableOwn()) return;
+    var data = readFields(ownFieldsEl, state.form);
+    document.getElementById('dueAmt').textContent = formatMoney(computeDue(state.form, data.answers));
+  }
+  ownFieldsEl.addEventListener('ff-change', updateDue);
+
+  // 只顯示依自己答案算出的應付金額（含代填），不顯示已付／還欠——收款狀態只有幹部看得到
+  function renderDueSummary(){
+    var f = state.form;
+    var el = document.getElementById('dueSummary');
+    if (!hasItemsQuestion(f) || (!state.own && !state.proxies.length)){
+      el.classList.add('hidden');
+      return;
+    }
+    var total = (state.own ? computeDue(f, state.own.answers) : 0) +
+      state.proxies.reduce(function(sum, p){ return sum + computeDue(f, p.answers); }, 0);
+    el.innerHTML = '<span>應付金額' + (state.proxies.length ? '（含代填 ' + state.proxies.length + ' 份）' : '') + '</span><b>' + formatMoney(total) + '</b>';
+    el.classList.remove('hidden');
+  }
+
+  function renderProxies(){
+    var f = state.form;
+    var box = document.getElementById('proxyBox');
+    if (!state.isMember || (!state.open && !state.proxies.length)){
+      box.classList.add('hidden');
+      return;
+    }
+    box.classList.remove('hidden');
+    var withItems = hasItemsQuestion(f);
+    document.getElementById('proxyLabel').textContent = (withItems ? '幫其他人訂餐' : '幫其他人填寫') + '（' + state.proxies.length + '）';
+    document.getElementById('proxyAddBtn').classList.toggle('hidden', !state.open);
+    document.getElementById('proxyList').innerHTML = state.proxies.length ? state.proxies.map(function(p){
+      var summary = withItems ? itemsSummary(f, p.answers) : '';
+      var tail = state.proxyLocked[p.id] ? '<span class="chip sage">已收款</span>' : (state.open ? ICON_EDIT : '');
+      return '<button type="button" class="proxy-row" data-proxy="' + escapeHtml(p.id) + '">' +
+        '<span class="nm">' + escapeHtml(p.name) + (summary ? '<span class="sub">' + escapeHtml(summary) + '</span>' : '') + '</span>' +
+        (withItems ? '<span class="amt">' + formatMoney(computeDue(f, p.answers)) + '</span>' : '') + tail +
+      '</button>';
+    }).join('') : '<div class="proxy-empty">' +
+      (withItems ? '幫自己帶來的槍手或朋友訂餐，每個人各自一筆。' : '幫沒有帳號的人填寫，每個人各自一筆。') + '</div>';
+  }
+
+  // ---------- 送出／修改／撤回自己的回應 ----------
+  async function handleWriteError(err){
+    console.error('寫入回應失敗', err);
+    if (err && err.code === 'permission-denied'){
+      try {
+        state.form = (await loadForm(formId)) || state.form;
+        state.open = isFormOpen(state.form, Date.now());
+        await loadOwnState();
+        if (state.isMember) await loadProxyState();
+      } catch (e){}
+      if (!state.open){ showToast('表單已截止，這次的修改沒有送出', 'error'); renderAll(); return; }
+      if (state.ownLocked){ showToast('已收款，如需修改請洽幹部。', 'error'); renderAll(); return; }
+    }
+    showToast('送出失敗：' + ((err && err.code) || '請稍後再試'), 'error');
+  }
+
+  submitBtn.addEventListener('click', async function(){
+    var f = state.form;
+    var data = readFields(ownFieldsEl, f);
+    var errors = validateAnswers(f, data.answers, { requireName: needsName(), name: data.name });
+    if (errors.length){ showToast(errors[0], 'error'); return; }
+    var name = needsName() ? data.name : state.profile.name;
+    var answers = cleanAnswers(f, data.answers);
+    var wasNew = !state.own;
+    submitBtn.disabled = true;
+    try {
+      // 訪客：開頁面時不建立任何帳號，按下送出才以匿名身分登入
+      if (!state.user){
+        try {
+          state.user = (await signInAnonymously(auth)).user;
+        } catch (e){
+          console.error('匿名登入失敗', e);
+          showToast('暫時無法以訪客身分送出，請聯絡幹部', 'error');
+          return;
+        }
+      }
+      if (wasNew) await createOwnResponse(formId, state.user.uid, name, answers);
+      else await updateResponse(formId, state.own.id, name, answers);
+      await loadOwnState();
+      if (state.isGuest && wasNew){ showSuccess(); return; }
+      showToast(wasNew ? '已送出' : '已儲存修改', 'success');
+      renderAll();
+    } catch (err){
+      await handleWriteError(err);
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+
+  document.getElementById('withdrawBtn').addEventListener('click', async function(){
+    var ok = await showConfirm('確定要撤回你的回應嗎？撤回後還可以在截止前重新填寫。', { danger: true, confirmText: '撤回' });
+    if (!ok) return;
+    try {
+      await deleteResponse(formId, state.own.id);
+      state.own = null;
+      state.ownLocked = false;
+      showToast('已撤回', 'success');
+      renderAll();
+    } catch (err){
+      await handleWriteError(err);
+    }
+  });
+
+  // ---------- 訪客 ----------
+  document.getElementById('guestLoginBtn').addEventListener('click', async function(){
+    if (state.own){
+      var ok = await showConfirm('你剛才以訪客身分填的回應不會自動轉到帳號，登入後請重新填寫。要繼續登入嗎？', { confirmText: '登入' });
+      if (!ok) return;
+    }
+    goToLogin();
+  });
+
+  function instrumentAnswer(){
+    var q = findInstrumentQuestion(state.form);
+    var v = q && state.own && state.own.answers ? state.own.answers[q.id] : null;
+    return Array.isArray(v) ? v : [];
+  }
+
+  function showSuccess(){
+    var f = state.form;
+    var inst = instrumentAnswer();
+    document.getElementById('formPage').classList.add('hidden');
+    document.getElementById('dueBar').classList.add('hidden');
+    document.getElementById('successPage').classList.remove('hidden');
+    document.getElementById('successText').textContent = f.title + (inst.length ? '・' + inst.join('、') : '') +
+      '。截止前用這支手機再打開連結，就能修改內容。';
+    document.getElementById('prefillText').innerHTML = '<b>已幫你帶入：</b>姓名 ' + escapeHtml(state.own.name) +
+      (inst.length ? '・樂器 ' + escapeHtml(inst.join('、')) : '') + '・' + escapeHtml(TEAM_LABELS[f.team] || '') +
+      '<br>還需要填：帳號、密碼、生日、電話';
+    window.scrollTo(0, 0);
+  }
+
+  document.getElementById('createAccountBtn').addEventListener('click', function(){
+    try {
+      sessionStorage.setItem(PREFILL_KEY, JSON.stringify({ name: state.own.name, instruments: instrumentAnswer(), team: state.form.team }));
+    } catch (e){}
+    location.href = 'login.html?mode=register&redirect=' + encodeURIComponent(location.pathname + location.search);
+  });
+
+  document.getElementById('skipAccountBtn').addEventListener('click', function(){
+    renderAll();
+    window.scrollTo(0, 0);
+  });
+
+  // ---------- 代填 ----------
+  var proxyOverlay = document.getElementById('proxySheetOverlay');
+  var proxyFieldsEl = document.getElementById('proxyFields');
+  var proxyFooter = document.getElementById('proxySheetFooter');
+  var editingProxy = null; // null＝新增
+
+  function openProxySheet(p){
+    editingProxy = p;
+    var locked = !!(p && state.proxyLocked[p.id]);
+    var editable = state.open && !locked;
+    document.getElementById('proxySheetTitle').textContent = p ? p.name : (hasItemsQuestion(state.form) ? '幫其他人訂餐' : '幫其他人填寫');
+    renderFields(proxyFieldsEl, state.form, p ? p.answers : {}, {
+      readOnly: !editable, showName: true, name: p ? p.name : '',
+      nameHint: '例如：長號槍手 王小明', instruments: state.instruments
+    });
+    var html = '';
+    if (locked) html += '<span class="lock-inline">已收款，如需修改請洽幹部。</span>';
+    if (p && editable) html += '<button type="button" class="ghost-btn danger" data-act="delete">刪除</button>';
+    html += editable
+      ? '<button type="button" class="primary-btn" data-act="save">' + (p ? '儲存修改' : '新增') + '</button>'
+      : '<button type="button" class="ghost-btn" data-act="close">關閉</button>';
+    proxyFooter.innerHTML = html;
+    proxyOverlay.classList.add('active');
+  }
+
+  function closeProxySheet(){
+    proxyOverlay.classList.remove('active');
+    editingProxy = null;
+  }
+
+  document.getElementById('proxyAddBtn').addEventListener('click', function(){ openProxySheet(null); });
+  document.getElementById('proxyList').addEventListener('click', function(e){
+    var row = e.target.closest('[data-proxy]');
+    if (!row) return;
+    var id = row.getAttribute('data-proxy');
+    openProxySheet(state.proxies.filter(function(p){ return p.id === id; })[0]);
+  });
+  document.getElementById('proxySheetClose').addEventListener('click', closeProxySheet);
+  proxyOverlay.addEventListener('click', function(e){
+    if (e.target === proxyOverlay) closeProxySheet();
+  });
+
+  proxyFooter.addEventListener('click', async function(e){
+    var btn = e.target.closest('[data-act]');
+    if (!btn) return;
+    var act = btn.getAttribute('data-act');
+    if (act === 'close'){ closeProxySheet(); return; }
+    var f = state.form;
+    var p = editingProxy;
+    btn.disabled = true;
+    try {
+      if (act === 'delete'){
+        var ok = await showConfirm('確定要刪除「' + p.name + '」的回應嗎？', { danger: true, confirmText: '刪除' });
+        if (!ok) return;
+        await deleteResponse(formId, p.id);
+        showToast('已刪除', 'success');
+      } else {
+        var data = readFields(proxyFieldsEl, f);
+        var errors = validateAnswers(f, data.answers, { requireName: true, name: data.name });
+        if (errors.length){ showToast(errors[0], 'error'); return; }
+        var answers = cleanAnswers(f, data.answers);
+        if (p) await updateResponse(formId, p.id, data.name, answers);
+        else await createProxyResponse(formId, state.user.uid, data.name, answers);
+        showToast(p ? '已儲存修改' : '已新增', 'success');
+      }
+      await loadProxyState();
+      closeProxySheet();
+      // 只重畫代填區和合計，不重畫自己的欄位，避免洗掉還沒送出的修改
+      renderDueSummary();
+      renderProxies();
+    } catch (err){
+      closeProxySheet();
+      await handleWriteError(err);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  boot();
+</script>
+</body>
+</html>

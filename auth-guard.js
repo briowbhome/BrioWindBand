@@ -84,7 +84,11 @@ function waitForAuthUser() {
   return new Promise(function (resolve) {
     var unsubscribe = onAuthStateChanged(auth, function (user) {
       unsubscribe();
-      resolve(user);
+      // 10/6 表單功能：訪客用分享連結填表時會以 Firebase 匿名身分登入，匿名身分沒有 users 文件。
+      // 一律當成「未登入」交給呼叫端處理（首頁顯示未登入版、後台導向登入頁），但不執行 signOut——
+      // 匿名身分要留在瀏覽器裡，之後在同一個瀏覽器註冊時才能升級成正式帳號、原本的回應自動接上。
+      // 在登入頁用既有帳號登入，會自然取代匿名身分
+      resolve(user && !user.isAnonymous ? user : null);
     });
   });
 }

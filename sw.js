@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'brio-v56';
+const CACHE_VERSION = 'brio-v57';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -22,6 +22,8 @@ const CORE_ASSETS = [
   './sheet-music.html',
   './repertoire-admin.html',
   './section-admin.html',
+  './forms-admin.html',
+  './form.html',
   './theme.css',
   './team-switcher.js',
   './pdf-split.js',
@@ -44,6 +46,13 @@ const CORE_ASSETS = [
   './repertoire.js',
   './seating-chart.js',
   './finance.js',
+  './forms-core.js',
+  './forms.js',
+  './form-fields.js',
+  './forms-admin-editor.js',
+  './forms-admin-responses.js',
+  './forms-admin-payments.js',
+  './forms-admin-import.js',
   './ios-install.js',
   './pull-refresh.js',
   './pwa-register.js',

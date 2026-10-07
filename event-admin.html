@@ -550,6 +550,9 @@
     flex:none; border:1px solid var(--line); background:var(--paper);
     border-radius:6px; padding:3px 6px; font-size:11px; color:var(--ink-soft);
   }
+  /* 10/6：連結到這場活動／音樂會的表單捷徑 */
+  .linked-form-link{ display:block; color:var(--brass-deep); font-weight:700; text-decoration:none; text-align:right; }
+  .linked-form-link + .linked-form-link{ margin-top:4px; }
 </style>
 </head>
 <body>
@@ -782,6 +785,7 @@
           <div class="info-row"><span class="k">時間</span><span class="v" id="infoTime">—</span></div>
           <div class="info-row"><span class="k">地點</span><span class="v" id="infoLocation">—</span></div>
           <div class="info-row hidden" id="infoConcertRow"><span class="k">所屬音樂會</span><span class="v" id="infoConcertTitle">—</span></div>
+          <div class="info-row hidden" id="infoFormsRow"><span class="k">表單</span><span class="v" id="infoForms"></span></div>
           <button type="button" class="info-edit-btn" id="infoEditBtn">✎ 編輯</button>
         </div>
         <div id="infoEditMode" class="hidden"></div>
@@ -895,6 +899,7 @@
         <div id="concertInfoViewMode">
           <div class="info-row"><span class="k">期間</span><span class="v" id="concertInfoPeriod">—</span></div>
           <div class="info-row"><span class="k">說明</span><span class="v" id="concertInfoDescription">—</span></div>
+          <div class="info-row hidden" id="concertInfoFormsRow"><span class="k">表單</span><span class="v" id="concertInfoForms"></span></div>
           <button type="button" class="info-edit-btn" id="concertInfoEditBtn">✎ 編輯</button>
         </div>
         <div id="concertInfoEditMode" class="hidden"></div>
@@ -987,6 +992,8 @@
   import { subscribeInstruments } from './instruments.js';
   import { applyTemplateToEventRoster, applyTemplateToConcertRoster, diffTemplateMembers } from './roster-templates.js';
   import { loadRemovedMemberNames, removedMemberLabel, REMOVED_TAG_HTML, removedDividerHtml, removedHintText } from './removed-members.js';
+  import { listTeamForms } from './forms.js';
+  import { escapeHtml as escapeFormHtml } from './forms-core.js';
   import {
     collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot,
     serverTimestamp, Timestamp, getDoc, getDocs, query, where, setDoc
@@ -1355,6 +1362,38 @@
     });
   });
 
+  // ---------- 10/6：連結到這場活動／音樂會的表單（捷徑，點了開表單管理）----------
+  var teamFormsPromise = null;
+  function ensureTeamForms(){
+    if (!teamFormsPromise){
+      teamFormsPromise = listTeamForms(activeTeam).then(function(list){
+        return list.filter(function(f){ return !f.archived; });
+      }).catch(function(err){
+        console.error('讀取表單失敗', err);
+        teamFormsPromise = null;
+        return [];
+      });
+    }
+    return teamFormsPromise;
+  }
+
+  function renderLinkedForms(type, id, rowId, valueId){
+    var row = document.getElementById(rowId);
+    row.classList.add('hidden');
+    if (!id) return;
+    ensureTeamForms().then(function(forms){
+      // 非同步回來時使用者可能已經切到別場，對不上就不畫
+      var currentId = type === 'event' ? openRosterEventId : openConcertId;
+      if (currentId !== id) return;
+      var linked = forms.filter(function(f){ return f.linkedTo && f.linkedTo.type === type && f.linkedTo.id === id; });
+      if (!linked.length) return;
+      document.getElementById(valueId).innerHTML = linked.map(function(f){
+        return '<a class="linked-form-link" href="forms-admin.html?open=' + encodeURIComponent(f.id) + '">' + escapeFormHtml(f.title) + '</a>';
+      }).join('');
+      row.classList.remove('hidden');
+    });
+  }
+
   // ---------- 音樂會明細 Sheet ----------
   var openConcertId = null;
   var activeConcertSheetTab = 'info'; // 'info' | 'pieces' | 'roster'
@@ -1367,6 +1406,7 @@
     if (!c) return;
     document.getElementById('concertInfoPeriod').textContent = formatConcertPeriod(c);
     document.getElementById('concertInfoDescription').textContent = c.description || '未填寫';
+    renderLinkedForms('concert', openConcertId, 'concertInfoFormsRow', 'concertInfoForms');
   }
 
   function setConcertSheetTab(tab){
@@ -2469,6 +2509,7 @@
       var concert = concertsById[evt.concertId];
       document.getElementById('infoConcertTitle').textContent = concert ? concert.title : '（找不到這場音樂會）';
     }
+    renderLinkedForms('event', openRosterEventId, 'infoFormsRow', 'infoForms');
   }
 
   document.getElementById('tabInfo').addEventListener('click', function(){

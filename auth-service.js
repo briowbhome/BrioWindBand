@@ -2,7 +2,9 @@ import { auth, db } from "./firebase-init.js";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signOut
+  signOut,
+  linkWithCredential,
+  EmailAuthProvider
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
   doc,
@@ -20,6 +22,7 @@ function usernameToEmail(account) {
 function mapAuthError(error) {
   var code = error && error.code;
   if (code === "auth/email-already-in-use") return "此帳號已被使用，請換一個帳號";
+  if (code === "auth/credential-already-in-use") return "此帳號已被使用，請換一個帳號";
   if (code === "auth/weak-password") return "密碼強度不足";
   if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") return "帳號或密碼錯誤";
   if (code === "auth/too-many-requests") return "嘗試次數過多，請稍後再試";
@@ -31,7 +34,16 @@ export async function registerAccount({ account, password, name, birthday, phone
   var email = usernameToEmail(account);
   var credential;
   try {
-    credential = await createUserWithEmailAndPassword(auth, email, password);
+    // 10/6 表單功能：訪客填表時是匿名身分，這時候註冊改成「升級」匿名帳號而不是新建，
+    // uid 不變，之前送出的表單回應就自動算是這個新帳號的
+    if (auth.currentUser && auth.currentUser.isAnonymous) {
+      credential = await linkWithCredential(auth.currentUser, EmailAuthProvider.credential(email, password));
+      // 刷新 token，讓 Firestore 規則看到的登入方式從 anonymous 變成 password，
+      // 下面寫入 users 文件才不會被「匿名身分不能建立 users」那條規則擋掉
+      await credential.user.getIdToken(true);
+    } else {
+      credential = await createUserWithEmailAndPassword(auth, email, password);
+    }
   } catch (error) {
     throw new Error(mapAuthError(error));
   }

@@ -901,6 +901,25 @@
     location.href = target;
   });
 
+  // 10/6 表單功能：訪客送出表單後按「建立帳號」會帶 mode=register 過來，並在 sessionStorage
+  // 放好表單裡已經填過的姓名／樂器／團別，這裡直接帶入，減少重填
+  var FORM_PREFILL_KEY = 'brio_form_register_prefill';
+  (function applyFormPrefill(){
+    if (new URLSearchParams(location.search).get('mode') !== 'register') return;
+    showView('register1');
+    var prefill = null;
+    try { prefill = JSON.parse(sessionStorage.getItem(FORM_PREFILL_KEY) || 'null'); } catch (e) {}
+    if (!prefill) return;
+    if (prefill.name) document.getElementById('regName').value = prefill.name;
+    if (Array.isArray(prefill.instruments) && prefill.instruments.length){
+      selectedInstruments.splice(0, selectedInstruments.length);
+      prefill.instruments.forEach(function(n){ selectedInstruments.push(n); });
+      renderTrigger();
+    }
+    var teamBtn = prefill.team ? teamPicker.querySelector('[data-team-option="' + prefill.team + '"]') : null;
+    if (teamBtn) teamBtn.click();
+  })();
+
   // 申請帳號表單（送出動作只會在步驟 2 觸發，步驟 1 的 Enter 已另外攔截）
   panelRegister.addEventListener('submit', function(e){
     e.preventDefault();
@@ -941,9 +960,13 @@
     }).then(function(result){
       // 註冊成功後直接登入進首頁——審核前只能看受限版的首頁，不用再回登入頁等審核，
       // 見 index.html 的訪客/審核中身分處理
-      btn.textContent = '✓ 申請已送出，前往首頁';
+      btn.textContent = '✓ 申請已送出';
       btn.style.background = '#5F6E58';
-      setTimeout(function(){ location.href = 'index.html'; }, 500);
+      try { sessionStorage.removeItem(FORM_PREFILL_KEY); } catch (e) {}
+      // 10/6：從表單過來註冊的人要回到表單；redirect 檢查規則跟登入成功那段相同（只接受站內路徑）
+      var redirect = new URLSearchParams(location.search).get('redirect');
+      var target = (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) ? redirect : 'index.html';
+      setTimeout(function(){ location.href = target; }, 500);
     }).catch(function(error){
       btn.disabled = false;
       btn.textContent = '送出帳號申請';

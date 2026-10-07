@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>布利歐管樂團｜表單管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#F2EFE5">
+<link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+<script src="./pwa-register.js" defer></script>
+<script src="./pull-refresh.js" defer></script>
+<link rel="stylesheet" href="./theme.css">
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% -10%, #EFE9D6 0%, transparent 45%),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Noto Sans TC','Noto Sans',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    min-height:100dvh;
+    display:flex;
+    justify-content:center;
+    padding: 0 0 calc(48px + env(safe-area-inset-bottom));
+  }
+  button, a, input, textarea, select{ -webkit-tap-highlight-color: transparent; font-family:inherit; }
+  :focus-visible{ outline:2.5px solid var(--brass-deep); outline-offset:2px; border-radius:6px; }
+  .app{
+    width:100%; max-width:460px; min-height:100vh; min-height:100dvh;
+    background:var(--paper); position:relative; display:flex; flex-direction:column;
+    padding-top: env(safe-area-inset-top);
+  }
+  .hidden{ display:none !important; }
+
+  /* ---------- appbar（比照 feedback-admin.html） ---------- */
+  .appbar{ display:flex; align-items:center; gap:12px; padding:18px 20px 14px; }
+  .admin-nav-btn{ width:30px; height:30px; flex:none; border:none; background:none; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--ink); cursor:pointer; padding:0; }
+  .admin-nav-btn:active{ background:rgba(32,36,47,.06); }
+  .mark{ width:38px; height:38px; flex:none; object-fit:cover; border-radius:50%; }
+  @media (max-width: 899px){
+    .appbar:has(.team-badge:not(.hidden)) .mark{ display:none; }
+  }
+  .brandtext{ display:flex; flex-direction:column; line-height:1.1; }
+  .brandtext .name{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:19px; letter-spacing:.02em; }
+  .brandtext .sub{ font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.14em; color:var(--ink-soft); margin-top:3px; text-transform:uppercase; }
+  .appbar .spacer{ flex:1; }
+  .avatar{
+    width:38px; height:38px; border-radius:50%; background:var(--burgundy); color:#F2EFE5;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Noto Serif TC',serif; font-weight:700; font-size:14px;
+    border:2px solid var(--paper-raised); box-shadow:0 0 0 1.5px var(--line);
+    padding:0; cursor:pointer; flex:none;
+  }
+  .back-btn{ width:30px; height:30px; flex:none; display:flex; align-items:center; justify-content:center; color:var(--ink); text-decoration:none; }
+  .brand-link{ display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; }
+  @keyframes skel-pulse{ 0%,100%{ opacity:.55; } 50%{ opacity:1; } }
+  .skel{ background:var(--line); animation:skel-pulse 1.4s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce){ .skel{ animation:none; opacity:.75; } }
+
+  .section-label{ display:flex; align-items:baseline; gap:8px; margin:20px 20px 4px; }
+  .section-label .tw{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:15.5px; }
+  .section-label .en{ font-family:'Roboto Mono',monospace; font-size:10px; letter-spacing:.12em; color:var(--ink-soft); text-transform:uppercase; }
+  .lede{ margin:6px 20px 10px; font-size:12.5px; line-height:1.6; color:var(--ink-soft); }
+  .filter-row{ display:flex; gap:6px; overflow-x:auto; margin:0 20px 14px; }
+  .filter-row::-webkit-scrollbar{ display:none; }
+  .filter-chip{ flex:none; border:1px solid var(--line); background:var(--paper-raised); color:var(--ink-soft); border-radius:999px; padding:6px 13px; font-size:11.5px; font-weight:600; cursor:pointer; }
+  .filter-chip.active{ background:var(--ink); border-color:var(--ink); color:var(--paper-raised); }
+
+  /* ---------- 列表 ---------- */
+  .top-actions{ display:flex; justify-content:flex-end; margin:-2px 20px 12px; }
+  .add-btn{ display:inline-flex; align-items:center; gap:6px; border:none; background:var(--ink); color:var(--paper-raised); border-radius:999px; padding:9px 15px; font-size:12.5px; font-weight:700; cursor:pointer; }
+  .add-btn:disabled{ opacity:.5; cursor:default; }
+  .fm-card{ display:block; width:calc(100% - 40px); margin:0 20px 12px; text-align:left; background:var(--paper-raised); border:1px solid var(--line); border-radius:var(--radius-md); box-shadow:var(--shadow-card); padding:13px 15px; cursor:pointer; color:var(--ink); }
+  .fm-card-top{ display:flex; align-items:center; gap:8px; }
+  .fm-card-title{ flex:1; min-width:0; font-weight:700; font-size:14px; }
+  .fm-meta{ display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:6px; font-size:11.5px; color:var(--ink-soft); }
+  .fm-meta span{ display:inline-flex; align-items:center; gap:4px; }
+  .fm-link{ display:flex; align-items:center; gap:4px; margin-top:6px; font-size:11.5px; font-weight:700; color:var(--brass-deep); }
+  .fm-empty{ margin:0 20px; padding:24px 16px; text-align:center; color:var(--ink-soft); font-size:12.5px; border:1px dashed var(--line); border-radius:var(--radius-md); }
+  .sheet-body .fm-empty{ margin:12px 0 0; }
+  .fm-loading{ padding:28px 0; text-align:center; color:var(--ink-soft); font-size:12.5px; }
+  .ico{ width:14px; height:14px; flex:none; }
+
+  /* ---------- 標籤 ---------- */
+  .chip{ display:inline-flex; align-items:center; gap:3px; font-size:10.5px; font-weight:700; border-radius:999px; padding:2px 8px; white-space:nowrap; flex:none; font-family:'Noto Sans TC','Noto Sans',sans-serif; }
+  .chip.sage{ background:var(--sage-bg); color:var(--sage); }
+  .chip.brass{ background:rgba(184,134,58,.14); color:var(--brass-deep); }
+  .chip.red{ background:#FBF3F3; color:var(--burgundy-deep); border:1px solid #EFD4D8; }
+  .chip.line{ background:var(--paper); color:var(--ink-soft); border:1px solid var(--line); }
+
+  /* ---------- Sheet ---------- */
+  .sheet-overlay{ position:fixed; inset:0; z-index:80; background:rgba(32,36,47,.45); display:none; align-items:flex-end; justify-content:center; }
+  .sheet-overlay.active{ display:flex; }
+  .sheet-overlay.upper{ z-index:86; }
+  .sheet{ width:100%; max-width:460px; max-height:88vh; background:var(--paper-raised); border-radius:20px 20px 0 0; display:flex; flex-direction:column; box-shadow:0 -10px 30px rgba(32,36,47,.3); }
+  .sheet.tall{ height:92vh; max-height:92vh; }
+  .sheet-handle{ width:36px; height:4px; background:var(--line); border-radius:999px; margin:10px auto 2px; flex:none; }
+  .sheet-header{ position:relative; padding:6px 44px 12px 20px; border-bottom:1px solid var(--line); flex:none; }
+  .sheet-header .name{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:16px; }
+  .sheet-sub{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:4px; font-size:11px; color:var(--ink-soft); }
+  .sheet-close{ position:absolute; top:4px; right:10px; width:30px; height:30px; border-radius:50%; border:none; background:none; color:var(--ink-soft); cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .sheet-close:active{ background:var(--paper); }
+  .sheet-tabs{ display:flex; gap:6px; padding:10px 20px 0; overflow-x:auto; flex:none; }
+  .sheet-tabs::-webkit-scrollbar{ display:none; }
+  .sheet-tab{ flex:none; padding:6px 12px; border-radius:999px; font-size:12px; font-weight:700; color:var(--ink-soft); border:1px solid var(--line); background:var(--paper); cursor:pointer; }
+  .sheet-tab.active{ background:var(--ink); color:var(--paper-raised); border-color:var(--ink); }
+  .sheet-body{ overflow-y:auto; padding:14px 20px 18px; flex:1; min-height:0; }
+  .sheet-footer{ display:flex; gap:10px; padding:12px 20px calc(12px + env(safe-area-inset-bottom)); border-top:1px solid var(--line); flex:none; }
+  .cta-btn{ flex:1; display:flex; align-items:center; justify-content:center; gap:8px; background:var(--brass); color:var(--ink); border:none; border-radius:var(--radius-md); padding:13px 14px; font-weight:700; font-size:14px; cursor:pointer; }
+  .cta-btn:disabled{ opacity:.5; cursor:default; }
+  .cta-btn-secondary{ background:var(--paper); color:var(--ink-soft); border:1px solid var(--line); }
+  .cta-btn-danger{ background:#FBF3F3; color:var(--burgundy); border:1px solid #EFD4D8; }
+  .small-btn{ display:inline-flex; align-items:center; gap:5px; border:1px solid var(--line); background:var(--paper); color:var(--ink-soft); border-radius:999px; padding:6px 12px; font-size:11.5px; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .small-btn.primary{ background:var(--brass); border-color:var(--brass); color:var(--ink); }
+  .small-btn.dark, .small-btn.active{ background:var(--ink); border-color:var(--ink); color:var(--paper-raised); }
+  .small-btn:disabled{ opacity:.45; cursor:default; }
+
+  /* ---------- 設定與題目 ---------- */
+  .label{ font-family:'Roboto Mono',monospace; font-size:10.5px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft); }
+  .field{ display:flex; flex-direction:column; gap:6px; margin-bottom:12px; }
+  .field-input{ width:100%; border:1px solid var(--line); background:var(--paper); border-radius:var(--radius-sm); padding:9px 11px; font-size:13px; color:var(--ink); }
+  textarea.field-input{ min-height:76px; resize:vertical; line-height:1.6; }
+  .field-row{ display:flex; gap:8px; align-items:center; }
+  .field-row .field-input{ flex:1; min-width:0; }
+  .switch-row{ display:flex; align-items:flex-start; gap:10px; padding:10px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); margin-bottom:14px; cursor:pointer; }
+  .switch-row .txt{ flex:1; font-size:13px; font-weight:700; }
+  .switch-row .hint{ display:block; font-size:11px; font-weight:400; color:var(--ink-soft); margin-top:2px; line-height:1.5; }
+  .switch-row input{ width:20px; height:20px; accent-color:var(--sage); flex:none; margin-top:2px; }
+  .qe{ border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--paper); margin-top:8px; }
+  .qe.open{ border-color:var(--brass); background:var(--paper-raised); }
+  .qe-top{ display:flex; align-items:center; gap:8px; padding:8px 6px 8px 11px; cursor:pointer; }
+  .qe-type{ font-family:'Roboto Mono',monospace; font-size:9.5px; font-weight:700; letter-spacing:.04em; color:var(--brass-deep); background:rgba(184,134,58,.14); border-radius:5px; padding:2px 6px; white-space:nowrap; flex:none; }
+  .qe-title{ flex:1; min-width:0; font-size:12.5px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .qe-ctl{ display:flex; gap:2px; flex:none; }
+  .qe-ctl button{ width:30px; height:30px; border:none; background:none; color:var(--ink-soft); border-radius:6px; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; }
+  .qe-ctl button:disabled{ opacity:.3; cursor:default; }
+  .qe-summary{ padding:0 11px 10px; font-size:11.5px; color:var(--ink-soft); line-height:1.6; }
+  .qe-body{ padding:0 11px 12px; display:flex; flex-direction:column; gap:8px; }
+  .qe-check{ display:flex; align-items:center; gap:8px; font-size:12.5px; cursor:pointer; }
+  .qe-check input{ width:17px; height:17px; accent-color:var(--brass); }
+  .qe-opt{ display:flex; gap:6px; align-items:center; }
+  .qe-opt .field-input{ padding:7px 9px; font-size:12.5px; }
+  .qe-opt .price{ flex:0 0 80px; font-family:'Roboto Mono',monospace; }
+  .qe-x{ width:28px; height:28px; border:none; background:none; color:var(--burgundy); cursor:pointer; flex:none; display:flex; align-items:center; justify-content:center; padding:0; }
+  .qe-body .small-btn{ align-self:flex-start; }
+  .qe-note{ font-size:11.5px; color:var(--burgundy-deep); line-height:1.5; }
+  .qe-hint{ font-size:11.5px; color:var(--ink-soft); line-height:1.5; }
+  .add-q{ width:100%; margin-top:10px; border:1px dashed var(--brass); background:none; border-radius:var(--radius-sm); padding:10px; font-size:12px; font-weight:700; color:var(--brass-deep); display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer; }
+  .type-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:8px; }
+  .type-grid button{ border:1px solid var(--line); background:var(--paper); border-radius:8px; padding:8px 4px; font-size:11.5px; font-weight:700; color:var(--ink-soft); cursor:pointer; }
+  .type-grid button.special{ border-color:var(--brass); color:var(--brass-deep); background:rgba(184,134,58,.12); }
+  .type-grid button:disabled{ opacity:.4; cursor:default; }
+  .status-row{ display:flex; gap:6px; flex-wrap:wrap; margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
+
+  /* ---------- 回應（Task 8 用） ---------- */
+  .seg{ display:flex; background:var(--paper); border:1px solid var(--line); border-radius:999px; padding:2px; margin-bottom:6px; }
+  .seg button{ flex:1; border:none; background:none; font-size:11.5px; font-weight:700; padding:6px 0; border-radius:999px; color:var(--ink-soft); cursor:pointer; }
+  .seg button.active{ background:var(--paper-raised); color:var(--ink); box-shadow:0 1px 2px rgba(32,36,47,.12); }
+  .stat{ padding:12px 0; border-bottom:1px solid var(--line); }
+  .stat:last-child{ border-bottom:none; }
+  .stat-h{ display:flex; justify-content:space-between; gap:8px; font-size:12.5px; font-weight:700; margin-bottom:8px; }
+  .stat-h .c{ font-family:'Roboto Mono',monospace; font-size:10.5px; color:var(--ink-soft); font-weight:500; white-space:nowrap; }
+  .bar-row{ display:grid; grid-template-columns:minmax(64px, 30%) 1fr auto; align-items:center; gap:8px; font-size:11.5px; margin-top:5px; }
+  .bar-row .lbl{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .bar-track{ height:8px; background:var(--paper); border-radius:999px; overflow:hidden; }
+  .bar-fill{ height:100%; background:var(--brass); border-radius:999px; }
+  .bar-row .n{ font-family:'Roboto Mono',monospace; text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .text-ans{ font-size:12px; line-height:1.6; background:var(--paper); border-radius:8px; padding:6px 9px; margin-top:5px; white-space:pre-wrap; word-break:break-word; }
+  .text-ans .who{ display:block; color:var(--ink-soft); font-size:10.5px; }
+  .resp-row{ display:flex; align-items:center; gap:10px; width:100%; text-align:left; border:none; border-bottom:1px solid var(--line); background:none; padding:10px 2px; cursor:pointer; color:var(--ink); }
+  .resp-row .main{ display:block; flex:1; min-width:0; }
+  .resp-row .nm{ display:flex; flex-wrap:wrap; align-items:center; gap:5px; font-size:13px; font-weight:700; }
+  .resp-row .sub{ display:block; font-size:11px; color:var(--ink-soft); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .resp-row .when{ font-family:'Roboto Mono',monospace; font-size:10.5px; color:var(--ink-soft); white-space:nowrap; }
+  .bind-list{ display:flex; flex-direction:column; margin-top:8px; }
+  .bind-item{ display:flex; justify-content:space-between; align-items:center; gap:10px; width:100%; text-align:left; border:none; border-bottom:1px solid var(--line); background:none; padding:11px 2px; font-size:13px; cursor:pointer; color:var(--ink); }
+  .bind-item .acct{ font-family:'Roboto Mono',monospace; font-size:11px; color:var(--ink-soft); }
+
+  /* ---------- 收款（Task 9 用） ---------- */
+  .kpis{ display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+  .kpi{ background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm); padding:9px 11px; }
+  .kpi .k{ font-size:10.5px; color:var(--ink-soft); }
+  .kpi .v{ font-family:'Roboto Mono',monospace; font-weight:700; font-size:16px; margin-top:2px; font-variant-numeric:tabular-nums; }
+  .kpi.alert{ background:#FBF3F3; border-color:#EFD4D8; }
+  .kpi.alert .v{ color:var(--burgundy); }
+  .pay-tools{ display:flex; gap:6px; margin:12px 0 4px; align-items:center; }
+  .pay-search{ flex:1; min-width:0; border:1px solid var(--line); background:var(--paper); border-radius:999px; padding:7px 12px; font-size:12.5px; color:var(--ink); }
+  .pg{ border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--paper); margin-top:8px; overflow:hidden; }
+  .pg-top{ display:flex; align-items:center; gap:10px; width:100%; text-align:left; border:none; background:none; padding:10px 11px; cursor:pointer; color:var(--ink); }
+  .pg-top .nm{ display:block; flex:1; min-width:0; font-size:13px; }
+  .pg-top .sub, .pd-row .sub{ display:block; font-size:10.5px; color:var(--ink-soft); margin-top:1px; }
+  .money{ text-align:right; font-family:'Roboto Mono',monospace; font-size:12px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .money .due{ display:block; font-weight:700; }
+  .st{ display:block; font-size:10.5px; margin-top:2px; font-family:'Noto Sans TC','Noto Sans',sans-serif; }
+  .st.owe{ color:var(--burgundy); }
+  .st.over{ color:var(--brass-deep); }
+  .st.paid{ color:var(--sage); }
+  .st.none{ color:var(--ink-soft); }
+  .chev{ color:var(--ink-soft); flex:none; transition:transform .15s; }
+  .pg.open .chev{ transform:rotate(180deg); }
+  @media (prefers-reduced-motion: reduce){ .chev{ transition:none; } }
+  .pg-detail{ display:none; border-top:1px solid var(--line); background:var(--paper-raised); }
+  .pg.open .pg-detail{ display:block; }
+  .pd-row{ display:flex; align-items:center; gap:8px; padding:9px 11px; font-size:12px; }
+  .pd-row + .pd-row{ border-top:1px dashed var(--line); }
+  .pd-row .nm{ flex:1; min-width:0; }
+  .pd-actions{ display:flex; gap:6px; padding:9px 11px; border-top:1px solid var(--line); }
+  .pd-actions .small-btn{ flex:1; justify-content:center; }
+  .amt-input{ width:100%; margin-top:6px; border:1.5px solid var(--brass); background:var(--paper); border-radius:var(--radius-sm); padding:10px 12px; font-family:'Roboto Mono',monospace; font-size:22px; font-weight:700; color:var(--ink); }
+  .quick{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .alloc{ margin-top:12px; background:var(--paper); border-radius:var(--radius-sm); padding:8px 11px; font-size:12px; }
+  .alloc-row{ display:flex; justify-content:space-between; gap:8px; padding:3px 0; }
+  .alloc-row span:last-child{ font-family:'Roboto Mono',monospace; }
+  .entry{ display:flex; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); font-size:12px; }
+  .entry .when{ font-family:'Roboto Mono',monospace; font-size:10.5px; color:var(--ink-soft); width:76px; flex:none; }
+  .entry .what{ flex:1; min-width:0; }
+  .entry .what .sub{ display:block; font-size:10.5px; color:var(--ink-soft); }
+  .entry .amt{ font-family:'Roboto Mono',monospace; font-weight:700; }
+  .entry .amt.neg{ color:var(--burgundy); }
+
+  /* ---------- 匯入名單（Task 11 用） ---------- */
+  .diff-sum{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  .diff-sum > div{ border-radius:var(--radius-sm); padding:8px 6px; text-align:center; border:1px solid var(--line); background:var(--paper); }
+  .diff-sum .v{ font-family:'Roboto Mono',monospace; font-weight:700; font-size:16px; }
+  .diff-sum .k{ font-size:10.5px; color:var(--ink-soft); }
+  .diff-sum .add .v{ color:var(--sage); }
+  .diff-sum .chg .v{ color:var(--brass-deep); }
+  .diff-sum .gone .v{ color:var(--burgundy); }
+  .diff-h{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin:16px 0 6px; }
+  .diff-h .hint{ font-size:10.5px; color:var(--ink-soft); }
+  .diff-list{ background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm); padding:2px 10px; }
+  .diff-row{ display:flex; align-items:center; gap:9px; padding:8px 0; font-size:12.5px; }
+  .diff-row + .diff-row{ border-top:1px solid var(--line); }
+  .diff-row .nm{ flex:1; min-width:0; }
+  .diff-row .inst{ font-family:'Roboto Mono',monospace; font-size:10.5px; color:var(--ink-soft); text-align:right; }
+  .diff-row .inst b{ color:var(--brass-deep); }
+  .diff-row .why{ display:block; font-size:10.5px; color:var(--ink-soft); }
+  .diff-row input[type=checkbox]{ width:18px; height:18px; flex:none; accent-color:var(--burgundy); }
+  .diff-row input.keep{ accent-color:var(--brass); }
+  .import-note{ font-size:11.5px; color:var(--ink-soft); margin-bottom:10px; }
+</style>
+</head>
+<body>
+<div class="app" id="appRoot">
+
+  <div class="appbar">
+    <button class="admin-nav-btn" id="adminNavBtn" type="button" aria-label="開啟後台導覽選單">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <a class="back-btn" href="stats-admin.html" aria-label="回統計首頁">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="m15 5-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <a class="brand-link" href="index.html">
+      <img class="mark" src="assets/BrioLogo.jpg" alt="布利歐管樂團 Logo">
+      <div class="brandtext">
+        <div class="name">布利歐管樂團</div>
+        <div class="sub">Brio Wind Band</div>
+      </div>
+    </a>
+    <div class="spacer"></div>
+    <span class="team-badge hidden" id="teamBadge"></span>
+    <button class="avatar skel" id="avatarBtn" type="button" aria-label="帳號選單"></button>
+  </div>
+
+  <div class="section-label">
+    <span class="tw">表單管理</span>
+    <span class="en">Forms</span>
+  </div>
+  <p class="lede">建立訂餐、報名等表單，查看回應、記錄收款。</p>
+  <div class="top-actions">
+    <button type="button" class="add-btn" id="newFormBtn">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>新增表單
+    </button>
+  </div>
+  <div class="filter-row" id="filterRow"></div>
+  <div id="formList"></div>
+  <div class="fm-empty hidden" id="formEmpty">目前沒有符合條件的表單。</div>
+
+</div>
+
+<!-- 表單明細 sheet：分頁內容由 forms-admin-*.js 各自畫進 #formSheetBody -->
+<div class="sheet-overlay" id="formSheetOverlay">
+  <div class="sheet tall">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button type="button" class="sheet-close" id="formSheetClose" aria-label="關閉">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <div class="name" id="formSheetTitle">—</div>
+      <div class="sheet-sub" id="formSheetMeta"></div>
+    </div>
+    <div class="sheet-tabs" id="formSheetTabs">
+      <button type="button" class="sheet-tab" data-tab="editor">設定與題目</button>
+      <button type="button" class="sheet-tab hidden" data-tab="responses">回應</button>
+      <button type="button" class="sheet-tab hidden" data-tab="payments">收款</button>
+      <button type="button" class="sheet-tab hidden" data-tab="import">匯入名單</button>
+    </div>
+    <div class="sheet-body" id="formSheetBody"></div>
+    <div class="sheet-footer hidden" id="formSheetFooter"></div>
+  </div>
+</div>
+
+<!-- 共用子 sheet：回應明細、綁定到團員、收款 -->
+<div class="sheet-overlay upper" id="subSheetOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button type="button" class="sheet-close" id="subSheetClose" aria-label="關閉">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <div class="name" id="subSheetTitle"></div>
+      <div class="sheet-sub" id="subSheetMeta"></div>
+    </div>
+    <div class="sheet-body" id="subSheetBody"></div>
+    <div class="sheet-footer hidden" id="subSheetFooter"></div>
+  </div>
+</div>
+
+<script type="module">
+  import { initAdminNav } from './admin-nav.js';
+  import { showToast } from './toast.js';
+  import { showConfirm } from './dialog.js';
+  import { requireAdminOrTeamAdmin, peekCachedProfile } from './auth-guard.js';
+  import { initAccountMenu } from './account-menu.js';
+  import { initTeamSwitcher } from './team-switcher.js';
+  import { db } from './firebase-init.js';
+  import { subscribeInstruments } from './instruments.js';
+  import { listTeamForms, createForm, loadResponses, loadPayments, loadTeamUsers, listLinkTargets } from './forms.js';
+  import {
+    escapeHtml, formatDeadline, formatShortDateTime, formStatusChip, hasItemsQuestion,
+    findInstrumentQuestion, responseKind, buildPaymentGroups, paymentTotals, formatMoney
+  } from './forms-core.js';
+  import { renderEditor, resetEditor } from './forms-admin-editor.js';
+  import { renderResponses } from './forms-admin-responses.js';
+  import { renderPayments } from './forms-admin-payments.js';
+  import { renderImport } from './forms-admin-import.js';
+
+  // 各分頁的畫面由獨立模組負責，這裡只管切換。之後的分頁模組做好後加進這張表
+  var RENDERERS = {
+    editor: renderEditor,
+    responses: renderResponses,
+    payments: renderPayments,
+    import: renderImport
+  };
+
+  var ICONS = {
+    users: '<svg class="ico" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="9" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M3.5 18.5c.9-2.7 2.9-4 5.5-4s4.6 1.3 5.5 4M15.5 6.3a3 3 0 0 1 0 5.4M17.5 14.8c1.3.6 2.3 1.8 3 3.7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+    clock: '<svg class="ico" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.7"/><path d="M12 7.5V12l3 2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+    coin: '<svg class="ico" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.7"/><path d="M12 7v10M15 9h-4.5a1.5 1.5 0 0 0 0 3h3a1.5 1.5 0 0 1 0 3h-4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    link: '<svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+    cal: '<svg class="ico" viewBox="0 0 24 24" fill="none"><rect x="4" y="5.5" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+    music: '<svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M9 17.5V6l10-2v11.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="17.5" r="2.5" stroke="currentColor" stroke-width="1.7"/><circle cx="16.5" cy="15.5" r="2.5" stroke="currentColor" stroke-width="1.7"/></svg>',
+    import: '<svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 17.5V19a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  };
+
+  var FILTERS = [
+    { key: 'open', label: '開放中' }, { key: 'draft', label: '草稿' },
+    { key: 'closed', label: '已關閉' }, { key: 'archived', label: '已封存' }
+  ];
+
+  var ctx = {
+    team: null, adminUid: null, adminName: '',
+    form: null, responses: [], payments: {}, teamUsers: {},
+    linkTargets: { events: [], concerts: [] }, instruments: [],
+    activeTab: 'editor', editorDirty: false,
+    bodyEl: document.getElementById('formSheetBody'),
+    footerEl: document.getElementById('formSheetFooter'),
+    onFormChanged: onFormChanged,
+    refresh: refreshSheet,
+    openSubSheet: openSubSheet,
+    closeSubSheet: closeSubSheet,
+    linkLabel: linkLabel
+  };
+  var forms = [];
+  var listStats = {};     // formId → 列表卡片要顯示的統計
+  var statsLoading = {};
+  var activeFilter = 'open';
+
+  function tsMs(ts){ return ts && ts.toMillis ? ts.toMillis() : 0; }
+
+  function filterKeyOf(f){
+    if (f.archived) return 'archived';
+    if (f.status === 'draft') return 'draft';
+    if (f.status === 'closed') return 'closed';
+    return 'open';
+  }
+
+  function linkLabel(linkedTo){
+    if (!linkedTo) return '';
+    var list = linkedTo.type === 'concert' ? ctx.linkTargets.concerts : ctx.linkTargets.events;
+    var hit = list.filter(function(x){ return x.id === linkedTo.id; })[0];
+    return (linkedTo.type === 'concert' ? '音樂會：' : '活動：') + (hit ? hit.title : '（找不到連結的項目）');
+  }
+
+  // 列表卡片的統計：回應數、代填數、訪客數；有品項題的表單另外算收款進度
+  function computeListStats(form, responses, payments){
+    var s = { total: responses.length, proxy: 0, guest: 0, moneyText: '' };
+    responses.forEach(function(r){
+      var kind = responseKind(r, ctx.teamUsers);
+      if (kind === 'proxy') s.proxy++;
+      if (kind === 'guest') s.guest++;
+    });
+    if (hasItemsQuestion(form)){
+      var t = paymentTotals(buildPaymentGroups(form, responses, payments, {}));
+      s.moneyText = '已收 ' + formatMoney(t.paid) + ' / ' + formatMoney(t.due);
+    }
+    return s;
+  }
+
+  // ---------- 列表 ----------
+  function cardHtml(f){
+    var chip = formStatusChip(f, Date.now());
+    var s = listStats[f.id];
+    var countText = '讀取中…';
+    if (s){
+      var extra = [];
+      if (s.proxy) extra.push('代填 ' + s.proxy);
+      if (s.guest) extra.push('訪客 ' + s.guest);
+      countText = s.total + ' 份回應' + (extra.length ? '（' + extra.join('、') + '）' : '');
+    }
+    var meta = '<span>' + ICONS.users + countText + '</span>';
+    if (f.closesAt) meta += '<span>' + ICONS.clock + formatDeadline(f.closesAt) + ' 截止</span>';
+    var meta2 = '';
+    if (s && s.moneyText) meta2 += '<span>' + ICONS.coin + s.moneyText + '</span>';
+    if (f.allowGuest) meta2 += '<span>' + ICONS.link + '允許未登入填寫</span>';
+    if (f.rosterImportedAt) meta2 += '<span>' + ICONS.import + '上次匯入 ' + formatShortDateTime(f.rosterImportedAt) + '</span>';
+    var link = f.linkedTo
+      ? '<div class="fm-link">' + (f.linkedTo.type === 'concert' ? ICONS.music : ICONS.cal) + escapeHtml(linkLabel(f.linkedTo)) + '</div>'
+      : '';
+    return '<button type="button" class="fm-card" data-open="' + escapeHtml(f.id) + '">' +
+      '<div class="fm-card-top"><span class="fm-card-title">' + escapeHtml(f.title) + '</span>' +
+      '<span class="chip ' + chip.tone + '">' + chip.label + '</span></div>' +
+      '<div class="fm-meta">' + meta + '</div>' +
+      (meta2 ? '<div class="fm-meta">' + meta2 + '</div>' : '') + link +
+    '</button>';
+  }
+
+  function renderList(){
+    var counts = {};
+    forms.forEach(function(f){ var k = filterKeyOf(f); counts[k] = (counts[k] || 0) + 1; });
+    document.getElementById('filterRow').innerHTML = FILTERS.map(function(x){
+      return '<button type="button" class="filter-chip' + (activeFilter === x.key ? ' active' : '') + '" data-filter="' + x.key + '">' +
+        x.label + (counts[x.key] ? ' ' + counts[x.key] : '') + '</button>';
+    }).join('');
+    var visible = forms.filter(function(f){ return filterKeyOf(f) === activeFilter; })
+      .sort(function(a, b){ return tsMs(b.createdAt) - tsMs(a.createdAt); });
+    document.getElementById('formList').innerHTML = visible.map(cardHtml).join('');
+    document.getElementById('formEmpty').classList.toggle('hidden', visible.length > 0);
+    visible.forEach(function(f){ if (!listStats[f.id]) loadListStats(f); });
+  }
+
+  function loadListStats(f){
+    if (statsLoading[f.id]) return;
+    statsLoading[f.id] = true;
+    Promise.all([loadResponses(f.id), loadPayments(f.id)]).then(function(res){
+      listStats[f.id] = computeListStats(f, res[0], res[1]);
+      renderList();
+    }).catch(function(err){
+      console.error('讀取回應數失敗', err);
+    }).finally(function(){
+      statsLoading[f.id] = false;
+    });
+  }
+
+  document.getElementById('filterRow').addEventListener('click', function(e){
+    var chip = e.target.closest('[data-filter]');
+    if (!chip) return;
+    activeFilter = chip.getAttribute('data-filter');
+    renderList();
+  });
+
+  document.getElementById('formList').addEventListener('click', function(e){
+    var card = e.target.closest('[data-open]');
+    if (card) openFormSheet(card.getAttribute('data-open'));
+  });
+
+  document.getElementById('newFormBtn').addEventListener('click', async function(){
+    var btn = document.getElementById('newFormBtn');
+    btn.disabled = true;
+    try {
+      var id = await createForm(ctx.team, ctx.adminUid);
+      forms = await listTeamForms(ctx.team);
+      activeFilter = 'draft';
+      renderList();
+      await openFormSheet(id);
+    } catch (err){
+      showToast('建立表單失敗：' + (err.code || err.message), 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // ---------- 明細 sheet ----------
+  var formSheetOverlay = document.getElementById('formSheetOverlay');
+
+  function renderSheetHeader(){
+    var f = ctx.form;
+    var chip = formStatusChip(f, Date.now());
+    var s = listStats[f.id];
+    document.getElementById('formSheetTitle').textContent = f.title;
+    document.getElementById('formSheetMeta').innerHTML =
+      '<span class="chip ' + chip.tone + '">' + chip.label + '</span>' +
+      (s ? '<span>' + s.total + ' 份回應</span>' : '');
+  }
+
+  function tabVisible(tab){
+    if (!RENDERERS[tab]) return false;
+    if (tab === 'editor' || tab === 'responses') return true;
+    if (tab === 'payments') return hasItemsQuestion(ctx.form);
+    if (tab === 'import') return !!(ctx.form.linkedTo && ctx.form.linkedTo.type === 'concert' && findInstrumentQuestion(ctx.form));
+    return false;
+  }
+
+  function syncTabs(){
+    if (!tabVisible(ctx.activeTab)) ctx.activeTab = 'editor';
+    document.querySelectorAll('#formSheetTabs [data-tab]').forEach(function(btn){
+      var tab = btn.getAttribute('data-tab');
+      btn.classList.toggle('hidden', !tabVisible(tab));
+      btn.classList.toggle('active', tab === ctx.activeTab);
+    });
+  }
+
+  function renderActiveTab(){
+    ctx.footerEl.innerHTML = '';
+    ctx.footerEl.classList.add('hidden');
+    ctx.footerEl.onclick = null;
+    ctx.bodyEl.onclick = null;
+    ctx.bodyEl.oninput = null;
+    ctx.bodyEl.onchange = null;
+    RENDERERS[ctx.activeTab](ctx);
+  }
+
+  async function loadSheetData(){
+    var id = ctx.form.id;
+    var res = await Promise.all([loadResponses(id), loadPayments(id)]);
+    if (!ctx.form || ctx.form.id !== id) return;
+    ctx.responses = res[0];
+    ctx.payments = res[1];
+    listStats[id] = computeListStats(ctx.form, ctx.responses, ctx.payments);
+    renderSheetHeader();
+    renderList();
+  }
+
+  // 分頁模組寫入回應／收款之後呼叫：重新讀資料、重畫目前分頁
+  async function refreshSheet(){
+    if (!ctx.form) return;
+    await loadSheetData();
+    renderActiveTab();
+  }
+
+  async function openFormSheet(formId){
+    var f = forms.filter(function(x){ return x.id === formId; })[0];
+    if (!f){ showToast('找不到這張表單', 'error'); return; }
+    ctx.form = f;
+    ctx.responses = [];
+    ctx.payments = {};
+    ctx.editorDirty = false;
+    ctx.activeTab = 'editor';
+    resetEditor();
+    renderSheetHeader();
+    syncTabs();
+    ctx.bodyEl.innerHTML = '<div class="fm-loading">載入中…</div>';
+    ctx.footerEl.classList.add('hidden');
+    ctx.bodyEl.scrollTop = 0;
+    formSheetOverlay.classList.add('active');
+    try {
+      await loadSheetData();
+    } catch (err){
+      console.error('讀取回應失敗', err);
+      showToast('讀取回應失敗，請重新整理', 'error');
+    }
+    if (ctx.form && ctx.form.id === formId) renderActiveTab();
+  }
+
+  function onFormChanged(updated){
+    ctx.form = updated;
+    forms = forms.map(function(x){ return x.id === updated.id ? updated : x; });
+    // 發佈、關閉、封存後，背後的列表跟著切到這張表單現在所在的篩選
+    activeFilter = filterKeyOf(updated);
+    renderSheetHeader();
+    syncTabs();
+    renderList();
+  }
+
+  async function confirmDiscard(){
+    if (!ctx.editorDirty) return true;
+    var ok = await showConfirm('有尚未儲存的修改，確定要離開嗎？', { confirmText: '離開', danger: true });
+    if (ok){
+      ctx.editorDirty = false;
+      resetEditor();
+    }
+    return ok;
+  }
+
+  async function closeFormSheet(){
+    if (!(await confirmDiscard())) return;
+    formSheetOverlay.classList.remove('active');
+    ctx.form = null;
+  }
+
+  document.getElementById('formSheetClose').addEventListener('click', closeFormSheet);
+  formSheetOverlay.addEventListener('click', function(e){
+    if (e.target === formSheetOverlay) closeFormSheet();
+  });
+
+  document.getElementById('formSheetTabs').addEventListener('click', async function(e){
+    var btn = e.target.closest('[data-tab]');
+    if (!btn || btn.getAttribute('data-tab') === ctx.activeTab) return;
+    if (ctx.activeTab === 'editor' && !(await confirmDiscard())) return;
+    ctx.activeTab = btn.getAttribute('data-tab');
+    syncTabs();
+    ctx.bodyEl.scrollTop = 0;
+    renderActiveTab();
+  });
+
+  // ---------- 共用子 sheet ----------
+  var subOverlay = document.getElementById('subSheetOverlay');
+  var subBody = document.getElementById('subSheetBody');
+  var subFooter = document.getElementById('subSheetFooter');
+
+  function clearSubHandlers(){
+    subBody.onclick = null;
+    subBody.oninput = null;
+    subBody.onchange = null;
+    subFooter.onclick = null;
+  }
+
+  function openSubSheet(opts){
+    clearSubHandlers();
+    document.getElementById('subSheetTitle').textContent = opts.title || '';
+    document.getElementById('subSheetMeta').textContent = opts.meta || '';
+    subBody.innerHTML = opts.bodyHtml || '';
+    subFooter.innerHTML = opts.footerHtml || '';
+    subFooter.classList.toggle('hidden', !opts.footerHtml);
+    subBody.scrollTop = 0;
+    subOverlay.classList.add('active');
+    return { body: subBody, footer: subFooter };
+  }
+
+  function closeSubSheet(){
+    subOverlay.classList.remove('active');
+    clearSubHandlers();
+  }
+
+  document.getElementById('subSheetClose').addEventListener('click', closeSubSheet);
+  subOverlay.addEventListener('click', function(e){
+    if (e.target === subOverlay) closeSubSheet();
+  });
+
+  // ---------- 啟動 ----------
+  var cachedProfile = peekCachedProfile();
+  if (cachedProfile && cachedProfile.name){
+    var avatarBtnEl = document.getElementById('avatarBtn');
+    avatarBtnEl.textContent = cachedProfile.name.charAt(0);
+    avatarBtnEl.classList.remove('skel');
+  }
+
+  requireAdminOrTeamAdmin().then(async function(result){
+    if (!result) return;
+
+    var avatarBtn = document.getElementById('avatarBtn');
+    avatarBtn.textContent = result.profile.name ? result.profile.name.charAt(0) : '?';
+    avatarBtn.classList.remove('skel');
+    initAccountMenu(result.profile.name);
+    initTeamSwitcher(result.profile);
+    initAdminNav('stats', result.profile, result.activeTeam);
+
+    ctx.team = result.activeTeam;
+    ctx.adminUid = result.uid;
+    ctx.adminName = result.profile.name || '';
+    subscribeInstruments(db, function(list){
+      ctx.instruments = list.map(function(x){ return x.name; });
+    });
+
+    try {
+      var res = await Promise.all([listTeamForms(ctx.team), loadTeamUsers(ctx.team), listLinkTargets(ctx.team)]);
+      forms = res[0];
+      ctx.teamUsers = res[1];
+      ctx.linkTargets = res[2];
+    } catch (err){
+      console.error('載入表單失敗', err);
+      showToast('載入失敗，請重新整理', 'error');
+      return;
+    }
+
+    // event-admin.html 的「表單」捷徑會帶 ?open={formId} 過來
+    var openId = new URLSearchParams(location.search).get('open');
+    var target = openId ? forms.filter(function(f){ return f.id === openId; })[0] : null;
+    if (target) activeFilter = filterKeyOf(target);
+    renderList();
+    if (target) openFormSheet(target.id);
+  });
+</script>
+</body>
+</html>

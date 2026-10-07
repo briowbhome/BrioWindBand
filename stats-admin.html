@@ -196,36 +196,25 @@
       </span>
       <svg class="dash-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </a>
-    <button type="button" class="dash-card dash-soon" data-soon>
+    <a class="dash-card" href="forms-admin.html">
       <span class="dash-icon navy">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 10v4a1 1 0 0 0 1 1h2l6 4V5L6 9H4a1 1 0 0 0-1 1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M16 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="5" y="3.5" width="14" height="17" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M9 8h6M9 12h6M9 16h3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
       </span>
       <span class="dash-body">
         <span class="dash-title">表單統計</span>
-        <span class="dash-sub">即將推出</span>
+        <span class="dash-sub">訂餐、報名等表單的回應與收款</span>
       </span>
-    </button>
+      <svg class="dash-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
   </div>
 
 </div>
-
-<div class="soon-toast" id="soonToast">即將推出</div>
 
 <script type="module">
   import { initAdminNav } from './admin-nav.js';
   import { requireAdminOrTeamAdmin, peekCachedProfile } from './auth-guard.js';
   import { initAccountMenu } from './account-menu.js';
   import { initTeamSwitcher } from './team-switcher.js';
-
-  var soonToast = document.getElementById('soonToast');
-  var soonTimer = null;
-  document.querySelectorAll('[data-soon]').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      if (soonTimer) clearTimeout(soonTimer);
-      soonToast.classList.add('show');
-      soonTimer = setTimeout(function(){ soonToast.classList.remove('show'); }, 1500);
-    });
-  });
 
   var cachedProfile = peekCachedProfile();
   if (cachedProfile && cachedProfile.name){
