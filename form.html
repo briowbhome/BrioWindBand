@@ -423,7 +423,7 @@
         (withItems ? '<span class="amt">' + formatMoney(computeDue(f, p.answers)) + '</span>' : '') + tail +
       '</button>';
     }).join('') : '<div class="proxy-empty">' +
-      (withItems ? '幫自己帶來的槍手或朋友訂餐，每個人各自一筆。' : '幫沒有帳號的人填寫，每個人各自一筆。') + '</div>';
+      (withItems ? '幫其他人訂餐，每個人各自一筆。' : '幫沒有帳號的人填寫，每個人各自一筆。') + '</div>';
   }
 
   // ---------- 送出／修改／撤回自己的回應 ----------
@@ -492,7 +492,7 @@
   // ---------- 訪客 ----------
   document.getElementById('guestLoginBtn').addEventListener('click', async function(){
     if (state.own){
-      var ok = await showConfirm('你剛才以訪客身分填的回應不會自動轉到帳號，登入後請重新填寫。要繼續登入嗎？', { confirmText: '登入' });
+      var ok = await showConfirm('你剛才以訪客身分填的回應不會保存，登入後請重新填寫。要繼續登入嗎？', { confirmText: '登入' });
       if (!ok) return;
     }
     goToLogin();

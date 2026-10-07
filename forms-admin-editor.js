@@ -201,13 +201,13 @@ function paint(ctx){
   var hasInstrument = qs.some(function(q){ return q.type === 'instrument'; });
   ctx.bodyEl.innerHTML =
     '<div class="field"><span class="label">標題</span><input class="field-input" data-k="title" maxlength="60" value="' + escapeHtml(draft.title) + '"></div>' +
-    '<div class="field"><span class="label">說明</span><textarea class="field-input" data-k="description" maxlength="2000" placeholder="截止時間、取餐地點、匯款方式等，網址會自動變成連結">' + escapeHtml(draft.description) + '</textarea></div>' +
+    '<div class="field"><span class="label">說明</span><textarea class="field-input" data-k="description" maxlength="2000" placeholder="截止時間、取餐地點、匯款方式等">' + escapeHtml(draft.description) + '</textarea></div>' +
     '<div class="field"><span class="label">連結活動或音樂會</span><select class="field-input" data-k="linkValue">' + linkOptionsHtml(ctx) + '</select></div>' +
     '<div class="field"><span class="label">截止時間（選填）</span><div class="field-row">' +
       '<input class="field-input" type="datetime-local" data-k="closesAtValue" value="' + escapeHtml(draft.closesAtValue) + '">' +
       (draft.closesAtValue ? '<button type="button" class="small-btn" data-clear-closes>清除</button>' : '') +
     '</div></div>' +
-    '<label class="switch-row"><span class="txt">允許未登入填寫<span class="hint">開啟後，沒有帳號的人也能用分享連結填寫，例如音樂會新成員報名。訂餐這類內部表單建議維持關閉。</span></span>' +
+    '<label class="switch-row"><span class="txt">允許未登入填寫<span class="hint">開啟後，沒有帳號的人也能用分享連結填寫。</span></span>' +
       '<input type="checkbox" data-k="allowGuest"' + (draft.allowGuest ? ' checked' : '') + '></label>' +
     '<div class="label">題目（' + qs.length + '）</div>' +
     qs.map(function(q, i){ return questionHtml(q, i, qs.length, ctx); }).join('') +
