@@ -1180,6 +1180,22 @@
     });
   }
 
+  // 10/8：團費帳目要顯示是誰繳的、哪一個繳費項目。linkedFeePaymentId 就是 feePayments 的
+  // 文件 ID（{dueId}_{uid}），直接從已經在監聽的繳費紀錄／應繳項目／團員名單查出來，不用改資料結構。
+  // 讀團員名單需要幹部權限（users 的讀取規則），只有財務權限的人讀不到時統一顯示「團員」
+  var ledgerMembersUnavailable = false;
+
+  function feeLedgerInfo(e) {
+    var payment = feePaymentsList.filter(function (p) { return p.id === e.linkedFeePaymentId; })[0];
+    var parts = e.linkedFeePaymentId.split('_');
+    var dueId = payment ? payment.dueId : parts[0];
+    var uid = payment ? payment.uid : parts[1];
+    var due = feeDuesList.filter(function (d) { return d.id === dueId; })[0];
+    var member = (approvedMembers || []).filter(function (m) { return m.uid === uid; })[0];
+    var name = member ? member.name : ((approvedMembers && !ledgerMembersUnavailable) ? '已移除的成員' : '團員');
+    return { dueTitle: due ? due.title : '來自團費', name: name };
+  }
+
   function renderLedgerList() {
     var container = document.getElementById('ledgerList');
     var entries = ledgerFilteredEntries();
@@ -1191,13 +1207,15 @@
       var cat = categoriesById[e.categoryId];
       var catLabel = cat ? cat.label : '（分類已刪除）';
       var dateStr = timestampToDateInputValue(e.date);
-      var fromFeeTag = e.linkedFeePaymentId ? '<span class="ledger-tag">來自團費</span>' : '';
+      var fee = e.linkedFeePaymentId ? feeLedgerInfo(e) : null;
+      // 綠色標籤原本固定寫「來自團費」，改成直接寫繳費項目名稱（標籤本身就代表來自團費）
+      var fromFeeTag = fee ? '<span class="ledger-tag">' + escapeHtml(fee.dueTitle) + '</span>' : '';
       var editAttr = e.linkedFeePaymentId ? '' : ' data-edit-ledger="' + e.id + '"';
       return (
         '<div class="ledger-row' + (e.voided ? ' voided' : '') + '"' + editAttr + (e.linkedFeePaymentId ? '' : ' style="cursor:pointer;"') + '>' +
           '<div class="ledger-row-main">' +
             '<span>' + dateStr + fromFeeTag + '</span>' +
-            '<span class="ledger-row-cat">' + escapeHtml(catLabel) + (e.note ? '・' + escapeHtml(e.note) : '') + '</span>' +
+            '<span class="ledger-row-cat">' + escapeHtml(catLabel) + (fee ? '・' + escapeHtml(fee.name) : '') + (e.note ? '・' + escapeHtml(e.note) : '') + '</span>' +
           '</div>' +
           '<span class="ledger-row-amount ' + e.type + '">' + (e.type === 'income' ? '+' : '-') + formatMoney(e.amount) + '</span>' +
         '</div>'
@@ -1415,6 +1433,7 @@
       feeDuesList = dues;
       renderDuesList();
       refreshOpenDueDetail();
+      renderLedgerList();
     }, function (err) { console.error('應繳項目監聽失敗', err); });
 
     subscribeRemittanceAccounts(db, activeTeam, function (accounts) {
@@ -1427,7 +1446,15 @@
       feePaymentsList = payments;
       renderDuesList();
       refreshOpenDueDetail();
+      renderLedgerList();
     }, function (err) { console.error('繳費紀錄監聽失敗', err); });
+
+    // 記帳本的團費帳目要顯示繳費人姓名，名單載入後重畫一次
+    ensureApprovedMembers().then(renderLedgerList).catch(function (err) {
+      console.error('讀取團員名單失敗（記帳本繳費人姓名）', err);
+      ledgerMembersUnavailable = true;
+      renderLedgerList();
+    });
 
     onSnapshot(collection(db, 'rosterTemplates'), function (snap) {
       rosterTemplatesList = [];

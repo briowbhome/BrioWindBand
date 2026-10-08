@@ -143,10 +143,19 @@ export function subscribeLedgerEntries(db, team, onData, onError) {
     snap.forEach(function (docSnap) {
       list.push(Object.assign({ id: docSnap.id }, docSnap.data()));
     });
+    // 10/8：日期只精確到「天」，同一天的帳目原本順序等於 Firestore 回傳順序（文件 ID 字母序，
+    // 等於隨機），改成日期相同時再依建立時間由新到舊。剛寫入、還沒拿到伺服器時間的那筆
+    // （createdAt 暫時是 null）當成最新的，排在最上面
+    function createdMs(e) {
+      return e.createdAt && e.createdAt.toMillis ? e.createdAt.toMillis() : Number.MAX_SAFE_INTEGER;
+    }
     list.sort(function (a, b) {
       var ta = a.date && a.date.toMillis ? a.date.toMillis() : 0;
       var tb = b.date && b.date.toMillis ? b.date.toMillis() : 0;
-      return tb - ta;
+      if (tb !== ta) return tb - ta;
+      var ca = createdMs(a);
+      var cb = createdMs(b);
+      return cb > ca ? 1 : (cb < ca ? -1 : 0);
     });
     onData(list);
   }, onError);
