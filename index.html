@@ -465,6 +465,24 @@
   .hero-row .ico{ flex:none; width:16px; height:16px; opacity:.85; }
   .hero-row .label{ color:#C9C2A8; font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.06em; min-width:52px;}
   .hero-row .val{ color:var(--paper); font-weight:500; }
+  /* 10/9 同分部互看出缺席：團練卡片的分部列（一個分部一行，點擊開分部名單） */
+  .hero-sections{
+    margin-top:12px; padding-top:11px;
+    border-top:1px dashed rgba(242,239,229,.22);
+    display:flex; flex-direction:column; gap:7px;
+  }
+  .hero-sect-row{
+    width:100%; background:none; border:none; padding:2px 0; margin:0;
+    font-family:inherit; text-align:left; cursor:pointer; color:inherit;
+  }
+  .hero-sect-row .ico.blank{ visibility:hidden; }
+  .hero-sect-row .val{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; font-weight:500; }
+  .hero-sect-row .chev{ flex:none; margin-left:auto; width:14px; height:14px; opacity:.7; }
+  .sect-stat{ display:inline-flex; align-items:center; gap:4px; font-size:11.5px; font-weight:700; }
+  .sect-stat i{ width:6px; height:6px; border-radius:50%; display:inline-block; }
+  .sect-stat.ok i{ background:#A9C29A; }
+  .sect-stat.lv i{ background:#E8A9B4; }
+  .sect-stat.no i{ background:#C9C2A8; }
 
   /* ---------- Ticket-stub check-in CTA ---------- */
   .checkin{
@@ -635,6 +653,13 @@
   .event-chip:first-child .t{ font-size:15px; margin-top:5px; }
   .event-chip:first-child .l{ font-size:11px; margin-top:5px; }
   .event-chip:not(:first-child){ opacity:.88; transform:scale(.96); transform-origin:left center; }
+  .event-chip.has-sect{ cursor:pointer; }
+  .event-chip .chip-sect{
+    display:flex; align-items:center; gap:4px;
+    margin-top:7px; padding-top:6px; border-top:1px dashed var(--line);
+    font-size:10.5px; color:var(--ink-soft); line-height:1.35;
+  }
+  .event-chip .chip-sect svg{ flex:none; width:12px; height:12px; }
   .chip-rsvp{
     position:absolute; top:6px; right:6px; width:16px; height:16px; border-radius:50%;
     font-size:9px; font-weight:700; line-height:16px; text-align:center; color:#F2EFE5;
@@ -743,6 +768,31 @@
   }
   .sheet-close:active{ background:var(--paper); }
   .sheet-body{ overflow-y:auto; padding:16px 20px 8px; }
+  /* 分部名單 sheet */
+  .sect-tabs{ display:flex; gap:6px; flex-wrap:wrap; padding:12px 20px 0; }
+  .sect-tab{
+    padding:6px 12px; border-radius:999px; border:1px solid var(--line);
+    background:var(--paper); color:var(--ink-soft); font-size:12px; font-weight:700;
+    font-family:inherit; cursor:pointer;
+  }
+  .sect-tab.on{ background:var(--ink); color:var(--paper); border-color:var(--ink); }
+  .sect-sum{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:14px; }
+  .sect-sum div{ border:1px solid var(--line); background:var(--paper); border-radius:var(--radius-sm); padding:8px; text-align:center; }
+  .sect-sum b{ display:block; font-family:'Roboto Mono',monospace; font-size:18px; }
+  .sect-sum span{ font-size:11px; color:var(--ink-soft); }
+  .sect-sum .ok b{ color:var(--sage); }
+  .sect-sum .lv b{ color:var(--burgundy); }
+  .sect-sum .no b{ color:var(--ink-soft); }
+  .sect-list{ background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm); padding:2px 12px; }
+  .sect-li{ display:flex; align-items:center; gap:8px; padding:9px 0; font-size:13.5px; }
+  .sect-li + .sect-li{ border-top:1px solid var(--line); }
+  .sect-li .nm{ flex:1; min-width:0; }
+  .sect-me{ font-size:10px; font-weight:700; color:var(--brass-deep); background:rgba(184,134,58,.14); border-radius:999px; padding:1px 7px; margin-left:6px; }
+  .sect-pill{ flex:none; font-size:11px; font-weight:700; border-radius:999px; padding:2px 9px; }
+  .sect-pill.ok{ background:var(--sage-bg); color:var(--sage); }
+  .sect-pill.lv{ background:#FBF3F3; color:var(--burgundy); }
+  .sect-pill.no{ background:var(--paper-raised); color:var(--ink-soft); border:1px solid var(--line); }
+  .sect-src{ font-size:11.5px; color:var(--ink-soft); line-height:1.6; margin:12px 0 calc(8px + env(safe-area-inset-bottom)); }
   .sheet-footer{
     display:flex; gap:10px;
     padding:14px 20px calc(14px + env(safe-area-inset-bottom));
@@ -957,6 +1007,8 @@
             <span class="val" id="heroRepertoireVal"></span>
           </div>
         </div>
+        <!-- 10/9 同分部互看出缺席：一個分部一行，renderHeroSections() 填入 -->
+        <div class="hero-sections hidden" id="heroSections"></div>
       </div>
       <div class="hero-empty hidden" id="heroEmpty">目前沒有排定的團練</div>
 
@@ -1068,6 +1120,20 @@
       <button type="button" class="cta-btn cta-btn-secondary" id="rsvpCancelBtn">取消</button>
       <button type="button" class="cta-btn" id="rsvpSubmitBtn">送出回報</button>
     </div>
+  </div>
+</div>
+
+<!-- 分部名單 Bottom Sheet（10/9 同分部互看出缺席） -->
+<div class="sheet-overlay" id="sectionSheetOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button type="button" class="sheet-close" id="sectionSheetClose" aria-label="關閉">×</button>
+      <div class="name" id="sectionSheetTitle">—</div>
+      <div class="account" id="sectionSheetSub">—</div>
+    </div>
+    <div class="sect-tabs hidden" id="sectionSheetTabs"></div>
+    <div class="sheet-body" id="sectionSheetBody"></div>
   </div>
 </div>
 
@@ -1193,6 +1259,7 @@
   import { VAPID_PUBLIC_KEY } from './push-config.js';
   import { listOpenFormsForMember, loadResponse } from './forms.js';
   import { hasItemsQuestion, formatDeadline, escapeHtml as escapeFormHtml } from './forms-core.js';
+  import { countStatuses, chipSummary, sortSheetMembers, sheetTitle, footnoteText } from './section-attendance-core.js';
   import {
     collection, query, where, or, orderBy, limit, onSnapshot, Timestamp,
     doc, getDoc, getDocs, setDoc, deleteDoc, serverTimestamp
@@ -1282,6 +1349,19 @@
   var WEEKDAY = ['日', '一', '二', '三', '四', '五', '六'];
   var eventTypesById = {};
   var latestEvents = [];
+  // 10/9 同分部互看出缺席：eventId -> 這場活動自己所在的分部摘要陣列（依樂器名稱排序），
+  // 來源是 sectionAttendance 的 onSnapshot（只有已核准團員會掛）
+  var sectionDocsByEvent = {};
+  var SECTION_ICON_HERO = '<svg class="ico" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="9" r="3" stroke="#F2EFE5" stroke-width="1.5"/><path d="M3.5 18.5c.9-2.7 2.9-4 5.5-4s4.6 1.3 5.5 4M15.5 6.3a3 3 0 0 1 0 5.4M17.5 14.8c1.3.6 2.3 1.8 3 3.7" stroke="#F2EFE5" stroke-width="1.5" stroke-linecap="round"/></svg>';
+  var SECTION_ICON_HERO_BLANK = SECTION_ICON_HERO.replace('class="ico"', 'class="ico blank"');
+  var SECTION_ICON_CHIP = '<svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="9" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M3.5 18.5c.9-2.7 2.9-4 5.5-4s4.6 1.3 5.5 4M15.5 6.3a3 3 0 0 1 0 5.4M17.5 14.8c1.3.6 2.3 1.8 3 3.7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+  var SECTION_CHEVRON = '<svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9.5 6l6 6-6 6" stroke="#F2EFE5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  function escapeSectionHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
   var rsvpReportsByEvent = {}; // 只有已核准/審核中會員登入後才會真的有資料，訪客維持空物件、畫面自然不顯示回報標籤
   var myFeeDuesList = []; // 自己在 memberIds 名單內、且未作廢的應繳項目
   var myFeePaymentsByDueId = {}; // dueId -> 自己的繳費紀錄（未作廢）
@@ -1352,11 +1432,37 @@
       document.getElementById('heroRepertoireVal').textContent =
         nextRehearsal.repertoire.length > 0 ? nextRehearsal.repertoire.join('、') : '曲目未定';
       renderRsvpChip(document.getElementById('heroRsvpChip'), nextRehearsal.id);
+      renderHeroSections(nextRehearsal.id);
 
       if (lastCheckinFetchedEventId !== nextRehearsal.id){
         lastCheckinFetchedEventId = nextRehearsal.id;
         syncCheckinLock();
       }
+    }
+
+    // 10/9 同分部互看出缺席：一個分部一行，分部圖示只放第一行（其餘行留白對齊）
+    function renderHeroSections(eventId){
+      var wrap = document.getElementById('heroSections');
+      var docs = sectionDocsByEvent[eventId] || [];
+      if (docs.length === 0){
+        wrap.classList.add('hidden');
+        wrap.innerHTML = '';
+        return;
+      }
+      wrap.innerHTML = docs.map(function(d, i){
+        var c = countStatuses(d.members);
+        return '<button type="button" class="hero-row hero-sect-row" data-section-event="' + escapeSectionHtml(eventId) + '" data-section-id="' + escapeSectionHtml(d.id) + '">' +
+          (i === 0 ? SECTION_ICON_HERO : SECTION_ICON_HERO_BLANK) +
+          '<span class="label">' + escapeSectionHtml(d.instrument) + '</span>' +
+          '<span class="val">' +
+            '<span class="sect-stat ok"><i></i>出席 ' + c.attending + '</span>' +
+            '<span class="sect-stat lv"><i></i>請假 ' + c.leave + '</span>' +
+            '<span class="sect-stat no"><i></i>未回報 ' + c.none + '</span>' +
+          '</span>' +
+          SECTION_CHEVRON +
+        '</button>';
+      }).join('');
+      wrap.classList.remove('hidden');
     }
 
     // 簽到狀態四態：已簽到（checkins 有紀錄）優先於其他三態；
@@ -1421,12 +1527,17 @@
         var dotHtml = report
           ? '<span class="chip-rsvp ' + (report.status === 'leave' ? 'leave' : 'attending') + '">' + (report.status === 'leave' ? '假' : '✓') + '</span>'
           : '';
+        var sectDocs = sectionDocsByEvent[evt.id] || [];
+        var sectHtml = sectDocs.length
+          ? '<div class="chip-sect">' + SECTION_ICON_CHIP + '<span>' + escapeSectionHtml(chipSummary(sectDocs)) + '</span></div>'
+          : '';
         return (
-          '<div class="event-chip">' +
+          '<div class="event-chip' + (sectDocs.length ? ' has-sect" data-section-event="' + escapeSectionHtml(evt.id) + '"' : '"') + '>' +
             dotHtml +
             '<div class="d">' + (evt.date.getMonth() + 1) + '/' + evt.date.getDate() + '（' + WEEKDAY[evt.date.getDay()] + '）</div>' +
             '<div class="t">' + evt.title + '</div>' +
             '<div class="l">' + (evt.location || '地點未定') + '</div>' +
+            sectHtml +
           '</div>'
         );
       }).join('');
@@ -2255,6 +2366,87 @@
       if (e.target === rsvpSheetOverlay) closeRsvpSheet();
     });
 
+    // ---------- 10/9 同分部互看出缺席：分部名單 sheet ----------
+    // 只顯示狀態，不顯示請假原因（摘要文件本來就沒有原因欄位）。多個分部時上方分頁切換
+    var sectionSheetOverlay = document.getElementById('sectionSheetOverlay');
+    var sectionSheetEventId = null;
+    var sectionSheetDocId = null;
+
+    function openSectionSheet(eventId, docId){
+      var docs = sectionDocsByEvent[eventId] || [];
+      if (docs.length === 0) return;
+      sectionSheetEventId = eventId;
+      sectionSheetDocId = docId && docs.some(function(d){ return d.id === docId; }) ? docId : docs[0].id;
+      renderSectionSheet();
+      sectionSheetOverlay.classList.add('active');
+    }
+
+    function closeSectionSheet(){
+      sectionSheetOverlay.classList.remove('active');
+      sectionSheetEventId = null;
+      sectionSheetDocId = null;
+    }
+
+    function renderSectionSheet(){
+      if (!sectionSheetEventId) return;
+      var docs = sectionDocsByEvent[sectionSheetEventId] || [];
+      if (docs.length === 0){ closeSectionSheet(); return; } // 調查關閉、被移出名單等，摘要消失
+      var current = docs.find(function(d){ return d.id === sectionSheetDocId; }) || docs[0];
+      sectionSheetDocId = current.id;
+      var date = current.eventDate && current.eventDate.toDate ? current.eventDate.toDate() : null;
+      document.getElementById('sectionSheetTitle').textContent = sheetTitle(current, date);
+      document.getElementById('sectionSheetSub').textContent = current.eventTitle;
+
+      var tabs = document.getElementById('sectionSheetTabs');
+      if (docs.length > 1){
+        tabs.innerHTML = docs.map(function(d){
+          return '<button type="button" class="sect-tab' + (d.id === current.id ? ' on' : '') + '" data-section-tab="' + escapeSectionHtml(d.id) + '">' + escapeSectionHtml(d.instrument) + '</button>';
+        }).join('');
+        tabs.classList.remove('hidden');
+      } else {
+        tabs.innerHTML = '';
+        tabs.classList.add('hidden');
+      }
+
+      var c = countStatuses(current.members);
+      var PILL = { attending: ['ok', '出席'], leave: ['lv', '請假'] };
+      var rows = sortSheetMembers(current.members, viewerUid).map(function(mem){
+        var pill = PILL[mem.status] || ['no', '未回報'];
+        return '<div class="sect-li"><span class="nm">' + escapeSectionHtml(mem.name) +
+          (mem.uid === viewerUid ? '<span class="sect-me">我</span>' : '') + '</span>' +
+          '<span class="sect-pill ' + pill[0] + '">' + pill[1] + '</span></div>';
+      }).join('');
+      document.getElementById('sectionSheetBody').innerHTML =
+        '<div class="sect-sum">' +
+          '<div class="ok"><b>' + c.attending + '</b><span>出席</span></div>' +
+          '<div class="lv"><b>' + c.leave + '</b><span>請假</span></div>' +
+          '<div class="no"><b>' + c.none + '</b><span>未回報</span></div>' +
+        '</div>' +
+        '<div class="sect-list">' + rows + '</div>' +
+        '<p class="sect-src">' + escapeSectionHtml(footnoteText(current)) + '</p>';
+    }
+
+    document.getElementById('sectionSheetTabs').addEventListener('click', function(e){
+      var tab = e.target.closest('[data-section-tab]');
+      if (!tab) return;
+      sectionSheetDocId = tab.getAttribute('data-section-tab');
+      renderSectionSheet();
+    });
+    document.getElementById('sectionSheetClose').addEventListener('click', closeSectionSheet);
+    sectionSheetOverlay.addEventListener('click', function(e){
+      if (e.target === sectionSheetOverlay) closeSectionSheet();
+    });
+    // 團練卡片：點哪一行就預設開哪個分部
+    document.getElementById('heroSections').addEventListener('click', function(e){
+      var row = e.target.closest('[data-section-id]');
+      if (row) openSectionSheet(row.getAttribute('data-section-event'), row.getAttribute('data-section-id'));
+    });
+    // 活動卡片：只有帶摘要的卡片可以點，開第一個分部
+    document.getElementById('programList').addEventListener('click', function(e){
+      var chip = e.target.closest('[data-section-event]');
+      if (chip) openSectionSheet(chip.getAttribute('data-section-event'), null);
+    });
+
     document.getElementById('rsvpSubmitBtn').addEventListener('click', function(){
       if (!rsvpOpenEventId || !viewerUid) return;
       var errorEl = document.getElementById('rsvpFormError');
@@ -2866,6 +3058,30 @@
       return f.closesAt && f.closesAt.toMillis ? f.closesAt.toMillis() : 8.64e15;
     }
 
+    // 10/9 同分部互看出缺席：查詢一定要帶 array-contains 自己，規則才放行（見 firestore.rules）。
+    // 不另外篩 team／日期：畫面只拿 latestEvents（已是目前團別、今天以後）裡的活動 ID 去查這份對照表，
+    // 其他團或已過去的摘要自然不會顯示
+    function subscribeSectionAttendance(uid){
+      onSnapshot(query(collection(db, 'sectionAttendance'), where('memberIds', 'array-contains', uid)), function(snap){
+        var map = {};
+        snap.forEach(function(docSnap){
+          var data = Object.assign({ id: docSnap.id }, docSnap.data());
+          if (!map[data.eventId]) map[data.eventId] = [];
+          map[data.eventId].push(data);
+        });
+        Object.keys(map).forEach(function(eventId){
+          map[eventId].sort(function(a, b){ return a.instrument.localeCompare(b.instrument, 'zh-Hant'); });
+        });
+        sectionDocsByEvent = map;
+        renderEventsSection();
+        renderSectionSheet();
+      }, function(err){
+        console.error('分部出缺席 監聽失敗', err);
+        sectionDocsByEvent = {};
+        renderEventsSection();
+      });
+    }
+
     function loadHomeForms(uid, team){
       listOpenFormsForMember(team).then(function(forms){
         return Promise.all(forms.map(function(f){
@@ -2965,6 +3181,8 @@
       renderNotifSheet();
       // 開放中的表單：只有已核准團員讀得到（規則 isTeamMemberOf），審核中不顯示
       if (viewerState === 'approved') loadHomeForms(viewerUid, getActiveTeam(viewerProfile));
+      // 同分部出缺席：規則只放行已核准團員，審核中不掛
+      if (viewerState === 'approved') subscribeSectionAttendance(viewerUid);
 
       // 審核中也算真團員（讀取權限跟已核准一樣），一併載入，跟團務總覽分頁對審核中開放的既有原則一致。
       // 不在這裡直接跑：這組讀取只有「團務總覽」分頁用得到，掛成 lazy loader，等使用者第一次

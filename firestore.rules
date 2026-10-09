@@ -447,6 +447,14 @@ service cloud.firestore {
       allow get, list: if isConductorFor('alumni') || isConductorFor('school');
     }
 
+    // 10/9 同分部互看出缺席：Cloud Function 整理的分部摘要（只有姓名＋狀態，沒有請假原因）。
+    // 只有摘要 memberIds 裡、而且是已核准的團員讀得到；前端查詢一定要帶
+    // where('memberIds', 'array-contains', uid)，規則才能從查詢條件證明每一筆都合格
+    match /sectionAttendance/{docId} {
+      allow get, list: if isApprovedMember() && resource.data.memberIds.hasAny([request.auth.uid]);
+      allow write: if false;
+    }
+
     // 指揮頁面的私人筆記本——8/19 又一輪從「綁活動、文件 ID = eventId_uid」改成「不綁活動，
     // 可以新增多則、永久保留」，因為原本設計換一場活動舊筆記就看不到了，使用者覺得不合理。
     // 文件 ID 改用 Firestore 自動產生（沒有天然的去重鍵可以組，是刻意跟其他 collection

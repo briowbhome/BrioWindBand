@@ -1,3 +1,13 @@
 functions/node_modules/
 functions/.env*
 npm-debug.log*
+.superpowers/
+scripts/service-account.json
+scripts/backup-users-*.json
+scripts/backup-events-concerts-*.json
+scripts/backup-finance-*.json
+scripts/backup-seating-*.json
+scripts/backup-announcements-*.json
+scripts/backup-roster-templates-*.json
+node_modules/
+tools/db-admin/
