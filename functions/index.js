@@ -237,3 +237,16 @@ exports.onConcertRosterWrittenSection = onDocumentWritten(
     await sectionAttendanceSync.recomputeConcertEvents(db, event.params.concertId, FieldValue.serverTimestamp());
   }
 );
+
+// 10/20 我的出缺席：簽到新增或刪除時，維護 events/{eventId}.hasCheckins（這場有沒有人簽到過）
+const checkinFlag = require('./checkinFlag');
+exports.onCheckinWrittenFlag = onDocumentWritten(
+  { document: 'checkins/{checkinId}', region: REGION },
+  async (event) => {
+    const before = event.data.before.exists ? event.data.before.data() : null;
+    const after = event.data.after.exists ? event.data.after.data() : null;
+    const eventId = checkinFlag.checkinEventId(before, after);
+    if (!eventId) return;
+    await checkinFlag.syncHasCheckins(db, eventId);
+  }
+);

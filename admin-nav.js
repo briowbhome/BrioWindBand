@@ -55,9 +55,14 @@ function ensureStyle() {
     // class 才顯示，這裡的選擇器故意比 .show 更高優先權（body+兩個 class），保證電腦版
     // 下一律強制常駐，不受使用者有沒有點過漢堡按鈕影響。這輪刻意不做收合，之後哪個頁面
     // 要接上電腦版排版，只要一樣切 body.layout-desktop 就能直接沿用這份共用樣式，
-    // 不用每頁各自重做一次側欄
+    // 不用每頁各自重做一次側欄。
+    // 10/10 修正：電腦版的側欄已經不是「蓋在頁面上的抽屜」而是頁面本身的一欄，z-index
+    // 要降下來——原本沿用手機版抽屜的 91，比頁面上所有 .sheet-overlay 彈窗（80）都高，
+    // 電腦版開任何彈窗時左邊一段會被常駐側欄蓋住。降到 45：高於 sticky appbar（40），
+    // 低於帳號選單（50）、彈窗（80）、toast（95）、dialog.js（96），彈窗的半透明遮罩
+    // 也會一起蓋住側欄，跟手機版一樣是完整的 modal
     'body.layout-desktop .admin-nav-overlay{display:none;}' +
-    'body.layout-desktop .admin-nav-drawer{transform:none;box-shadow:none;border-right:1px solid var(--line);}';
+    'body.layout-desktop .admin-nav-drawer{transform:none;box-shadow:none;border-right:1px solid var(--line);z-index:45;}';
   document.head.appendChild(style);
 }
 

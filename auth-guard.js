@@ -28,6 +28,24 @@ function writeProfileCache(uid, profile) {
   try {
     sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ uid: uid, profile: profile, at: Date.now() }));
   } catch (e) {}
+  writeLastTeamIds(profile);
+}
+
+// 10/20 修正「校內團成員開網頁先看到校友團活動」：上面那份 profile 快取是 sessionStorage＋5 分鐘，
+// PWA 冷啟動、開新分頁或隔超過 5 分鐘就讀不到，peekActiveTeam() 只能退回預設校友團。
+// 另外用 localStorage 記住「上次的 teamIds」（不設期限），專門給「驗證完成前先猜團別」用——
+// 團別不是敏感資料，真正能讀什麼仍由 Firestore 規則把關，猜錯只會讓畫面短暫顯示另一團，
+// 呼叫端驗證完成後要自己比對、猜錯就重查（見 index.html）。存 teamIds 而不是直接存團別，
+// 雙團籍成員切換團別（team-switcher.js 改 brio_active_team 後 reload）時才會猜到新的那團
+var LAST_TEAM_IDS_KEY = "brio_last_team_ids";
+
+function writeLastTeamIds(profile) {
+  if (!profile || !Array.isArray(profile.teamIds)) return;
+  try { localStorage.setItem(LAST_TEAM_IDS_KEY, JSON.stringify(profile.teamIds)); } catch (e) {}
+}
+
+function clearLastTeamIds() {
+  try { localStorage.removeItem(LAST_TEAM_IDS_KEY); } catch (e) {}
 }
 
 function clearProfileCache() {
@@ -46,6 +64,18 @@ export function peekCachedProfile() {
   } catch (e) {
     return null;
   }
+}
+
+// 驗證完成前「最可能的團別」：優先用 5 分鐘內的 profile 快取，沒有就用 localStorage 記住的
+// 上次 teamIds，兩者都沒有（全新裝置/訪客/登出後）才預設校友團。只是猜測，不是權威結果
+export function peekActiveTeam() {
+  var cached = peekCachedProfile();
+  if (cached) return getActiveTeam(cached);
+  try {
+    var ids = JSON.parse(localStorage.getItem(LAST_TEAM_IDS_KEY));
+    if (Array.isArray(ids)) return getActiveTeam({ teamIds: ids });
+  } catch (e) {}
+  return "alumni";
 }
 
 // 團別切換機制（9/17 新增）：見 docs/superpowers/specs/2026-09-17-events-team-partition-design.md
@@ -69,16 +99,19 @@ var TEAM_THEME_COLOR = { alumni: "#F2EFE5", school: "#F0EEE6" };
 // 同時更新 PWA 外框顏色。所有已登入頁面共用同一份 auth-guard.js，這裡是唯一需要
 // 呼叫這個函式的地方，頁面本身不需要各自處理配色
 export function applyTeamTheme(profile) {
-  var team = getActiveTeam(profile);
+  applyTeamThemeFor(getActiveTeam(profile));
+}
+
+function applyTeamThemeFor(team) {
   document.documentElement.setAttribute("data-team", team);
   var meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute("content", TEAM_THEME_COLOR[team] || TEAM_THEME_COLOR.alumni);
 }
 
-// 模組一 import 就立刻嘗試用快取套用一次配色（如果有的話），讓骨架畫面盡量不要用錯的
-// 顏色渲染；沒有快取時維持預設校友團配色，不影響任何邏輯。resolveProfile() 拿到權威
+// 模組一 import 就立刻用 peekActiveTeam() 的猜測套用一次配色，讓骨架畫面盡量不要用錯的
+// 顏色渲染；完全沒有線索時維持預設校友團配色，不影響任何邏輯。resolveProfile() 拿到權威
 // 資料後一定還會再套用一次覆蓋，這裡只是「盡量不要閃爍」的優化，不是正確性的唯一來源
-applyTeamTheme(peekCachedProfile());
+applyTeamThemeFor(peekActiveTeam());
 
 function waitForAuthUser() {
   return new Promise(function (resolve) {
@@ -653,6 +686,10 @@ export async function requireSectionLeader() {
 export async function resolveMemberAccess() {
   var user = await waitForAuthUser();
   if (!user) {
+    // 沒登入（例如登入過期但沒走 logout()）時，模組載入時可能已經照上次的 teamIds
+    // 套了校內團配色，這裡改回訪客一律看的校友團，並清掉已經不屬於任何人的團別猜測
+    clearLastTeamIds();
+    applyTeamThemeFor("alumni");
     return { state: "guest", uid: null, profile: null };
   }
 
@@ -687,6 +724,8 @@ export async function resolveMemberAccess() {
 // 而不是被強制導去登入頁——這是這次開放訪客瀏覽後才需要的差異，其他呼叫端不受影響
 export async function logout(redirectTo) {
   clearProfileCache();
+  // 登出後這台裝置下一位使用者（或訪客）不該沿用上一位的團別猜測
+  clearLastTeamIds();
   await signOut(auth);
   location.href = redirectTo || "login.html";
 }

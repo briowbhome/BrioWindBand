@@ -384,6 +384,8 @@ service cloud.firestore {
       allow get: if request.auth != null &&
         (checkinId.split('_')[1] == request.auth.uid || isAdminTierFor('alumni') || isAdminTierFor('school'));
       allow list: if isAdminTierFor('alumni') || isAdminTierFor('school');
+      // 10/20 我的出缺席：本人查詢自己全部的簽到紀錄（找出名單外的簽到），寫法比照 attendanceReports
+      allow list: if hasProfile() && resource.data.uid == request.auth.uid;
       // 指揮專用頁面唯讀查看統計，不開放建立/修改/刪除
       allow get, list: if isConductorFor('alumni') || isConductorFor('school');
 

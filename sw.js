@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'brio-v59';
+const CACHE_VERSION = 'brio-v60';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -48,6 +48,7 @@ const CORE_ASSETS = [
   './finance.js',
   './forms-core.js',
   './section-attendance-core.js',
+  './my-attendance-core.js',
   './forms.js',
   './form-fields.js',
   './forms-admin-editor.js',

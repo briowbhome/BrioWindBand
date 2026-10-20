@@ -483,7 +483,10 @@
      不佔垂直空間。用 CSS Grid 命名區域＋display:contents 讓 .parts-header／
      .field（分部欄位那組）「消失」成透明容器，把它們原本包住的子元素（標籤/操作按鈕）
      直接暴露成 grid 的子項目分別擺放，不用真的搬動 DOM、手機版排版完全不受影響 ---------- */
-  body.layout-desktop .sheet-body{
+  /* 10/10 修正：原本選擇器沒限定範圍（body.layout-desktop .sheet-body），連分割合訂本
+     上傳、上傳多個樂譜這兩個彈窗的內距也一起被歸零，內容貼齊左邊。只有曲目詳情面板
+     需要這套嵌入式版面，限定在 #pieceSheetOverlay 底下 */
+  body.layout-desktop #pieceSheetOverlay .sheet-body{
     display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden; padding:0;
   }
   body.layout-desktop #pieceViewMode,
@@ -1276,9 +1279,18 @@
     pieceSaveBtn.disabled = true;
 
     if (editingPieceId){
-      updatePiece(db, editingPieceId, title, composer, draftParts).then(function(){
+      var savingPieceId = editingPieceId;
+      var savedParts = draftParts.slice();
+      updatePiece(db, savingPieceId, title, composer, savedParts).then(function(){
         pieceSaveBtn.disabled = false;
-        closePieceSheet();
+        // 存檔後留在同一首曲目、回到唯讀摘要（比照全站「先看後編、存檔回唯讀摘要」慣例），
+        // 不關掉整個面板。subscribeRepertoire 的回呼只重繪左側清單、不會重繪詳情面板，
+        // 所以這裡直接用剛存進去的值組畫面，不等 onSnapshot
+        if (editingPieceId !== savingPieceId) return; // 存檔途中已經切到別的曲目
+        showPieceView(Object.assign({}, piecesById[savingPieceId] || {}, {
+          title: title, composer: composer || null, parts: savedParts
+        }));
+        showToast('曲目已儲存', 'success');
       }).catch(function(err){
         pieceSaveBtn.disabled = false;
         showFormError('操作失敗（' + err.code + '）');

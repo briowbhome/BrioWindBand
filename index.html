@@ -207,6 +207,34 @@
   }
   .my-concert-piece-row .k{ color:var(--ink); }
   .my-concert-piece-row .v{ color:var(--ink-soft); text-align:right; flex:none; }
+  /* ---------- 我的出缺席（10/20 新增）：音樂會卡片上的摘要列＋明細 sheet，
+     sheet 的三格數字／狀態標籤直接沿用分部名單的 .sect-sum／.sect-pill ---------- */
+  .att-row{
+    display:flex; align-items:center; gap:10px; width:100%; margin:10px 0 2px; padding:10px 12px;
+    background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm);
+    font-family:inherit; font-size:12.5px; color:var(--ink); text-align:left; cursor:pointer;
+  }
+  .att-row:active{ background:var(--sage-bg); }
+  .att-row.empty{ color:var(--ink-soft); cursor:default; }
+  .att-row .lbl{ font-weight:700; flex:none; }
+  .att-row.empty .lbl{ font-weight:500; }
+  .att-row .nums{ flex:1; min-width:0; display:flex; gap:10px; flex-wrap:wrap; }
+  .att-row .nums b{ font-family:'Roboto Mono',monospace; font-weight:600; margin-left:3px; font-variant-numeric:tabular-nums; }
+  .att-row .ok b{ color:var(--sage); }
+  .att-row .lv b{ color:var(--burgundy); }
+  .att-row .no b{ color:var(--ink-soft); }
+  .att-row .chev{ flex:none; color:var(--ink-soft); }
+  .att-basis{ font-size:11.5px; color:var(--ink-soft); line-height:1.6; margin:0 0 4px; }
+  .att-list-h{ font-size:11px; font-weight:700; letter-spacing:.06em; color:var(--ink-soft); margin:14px 0 6px; }
+  .att-ev{ display:flex; align-items:center; gap:10px; padding:9px 0; }
+  .att-ev + .att-ev{ border-top:1px solid var(--line); }
+  .att-ev .d{ flex:none; width:38px; font-family:'Roboto Mono',monospace; font-size:11.5px; color:var(--ink-soft); font-variant-numeric:tabular-nums; }
+  .att-ev .t{ flex:1; min-width:0; }
+  .att-ev .n{ font-size:13px; }
+  .att-ev .m{ font-size:11px; color:var(--ink-soft); margin-top:1px; }
+  .att-ev .m.warn{ color:var(--burgundy); }
+  .att-ev.muted .n{ color:var(--ink-soft); }
+  .att-bottom-gap{ height:calc(8px + env(safe-area-inset-bottom)); }
   /* ---------- 團務總覽「清單容器」：8/31 公告分類這輪新增，「我的團費」跟新的「公告」
      區塊共用同一種「一個容器＋分隔線列表」樣式，跟「我的音樂會」的獨立卡片區隔開——
      團費/公告都是條列性質的清單，音樂會每筆資訊量大適合各自獨立卡片，兩種視覺語言
@@ -1181,6 +1209,19 @@
   </div>
 </div>
 
+<!-- 我的出缺席 Bottom Sheet（10/20 新增） -->
+<div class="sheet-overlay" id="myAttendanceSheetOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button type="button" class="sheet-close" id="myAttendanceSheetClose" aria-label="關閉">×</button>
+      <div class="name">我的出缺席</div>
+      <div class="account" id="myAttendanceSheetSub" style="font-family:inherit;">—</div>
+    </div>
+    <div class="sheet-body" id="myAttendanceSheetBody"></div>
+  </div>
+</div>
+
 <!-- 意見回饋浮動圖示：只在首頁出現 -->
 <div class="feedback-fab" id="feedbackFabBtn" aria-label="意見回饋">
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8A2.5 2.5 0 0 1 17.5 16H10l-4.2 3.4a.6.6 0 0 1-.98-.47V16A2.5 2.5 0 0 1 4 13.5v-8Z" stroke="#20242F" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 6.7v4" stroke="#20242F" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="12.6" r="0.9" fill="#20242F"/></svg>
@@ -1251,7 +1292,7 @@
   import { showConfirm } from './dialog.js';
   import { MESSAGES } from './messages.js';
   import { subscribeRemittanceAccounts } from './finance.js';
-  import { resolveMemberAccess, peekCachedProfile, getActiveTeam, hasAnyTeamRole, hasActiveTeamRole } from './auth-guard.js';
+  import { resolveMemberAccess, peekCachedProfile, peekActiveTeam, getActiveTeam, hasAnyTeamRole, hasActiveTeamRole } from './auth-guard.js';
   import { initTeamSwitcher } from './team-switcher.js';
   import { loadEventTypesOnce } from './event-types.js';
   import { cachedThenFresh } from './data-cache.js';
@@ -1260,6 +1301,7 @@
   import { listOpenFormsForMember, loadResponse } from './forms.js';
   import { hasItemsQuestion, formatDeadline, escapeHtml as escapeFormHtml } from './forms-core.js';
   import { countStatuses, chipSummary, sortSheetMembers, sheetTitle, footnoteText } from './section-attendance-core.js';
+  import { buildMyAttendance, formatMD } from './my-attendance-core.js';
   import {
     collection, query, where, or, orderBy, limit, onSnapshot, Timestamp,
     doc, getDoc, getDocs, setDoc, deleteDoc, serverTimestamp
@@ -1549,18 +1591,22 @@
     var todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     // 這段程式碼在 resolveMemberAccess() 解析完成前就會先發出查詢（訪客也看得到「下次團練」），
-    // 這時候還不知道真正的 activeTeam，用 peekCachedProfile()（跟骨架畫面同一份 sessionStorage
-    // 快取）做樂觀猜測；沒有快取（全新裝置/訪客）預設校友團。已知限制：校內團真的有成員後，
-    // 該團成員在全新裝置第一次造訪、快取還沒建立前，有機會短暫看到校友團的活動卡片，
-    // 等下一次載入快取命中就會恢復正確——這是跟骨架屏姓名縮寫閃爍同一類已知限制，不特別處理
-    var activeTeam = getActiveTeam(peekCachedProfile());
-    var upcomingQuery = query(
-      collection(db, 'events'),
-      where('team', 'array-contains', activeTeam),
-      where('date', '>=', Timestamp.fromDate(todayStart)),
-      orderBy('date', 'asc'),
-      limit(20)
-    );
+    // 這時候還不知道真正的團別，用 peekActiveTeam() 樂觀猜測（5 分鐘內的 profile 快取，
+    // 沒有就用 localStorage 記住的上次 teamIds，都沒有才預設校友團）。
+    // 10/20 修正：原本只看 sessionStorage 的 5 分鐘快取，PWA 冷啟動幾乎一定讀不到、退回校友團，
+    // 而且驗證完成後不會改正，校內團成員要重新整理才看得到自己團的活動。現在 feedTeam 記錄
+    // 「畫面目前是照哪一團查的」，resolveMemberAccess() 解出真正團別後不一樣就呼叫
+    // loadTeamFeed() 用正確團別重查重畫（見下方 resolveMemberAccess().then）
+    var feedTeam = peekActiveTeam();
+    function upcomingQueryFor(team){
+      return query(
+        collection(db, 'events'),
+        where('team', 'array-contains', team),
+        where('date', '>=', Timestamp.fromDate(todayStart)),
+        orderBy('date', 'asc'),
+        limit(20)
+      );
+    }
 
     // 活動類型跟活動本身是兩份分開即時更新的資料，先等類型資料到齊過一次才開始畫，
     // 避免類型還沒載入時先顯示原始 ID 的畫面
@@ -1637,26 +1683,36 @@
       renderEventsSection();
     }).catch(renderEventsError);
 
-    cachedThenFresh('brio_cache_events', function(){
-      return getDocs(upcomingQuery).then(function(snap){
-        return snap.docs.map(function(docSnap){
-          var data = docSnap.data();
-          return {
-            id: docSnap.id,
-            title: data.title,
-            type: data.type,
-            date: data.date.toDate(),
-            allDay: !!data.allDay,
-            endTime: data.endTime && data.endTime.toDate ? data.endTime.toDate() : null,
-            location: data.location,
-            repertoire: Array.isArray(data.repertoire) ? data.repertoire : []
-          };
+    // 快取 key 併入團別：不然第一眼畫出來的可能是另一團的舊快取（雙團籍成員切換團別也會混到）。
+    // render／錯誤處理都先確認 team 還是 feedTeam——猜錯團別的那次查詢如果比較晚回來，
+    // 結果要丟掉，不能蓋掉已經換成正確團別的畫面
+    function loadEvents(team){
+      cachedThenFresh('brio_cache_events_' + team, function(){
+        return getDocs(upcomingQueryFor(team)).then(function(snap){
+          return snap.docs.map(function(docSnap){
+            var data = docSnap.data();
+            return {
+              id: docSnap.id,
+              title: data.title,
+              type: data.type,
+              date: data.date.toDate(),
+              allDay: !!data.allDay,
+              endTime: data.endTime && data.endTime.toDate ? data.endTime.toDate() : null,
+              location: data.location,
+              repertoire: Array.isArray(data.repertoire) ? data.repertoire : []
+            };
+          });
         });
+      }, function(events){
+        if (team !== feedTeam) return;
+        latestEvents = reviveEventList(events);
+        renderEventsSection();
+      }, reviveEventList).catch(function(err){
+        if (team !== feedTeam) return;
+        renderEventsError(err);
       });
-    }, function(events){
-      latestEvents = reviveEventList(events);
-      renderEventsSection();
-    }, reviveEventList).catch(renderEventsError);
+    }
+    loadEvents(feedTeam);
 
     // 公告：接 announcements collection，最新一則當標題，其餘展開成清單
     function formatRelativeTime(date){
@@ -1719,60 +1775,93 @@
     // 唯一的取捨是「停留頁面時剛好有新公告發布」不會自動跳出，要下拉重整或重新整理才看得到
     // 9/19 追加修正：「更新」分類公告（App 軟體版本異動）跟團別無關，用 or() 讓它不受
     // activeTeam 過濾，臨時/活動兩類維持只看目前團別
-    cachedThenFresh('brio_cache_announcements', function(){
-      return getDocs(query(collection(db, 'announcements'),
-        or(where('team', '==', activeTeam), where('category', '==', 'update')),
-        orderBy('createdAt', 'desc'), limit(20))).then(function(snap){
-        return snap.docs.map(function(docSnap){
-          var data = docSnap.data();
-          return {
-            id: docSnap.id,
-            content: data.content,
-            category: data.category || 'urgent',
-            items: Array.isArray(data.items) ? data.items : null,
-            showPrompt: data.showPrompt !== false, // 只有 category==='update' 才有意義，預設 true
-            createdAt: data.createdAt && data.createdAt.toDate ? data.createdAt.toDate() : new Date()
-          };
+    function loadAnnouncements(team){
+      cachedThenFresh('brio_cache_announcements_' + team, function(){
+        return getDocs(query(collection(db, 'announcements'),
+          or(where('team', '==', team), where('category', '==', 'update')),
+          orderBy('createdAt', 'desc'), limit(20))).then(function(snap){
+          return snap.docs.map(function(docSnap){
+            var data = docSnap.data();
+            return {
+              id: docSnap.id,
+              content: data.content,
+              category: data.category || 'urgent',
+              items: Array.isArray(data.items) ? data.items : null,
+              showPrompt: data.showPrompt !== false, // 只有 category==='update' 才有意義，預設 true
+              createdAt: data.createdAt && data.createdAt.toDate ? data.createdAt.toDate() : new Date()
+            };
+          });
         });
-      });
-    }, function(items){
-      latestAnnouncements = items;
-      renderNotifDot();
-      renderNotifSheet();
+      }, function(items){
+        if (team !== feedTeam) return;
+        latestAnnouncements = items;
+        renderNotifDot();
+        renderNotifSheet();
+        renderOverviewAnnouncements();
+        maybeShowUpdatePrompt();
+
+        // appbar 正下方常駐區塊：只處理臨時公告，活動/更新公告改在團務總覽「公告」
+        // 區塊顯示，這裡完全不混分類
+        var urgentItems = items.filter(function(it){ return it.category === 'urgent'; });
+        var wrap = document.getElementById('announceWrap');
+        if (urgentItems.length === 0){
+          wrap.classList.add('hidden');
+          return;
+        }
+        wrap.classList.remove('hidden');
+
+        document.getElementById('announceHeadline').textContent = urgentItems[0].content;
+        document.getElementById('announceMeta').textContent = formatRelativeTime(urgentItems[0].createdAt);
+
+        var rest = urgentItems.slice(1);
+        if (rest.length === 0){
+          announceMoreBtn.classList.add('hidden');
+          announceList.classList.add('hidden');
+          announceList.innerHTML = '';
+          return;
+        }
+        announceMoreBtn.classList.remove('hidden');
+        announceMoreBtn.textContent = '還有 ' + rest.length + ' 則公告';
+        announceList.innerHTML = rest.map(function(item){
+          return (
+            '<div class="announce-item">' +
+              item.content +
+              '<div class="t">' + formatRelativeTime(item.createdAt) + '</div>' +
+            '</div>'
+          );
+        }).join('');
+      }, reviveAnnouncements).catch(function(err){ console.error('announcements 讀取失敗', err); });
+    }
+    loadAnnouncements(feedTeam);
+
+    // 10/20：快取 key 改成依團別區分後，舊的不分團 key 用不到了，順手清掉
+    try {
+      localStorage.removeItem('brio_cache_events');
+      localStorage.removeItem('brio_cache_announcements');
+    } catch (e) {}
+
+    // 驗證完成後發現先前猜錯團別時呼叫：換成正確團別重查活動與公告。新團別有快取就會
+    // 直接畫出快取（cachedThenFresh），沒有快取時先把活動區退回骨架、公告清空，
+    // 不要讓另一團的資料繼續掛在畫面上等新結果回來
+    function loadTeamFeed(team){
+      var hasCache = false;
+      try { hasCache = !!localStorage.getItem('brio_cache_events_' + team); } catch (e) {}
+      feedTeam = team;
+      if (!hasCache){
+        latestEvents = [];
+        document.getElementById('heroContent').classList.add('hidden');
+        document.getElementById('heroEmpty').classList.add('hidden');
+        document.getElementById('heroSkeleton').classList.remove('hidden');
+        document.getElementById('programList').classList.add('hidden');
+        document.getElementById('programEmpty').classList.add('hidden');
+        document.getElementById('programSkeleton').classList.remove('hidden');
+      }
+      latestAnnouncements = [];
+      document.getElementById('announceWrap').classList.add('hidden');
       renderOverviewAnnouncements();
-      maybeShowUpdatePrompt();
-
-      // appbar 正下方常駐區塊：只處理臨時公告，活動/更新公告改在團務總覽「公告」
-      // 區塊顯示，這裡完全不混分類
-      var urgentItems = items.filter(function(it){ return it.category === 'urgent'; });
-      var wrap = document.getElementById('announceWrap');
-      if (urgentItems.length === 0){
-        wrap.classList.add('hidden');
-        return;
-      }
-      wrap.classList.remove('hidden');
-
-      document.getElementById('announceHeadline').textContent = urgentItems[0].content;
-      document.getElementById('announceMeta').textContent = formatRelativeTime(urgentItems[0].createdAt);
-
-      var rest = urgentItems.slice(1);
-      if (rest.length === 0){
-        announceMoreBtn.classList.add('hidden');
-        announceList.classList.add('hidden');
-        announceList.innerHTML = '';
-        return;
-      }
-      announceMoreBtn.classList.remove('hidden');
-      announceMoreBtn.textContent = '還有 ' + rest.length + ' 則公告';
-      announceList.innerHTML = rest.map(function(item){
-        return (
-          '<div class="announce-item">' +
-            item.content +
-            '<div class="t">' + formatRelativeTime(item.createdAt) + '</div>' +
-          '</div>'
-        );
-      }).join('');
-    }, reviveAnnouncements).catch(function(err){ console.error('announcements 讀取失敗', err); });
+      loadEvents(team);
+      loadAnnouncements(team);
+    }
 
     // ---------- 團務總覽「公告」區塊：活動／更新公告（臨時公告不重複顯示） ----------
     function renderUpdateItemsHtml(items){
@@ -2130,6 +2219,14 @@
     document.getElementById('myConcertsSlot').addEventListener('click', function(e){
       var btn = e.target.closest('[data-concert-notes]');
       if (btn) openConcertNotesSheet(btn.getAttribute('data-concert-notes'));
+      var attBtn = e.target.closest('[data-my-attendance]');
+      if (attBtn) openMyAttendanceSheet(attBtn.getAttribute('data-my-attendance'));
+    });
+
+    var myAttendanceSheetOverlay = document.getElementById('myAttendanceSheetOverlay');
+    document.getElementById('myAttendanceSheetClose').addEventListener('click', closeMyAttendanceSheet);
+    myAttendanceSheetOverlay.addEventListener('click', function(e){
+      if (e.target === myAttendanceSheetOverlay) closeMyAttendanceSheet();
     });
 
     var concertNotesSheetOverlay = document.getElementById('concertNotesSheetOverlay');
@@ -2613,6 +2710,109 @@
       return concerts.filter(function(c){ return c; });
     }
 
+    // ---------- 團務總覽：我的出缺席（10/20 新增）----------
+    // 接在 loadMyConcerts() 之後跑，四份都是「本人」的資料：這些音樂會的活動（events 公開讀取）、
+    // 我所在的應到名單、我的回報、我的簽到（checkins 本人 list 是 10/20 新增的規則）。
+    // 判斷邏輯全部在 my-attendance-core.js
+    var myAttendanceData = null; // null＝還沒載入完，卡片先不畫摘要列
+
+    async function loadMyAttendance(uid, concertIds){
+      if (concertIds.length === 0) return {};
+      // where in 一次最多 30 個值
+      var batches = [];
+      for (var i = 0; i < concertIds.length; i += 30) batches.push(concertIds.slice(i, i + 30));
+      var results = await Promise.all([
+        Promise.all(batches.map(function(ids){
+          return getDocs(query(collection(db, 'events'), where('concertId', 'in', ids)));
+        })),
+        getDocs(query(collection(db, 'eventRosters'), where('members', 'array-contains', uid))),
+        getDocs(query(collection(db, 'attendanceReports'), where('uid', '==', uid))),
+        getDocs(query(collection(db, 'checkins'), where('uid', '==', uid)))
+      ]);
+
+      var events = [];
+      results[0].forEach(function(snap){
+        snap.forEach(function(d){
+          var data = d.data();
+          if (!data.date) return;
+          events.push({ id: d.id, concertId: data.concertId, title: data.title || '', dateMs: data.date.toMillis(), hasCheckins: data.hasCheckins === true });
+        });
+      });
+      var tomorrow = new Date();
+      tomorrow.setHours(0, 0, 0, 0);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      return buildMyAttendance({
+        concertIds: concertIds,
+        events: events,
+        rosterEventIds: results[1].docs.map(function(d){ return d.id; }),
+        reports: results[2].docs.map(function(d){ var r = d.data(); return { eventId: r.eventId, status: r.status, reason: r.reason || '' }; }),
+        checkins: results[3].docs.map(function(d){
+          var c = d.data();
+          return { eventId: c.eventId, checkedInAtMs: c.checkedInAt ? c.checkedInAt.toMillis() : 0, method: c.method };
+        }),
+        tomorrowStartMs: tomorrow.getTime()
+      });
+    }
+
+    function myAttendanceRowHtml(concertId){
+      if (!myAttendanceData || !myAttendanceData[concertId]) return '';
+      var a = myAttendanceData[concertId];
+      if (a.counted.length === 0 && a.excluded.length === 0){
+        return '<div class="att-row empty"><span class="lbl">尚無出缺席紀錄</span></div>';
+      }
+      return (
+        '<button type="button" class="att-row" data-my-attendance="' + concertId + '">' +
+          '<span class="lbl">出缺席</span>' +
+          '<span class="nums">' +
+            '<span class="ok">出席<b>' + a.counts.attended + '</b></span>' +
+            '<span class="lv">請假<b>' + a.counts.leave + '</b></span>' +
+            '<span class="no">缺席<b>' + a.counts.absent + '</b></span>' +
+          '</span>' +
+          '<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+        '</button>'
+      );
+    }
+
+    var ATT_PILL = { attended: ['ok', '出席'], leave: ['lv', '請假'], absent: ['no', '缺席'] };
+
+    function myAttendanceEventsHtml(rows, withPill){
+      return '<div class="sect-list">' + rows.map(function(r){
+        var pill = withPill ? '<span class="sect-pill ' + ATT_PILL[r.status][0] + '">' + ATT_PILL[r.status][1] + '</span>' : '';
+        return (
+          '<div class="att-ev' + (withPill ? '' : ' muted') + '">' +
+            '<span class="d">' + formatMD(r.dateMs) + '</span>' +
+            '<span class="t"><div class="n">' + escapeHtmlForOverview(r.title) + '</div>' +
+              '<div class="m' + (r.warn ? ' warn' : '') + '">' + escapeHtmlForOverview(r.note) + '</div></span>' +
+            pill +
+          '</div>'
+        );
+      }).join('') + '</div>';
+    }
+
+    function openMyAttendanceSheet(concertId){
+      var a = myAttendanceData && myAttendanceData[concertId];
+      if (!a) return;
+      var concert = myConcertsData.filter(function(x){ return x.concertId === concertId; })[0];
+      document.getElementById('myAttendanceSheetSub').textContent = concert ? concert.title : '';
+      var html =
+        '<div class="sect-sum">' +
+          '<div class="ok"><b>' + a.counts.attended + '</b><span>出席</span></div>' +
+          '<div class="lv"><b>' + a.counts.leave + '</b><span>請假</span></div>' +
+          '<div class="no"><b>' + a.counts.absent + '</b><span>缺席</span></div>' +
+        '</div>' +
+        '<p class="att-basis">統計 ' + a.counted.length + ' 場有開放簽到的活動，出席以簽到紀錄為準。</p>';
+      if (a.counted.length) html += '<div class="att-list-h">已統計</div>' + myAttendanceEventsHtml(a.counted, true);
+      if (a.excluded.length) html += '<div class="att-list-h">不列入統計</div>' + myAttendanceEventsHtml(a.excluded, false);
+      html += '<div class="att-bottom-gap"></div>';
+      document.getElementById('myAttendanceSheetBody').innerHTML = html;
+      document.getElementById('myAttendanceSheetOverlay').classList.add('active');
+    }
+
+    function closeMyAttendanceSheet(){
+      document.getElementById('myAttendanceSheetOverlay').classList.remove('active');
+    }
+
     function escapeHtmlForOverview(s){
       return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
         return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
@@ -2972,6 +3172,7 @@
           '<div class="my-concert-card">' +
             '<div class="my-concert-title">' + escapeHtmlForOverview(c.title) + '</div>' +
             '<div class="my-concert-instrument">分部：' + escapeHtmlForOverview(c.instruments.join('、') || '未設定') + '</div>' +
+            myAttendanceRowHtml(c.concertId) +
             piecesHtml +
             '<button type="button" class="concert-notes-btn" data-concert-notes="' + c.concertId + '">分部筆記</button>' +
           '</div>'
@@ -3132,6 +3333,10 @@
       viewerUid = access.uid;
       viewerProfile = access.profile;
       if (viewerProfile) initTeamSwitcher(viewerProfile);
+      // 活動／公告在驗證完成前是照 peekActiveTeam() 猜的團別先查，猜錯（全新裝置、
+      // 換人登入、登出後變訪客）就換成正確團別重查重畫。訪客沒有團籍，一律看校友團
+      var resolvedTeam = access.activeTeam || 'alumni';
+      if (resolvedTeam !== feedTeam) loadTeamFeed(resolvedTeam);
       overviewLocked = (viewerState === 'guest');
 
       // tabbar「我的」：不論身分一律連到 profile.html——訪客點進去要先看到「登入」按鈕，
@@ -3191,6 +3396,13 @@
         loadMyConcerts(viewerUid).then(function(concerts){
           myConcertsData = concerts;
           renderMyConcerts(concerts);
+          // 出缺席摘要另外載入，失敗時卡片維持沒有摘要列，不影響音樂會本身
+          loadMyAttendance(viewerUid, concerts.map(function(c){ return c.concertId; })).then(function(data){
+            myAttendanceData = data;
+            renderMyConcerts(myConcertsData);
+          }).catch(function(err){
+            console.error('我的出缺席 載入失敗', err);
+          });
         }).catch(function(err){
           console.error('我的音樂會 載入失敗', err);
         });
