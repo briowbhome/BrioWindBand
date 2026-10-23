@@ -119,6 +119,7 @@
   .small-btn{ display:inline-flex; align-items:center; gap:5px; border:1px solid var(--line); background:var(--paper); color:var(--ink-soft); border-radius:999px; padding:6px 12px; font-size:11.5px; font-weight:700; cursor:pointer; white-space:nowrap; }
   .small-btn.primary{ background:var(--brass); border-color:var(--brass); color:var(--ink); }
   .small-btn.dark, .small-btn.active{ background:var(--ink); border-color:var(--ink); color:var(--paper-raised); }
+  .small-btn.danger{ color:var(--burgundy); border-color:#EFD4D8; }
   .small-btn:disabled{ opacity:.45; cursor:default; }
 
   /* ---------- 設定與題目 ---------- */
@@ -372,6 +373,7 @@
     bodyEl: document.getElementById('formSheetBody'),
     footerEl: document.getElementById('formSheetFooter'),
     onFormChanged: onFormChanged,
+    onFormDeleted: onFormDeleted,
     refresh: refreshSheet,
     openSubSheet: openSubSheet,
     closeSubSheet: closeSubSheet,
@@ -585,6 +587,17 @@
     activeFilter = filterKeyOf(updated);
     renderSheetHeader();
     syncTabs();
+    renderList();
+  }
+
+  // 10/23 刪除草稿：關掉 sheet（未儲存的修改一併捨棄，表單已經不存在），列表移除這一張
+  function onFormDeleted(formId){
+    forms = forms.filter(function(x){ return x.id !== formId; });
+    delete listStats[formId];
+    ctx.editorDirty = false;
+    resetEditor();
+    formSheetOverlay.classList.remove('active');
+    ctx.form = null;
     renderList();
   }
 

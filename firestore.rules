@@ -576,9 +576,13 @@ service cloud.firestore {
       allow list: if isAdminTierFor(resource.data.team)
         || (resource.data.status != 'draft' && isTeamMemberOf(resource.data.team));
       allow create: if isAdminTierFor(request.resource.data.team);
+      // 10/23：發佈過的表單不能改回草稿，不然可以先改回草稿再刪，繞過下面「只能刪草稿」的限制
       allow update: if isAdminTierFor(resource.data.team)
-        && request.resource.data.team == resource.data.team;
-      // 不開放刪除，改用 archived 封存（可還原）
+        && request.resource.data.team == resource.data.team
+        && (request.resource.data.status != 'draft' || resource.data.status == 'draft');
+      // 原則上不刪除，改用 archived 封存（可還原）。10/23 例外：草稿可以刪——草稿從沒開放過，
+      // 團員不可能填過；「沒有回應」由前端再確認一次（規則沒辦法數子集合的文件數）
+      allow delete: if isAdminTierFor(resource.data.team) && resource.data.status == 'draft';
 
       match /responses/{responseId} {
         // 自己的回應文件 ID 就是自己的 uid：文件還不存在時也要讀得到，首頁才能判斷「還沒填」

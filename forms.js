@@ -48,6 +48,11 @@ export async function createForm(team, uid) {
   return ref.id;
 }
 
+// 10/23：只有沒有回應的草稿能刪（規則只放行 status == 'draft'，「沒有回應」由呼叫端確認）
+export function deleteForm(formId) {
+  return deleteDoc(doc(db, 'forms', formId));
+}
+
 export function updateForm(formId, patch) {
   return updateDoc(doc(db, 'forms', formId), Object.assign({}, patch, { updatedAt: serverTimestamp() }));
 }

@@ -3,7 +3,7 @@
 import { Timestamp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 import { showToast } from './toast.js';
 import { showConfirm } from './dialog.js';
-import { updateForm } from './forms.js';
+import { updateForm, deleteForm } from './forms.js';
 import { QUESTION_TYPE_LABELS, QUESTION_TYPE_ORDER, newId, escapeHtml, toDatetimeLocalValue } from './forms-core.js';
 
 var draft = null;          // 編輯中的副本（closesAt 存成 datetime-local 字串，linkedTo 存成 'event:ID' 字串）
@@ -180,6 +180,10 @@ function questionHtml(q, idx, total, ctx){
   return html + '</div></div>';
 }
 
+function canDeleteForm(ctx){
+  return ctx.form.status === 'draft' && ctx.responses.length === 0 && Object.keys(ctx.payments).length === 0;
+}
+
 function statusButtonsHtml(ctx){
   var f = ctx.form;
   var b = [];
@@ -190,6 +194,8 @@ function statusButtonsHtml(ctx){
   else if (f.status === 'draft'){ b.push(btn('publish', '發佈', 'primary')); b.push(btn('archive', '封存')); }
   else if (f.status === 'open') b.push(btn('close', '關閉表單'));
   else if (f.status === 'closed'){ b.push(btn('reopen', '重新開放', 'primary')); b.push(btn('archive', '封存')); }
+  // 10/23：沒有回應的草稿可以刪除（封存中的草稿也可以）；有回應或收款紀錄的一律只能封存
+  if (canDeleteForm(ctx)) b.push('<button type="button" class="small-btn danger" data-status="delete">' + SVG.trash + '刪除</button>');
   if (f.status !== 'draft'){
     b.push('<button type="button" class="small-btn" data-copy-link>' + SVG.link + (f.allowGuest ? '複製分享連結' : '複製連結') + '</button>');
   }
@@ -394,6 +400,10 @@ async function save(ctx, extra){
 }
 
 async function changeStatus(ctx, action){
+  if (action === 'delete'){
+    await removeDraft(ctx);
+    return;
+  }
   var extra = {};
   if (action === 'publish' || action === 'reopen'){
     if (!draft.questions.length){
@@ -413,6 +423,20 @@ async function changeStatus(ctx, action){
   if (action === 'archive') extra.archived = true;
   if (action === 'unarchive') extra.archived = false;
   if (await save(ctx, extra)) showToast(STATUS_DONE[action], 'success');
+}
+
+async function removeDraft(ctx){
+  if (!canDeleteForm(ctx)) return;
+  var title = ctx.form.title || '未命名表單';
+  if (!(await showConfirm('刪除後無法復原。確定要刪除「' + title + '」嗎？', { danger: true, confirmText: '刪除' }))) return;
+  try {
+    await deleteForm(ctx.form.id);
+  } catch (e){
+    showToast('刪除失敗：' + (e.code || e.message), 'error');
+    return;
+  }
+  ctx.onFormDeleted(ctx.form.id);
+  showToast('已刪除表單', 'success');
 }
 
 function copyLink(ctx){
